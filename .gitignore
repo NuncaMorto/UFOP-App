@@ -1,0 +1,53 @@
+# Rust
+/target/
+rust-core/target/
+**/*.rs.bk
+
+# Build artifacts & distributed APKs
+/dist/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Android / Gradle / Kotlin / IDE
+android-app/.gradle/
+android-app/.kotlin/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+android-app/.idea/
+android-app/captures/
+android-app/.cxx/
+android-app/.externalNativeBuild/
+local.properties
+.idea/
+*.iml
+
+# Keys, secrets, environment & personal PDFs
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+*.pdf
+
+# iOS / Xcode
+ios-app/build/
+ios-app/.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Python & OS
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+desktop.ini

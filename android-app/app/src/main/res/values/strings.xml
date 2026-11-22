@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vida Acadêmica</string>
+    <string name="widget_name">Vida Acadêmica</string>
+    <string name="widget_empty_message">Nenhuma aula ou compromisso hoje</string>
+    <string name="widget_refresh">Atualizar</string>
+</resources>

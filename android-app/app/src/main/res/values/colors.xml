@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0E1F16</color>
+    <color name="launcher_facet_emerald">#183526</color>
+    <color name="launcher_accent_cobalt">#5E8BFF</color>
+    <color name="launcher_accent_emerald">#6BCB77</color>
+    <color name="launcher_accent_gold">#E9B44C</color>
+    <color name="widget_background_dark">#121915</color>
+    <color name="widget_item_dark">#1B2420</color>
+    <color name="widget_stroke_dark">#26FFFFFF</color>
+</resources>

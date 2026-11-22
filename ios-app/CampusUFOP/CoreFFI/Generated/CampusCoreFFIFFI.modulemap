@@ -1,0 +1,4 @@
+module CampusCoreFFIFFI {
+    header "CampusCoreFFIFFI.h"
+    export *
+}

@@ -1,0 +1,6 @@
+[bindings.kotlin]
+package_name = "br.ufop.campus.core.uniffi"
+cdylib_name = "campus_core"
+
+[bindings.swift]
+module_name = "CampusCoreFFI"

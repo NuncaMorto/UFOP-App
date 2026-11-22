@@ -1,0 +1,6 @@
+# Exemplo de configuração local (copie para local.properties — arquivo ignorado pelo Git)
+# Caminho para o Android SDK instalado na sua máquina:
+sdk.dir=C\:\\Users\\SEU_USUARIO\\AppData\\Local\\Android\\Sdk
+
+# Opcional: e-mail de destino para o formulário de feedback (via FormSubmit):
+# feedback.recipient=seu-email@exemplo.com
