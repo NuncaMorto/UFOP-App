@@ -12,6 +12,15 @@ updates:
       rust-dependencies:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "uniffi"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "rusqlite"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   - package-ecosystem: "gradle"
     directory: "/android-app"
@@ -25,6 +34,24 @@ updates:
       android-dependencies:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "com.android.application"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "gradle-wrapper"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "org.jetbrains.kotlin.*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "androidx.compose:compose-bom"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "net.java.dev.jna:jna"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -34,3 +61,7 @@ updates:
     open-pull-requests-limit: 5
     reviewers:
       - "NuncaMorto"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
