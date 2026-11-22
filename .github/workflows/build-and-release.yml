@@ -20,6 +20,19 @@ on:
         required: false
         default: ""
         type: string
+      prerelease:
+        description: "Marcar Release no GitHub como Pre-release (beta/testes)"
+        required: false
+        default: true
+        type: boolean
+      android_build_type:
+        description: "Build Android (release assinado requer secrets ANDROID_KEYSTORE_*)"
+        required: false
+        default: "debug"
+        type: choice
+        options:
+          - debug
+          - release
 
 permissions:
   contents: write
@@ -70,8 +83,25 @@ jobs:
             TAG="v${RAW_VER:-1.9.6}"
           fi
           VERSION="${TAG#v}"
+
+          INPUT_PRE="${{ github.event.inputs.prerelease }}"
+          if [[ "${TAG}" == *-* ]]; then
+            IS_PRERELEASE="true"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${INPUT_PRE}" == "true" ]] || { [[ -z "${INPUT_PRE}" ]] && [[ "${GITHUB_REF_NAME}" == "develop" ]]; }; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+
           echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "is_prerelease=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"
 
       - name: Build iOS .ipa (unsigned)
         env:
@@ -92,6 +122,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.meta.outputs.release_tag }}
           VERSION: ${{ steps.meta.outputs.version }}
+          IS_PRERELEASE: ${{ steps.meta.outputs.is_prerelease }}
         run: |
           if ! gh release view "${TAG}" >/dev/null 2>&1; then
             NOTES_FILE="$(mktemp)"
@@ -116,7 +147,17 @@ jobs:
           text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica UFOP v{version}\n"
           Path(out_path).write_text(text, encoding="utf-8")
           PY
-            gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --notes-file "${NOTES_FILE}"
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
+            else
+              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --notes-file "${NOTES_FILE}" --latest
+            fi
+          else
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              gh release edit "${TAG}" --prerelease
+            else
+              gh release edit "${TAG}" --prerelease=false --latest
+            fi
           fi
           gh release upload "${TAG}" dist/*.ipa dist/*.ipa.sha256 --clobber
 
@@ -156,8 +197,10 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Resolve version metadata
+      - name: Resolve version & build metadata
         id: meta
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
@@ -169,24 +212,77 @@ jobs:
             TAG="v${RAW_VER:-1.9.6}"
           fi
           VERSION="${TAG#v}"
+
+          INPUT_PRE="${{ github.event.inputs.prerelease }}"
+          if [[ "${TAG}" == *-* ]]; then
+            IS_PRERELEASE="true"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${INPUT_PRE}" == "true" ]] || { [[ -z "${INPUT_PRE}" ]] && [[ "${GITHUB_REF_NAME}" == "develop" ]]; }; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+
+          WANT_RELEASE="false"
+          if [[ "${{ github.event.inputs.android_build_type }}" == "release" ]] || { [[ "${GITHUB_REF}" == refs/tags/v* ]] && [[ "${IS_PRERELEASE}" == "false" ]]; }; then
+            WANT_RELEASE="true"
+          fi
+
+          if [[ "${WANT_RELEASE}" == "true" && -n "${KEYSTORE_B64}" ]]; then
+            BUILD_TYPE="release"
+          else
+            if [[ "${WANT_RELEASE}" == "true" && -z "${KEYSTORE_B64}" ]]; then
+              echo "::warning::Build release solicitado, mas o secret ANDROID_KEYSTORE_BASE64 não está configurado; gerando debug APK."
+            fi
+            BUILD_TYPE="debug"
+          fi
+
           echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "is_prerelease=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "build_type=${BUILD_TYPE}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run Android unit tests & assemble debug APK
+      - name: Run Android unit tests & assemble APK
         env:
           FEEDBACK_RECIPIENT: ${{ secrets.FEEDBACK_RECIPIENT }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          BUILD_TYPE: ${{ steps.meta.outputs.build_type }}
         run: |
           chmod +x android-app/gradlew
           cd android-app
-          ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+          if [[ "${BUILD_TYPE}" == "release" ]]; then
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/ufop-release.jks"
+            export ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/ufop-release.jks"
+            ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon
+          else
+            ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+          fi
+
+      - name: Cleanup temporary keystore
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/ufop-release.jks"
 
       - name: Package APK & SHA-256
         env:
           VERSION: ${{ steps.meta.outputs.version }}
+          BUILD_TYPE: ${{ steps.meta.outputs.build_type }}
         run: |
           mkdir -p dist
-          APK_NAME="Vida-Academica-UFOP-v${VERSION}-debug.apk"
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
+          if [[ "${BUILD_TYPE}" == "release" ]]; then
+            APK_NAME="Vida-Academica-UFOP-v${VERSION}.apk"
+            cp android-app/app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
+          else
+            APK_NAME="Vida-Academica-UFOP-v${VERSION}-debug.apk"
+            cp android-app/app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
+          fi
           (cd dist && sha256sum "${APK_NAME}" > "${APK_NAME}.sha256")
 
       - name: Upload Android .apk workflow artifact
@@ -200,8 +296,42 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.meta.outputs.release_tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          IS_PRERELEASE: ${{ steps.meta.outputs.is_prerelease }}
         run: |
           if ! gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --generate-notes
+            NOTES_FILE="$(mktemp)"
+            python3 - "${VERSION}" "${NOTES_FILE}" << 'PY'
+          import re, sys
+          from pathlib import Path
+          version, out_path = sys.argv[1], sys.argv[2]
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+          pat = re.compile(rf"^##\s+(?:\[)?v?{re.escape(version)}(?:\b|\]|\s|$)")
+          cap, active = [], False
+          for line in lines:
+              if not active:
+                  if pat.match(line):
+                      active = True
+                      cap.append(line)
+              else:
+                  if line.startswith("## "):
+                      break
+                  cap.append(line)
+          while cap and cap[-1].strip() in ("", "---"):
+              cap.pop()
+          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica UFOP v{version}\n"
+          Path(out_path).write_text(text, encoding="utf-8")
+          PY
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
+            else
+              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --notes-file "${NOTES_FILE}" --latest
+            fi
+          else
+            if [[ "${IS_PRERELEASE}" == "true" ]]; then
+              gh release edit "${TAG}" --prerelease
+            else
+              gh release edit "${TAG}" --prerelease=false --latest
+            fi
           fi
           gh release upload "${TAG}" dist/*.apk dist/*.apk.sha256 --clobber

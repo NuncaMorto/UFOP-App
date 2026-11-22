@@ -25,6 +25,37 @@ val feedbackEndpoint = if (rawFeedbackRecipient.isNotEmpty()) {
     ""
 }
 
+val releaseStoreFilePath = (
+    localProperties.getProperty("release.storeFile")
+        ?: System.getenv("ANDROID_KEYSTORE_PATH")
+        ?: ""
+    ).trim()
+val releaseStorePassword = (
+    localProperties.getProperty("release.storePassword")
+        ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        ?: ""
+    ).trim()
+val releaseKeyAlias = (
+    localProperties.getProperty("release.keyAlias")
+        ?: System.getenv("ANDROID_KEY_ALIAS")
+        ?: ""
+    ).trim()
+val releaseKeyPassword = (
+    localProperties.getProperty("release.keyPassword")
+        ?: System.getenv("ANDROID_KEY_PASSWORD")
+        ?: ""
+    ).trim()
+val releaseKeystoreFile = if (releaseStoreFilePath.isNotBlank()) {
+    rootProject.file(releaseStoreFilePath)
+} else {
+    null
+}
+val hasReleaseSigning = releaseKeystoreFile != null &&
+    releaseKeystoreFile.isFile &&
+    releaseStorePassword.isNotBlank() &&
+    releaseKeyAlias.isNotBlank() &&
+    releaseKeyPassword.isNotBlank()
+
 android {
     namespace = "br.ufop.campus"
     compileSdk = 35
@@ -41,8 +72,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning && releaseKeystoreFile != null) {
+            create("release") {
+                storeFile = releaseKeystoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

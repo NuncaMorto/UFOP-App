@@ -1,8 +1,10 @@
 # Regras do Projeto — Vida Acadêmica UFOP (`UFOP-App`)
 
-## 1. Git, Commits e Push Contínuo
-- Após qualquer alteração aprovada/implementada e verificada no app, criar um commit claro no Git e enviar (`git push`) para `origin/main` no repositório `NuncaMorto/UFOP-App`.
-- Quando houver incremento de versão do app (`versionName` / `versionCode`), criar e enviar também a tag anotada correspondente (`vX.Y.Z`, ex.: `v1.9.6`).
+## 1. Git, Branches, Commits e Push Contínuo
+- Fluxo em duas branches principais no repositório `NuncaMorto/UFOP-App`:
+  - **`origin/develop`:** branch padrão de desenvolvimento e testes contínuos (Android + iOS sempre sincronizados). Após qualquer alteração aprovada e verificada, fazer commit claro e enviar (`git push`) para `origin/develop`. Compilações de teste são publicadas como **Pre-release** no GitHub.
+  - **`origin/main`:** branch estável reservada para lançamentos oficiais (`v1.0.0` em diante), recebendo merge de `develop` somente quando Android e iOS estiverem validados.
+- Quando houver incremento de versão do app (`versionName` / `versionCode`), criar e enviar também a tag anotada correspondente (`vX.Y.Z`, ex.: `v1.9.6` ou `v1.0.0`).
 - Nunca faça commit ou push sem rodar antes a suíte de verificação aplicável às áreas alteradas.
 
 ## 2. Versionamento

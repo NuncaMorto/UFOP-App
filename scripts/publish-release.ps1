@@ -44,7 +44,9 @@ if (-not $Tag) {
 
 $VersionBare = $Tag.Substring(1)
 
-$ApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-debug.apk"
+$ReleaseApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag.apk"
+$DebugApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-debug.apk"
+$ApkPath = if (Test-Path $ReleaseApkPath) { $ReleaseApkPath } else { $DebugApkPath }
 $IpaPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-unsigned.ipa"
 
 $Assets = New-Object System.Collections.Generic.List[string]
@@ -118,7 +120,9 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Falha ao enviar assets para a Release '$Tag' (exit code $LASTEXITCODE)."
         }
-        & gh release edit $Tag --title $Title --notes-file $ResolvedNotesPath
+        $EditArgs = @("release", "edit", $Tag, "--title", $Title, "--notes-file", $ResolvedNotesPath)
+        if ($Prerelease) { $EditArgs += "--prerelease" } else { $EditArgs += "--prerelease=false" }
+        & gh @EditArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Falha ao atualizar título/notas da Release '$Tag' (exit code $LASTEXITCODE)."
         }
