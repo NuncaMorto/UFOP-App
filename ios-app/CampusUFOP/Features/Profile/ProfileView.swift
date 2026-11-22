@@ -322,7 +322,7 @@ public struct ProfileView: View {
             metricTile(title: "Disciplinas", value: "\(summary.totalCourses)", subtitle: "Em \(summary.semester)", tint: primaryAccent)
             metricTile(title: "Faltas acumuladas", value: "\(summary.totalAbsences)/\(summary.totalMaxAbsences)", subtitle: "\(summary.coursesAtRisk) em risco", tint: CampusTheme.mathBlue)
             metricTile(title: "Canceladas", value: "\(summary.totalCancelledClasses)", subtitle: "Não somam falta", tint: CampusTheme.compPurple)
-            metricTile(title: "Avaliações", value: "\(summary.pendingAssessments)", subtitle: "\(summary.completedAssessments) concluídas", tint: CampusTheme.engineeringGreen)
+            metricTile(title: "Avaliações", value: "\(summary.pendingAssessments)", subtitle: "\(summary.completedAssessments) concluídas", tint: CampusTheme.algebraGreen)
         }
     }
 

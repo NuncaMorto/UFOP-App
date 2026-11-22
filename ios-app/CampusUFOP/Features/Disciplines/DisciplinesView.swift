@@ -86,12 +86,10 @@ public struct DisciplinesView: View {
         }
         .sheet(isPresented: $viewModel.isAddCoursePresented) {
             AddCourseSheetView(
-                store: viewModel.store,
-                defaultSemester: viewModel.semesterFilter,
-                defaultDepartmentId: viewModel.departmentFilter == "Todos os departamentos" ? "MAT" : viewModel.departmentFilter,
-                onCreate: { semester, departmentId, name, professor, workloadHours, colorHex, isEad, initialSlot in
-                    try viewModel.createCourse(
-                        semester: semester,
+                semester: viewModel.semesterFilter,
+                onSave: { departmentId, name, professor, workloadHours, colorHex, isEad, initialSlot in
+                    _ = try viewModel.createCourse(
+                        semester: viewModel.semesterFilter,
                         departmentId: departmentId,
                         name: name,
                         professor: professor,

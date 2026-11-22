@@ -855,17 +855,3 @@ private extension Array {
         indices.contains(index) ? self[index] : nil
     }
 }
-
-private extension ParsedCertificateCourse {
-    init(code: String, turma: String, name: String, building: String, isEad: Bool, departmentId: String, workloadHours: Int, professor: String, slots: [ParsedCertificateSlot]) {
-        self.code = code
-        self.turma = turma
-        self.name = name
-        self.building = building
-        self.isEad = isEad
-        self.departmentId = departmentId
-        self.workloadHours = workloadHours
-        self.professor = professor
-        self.slots = slots
-    }
-}

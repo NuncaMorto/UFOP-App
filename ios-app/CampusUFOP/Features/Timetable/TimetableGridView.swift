@@ -499,7 +499,7 @@ public struct TimetableGridView: View {
         let offset = dayMap[cell.weekdayShort] ?? 0
         let weekDates = CampusStore.mondayToSundayDates(containing: Date())
         let targetIso = offset < weekDates.count ? CampusStore.isoString(from: weekDates[offset]) : CampusStore.todayIsoDateString()
-        store.selectAgendaDate(isoDate: targetIso)
+        store.selectAgendaDate(targetIso)
         return store.getClassCheckInDetail(agendaItemId: "lecture-\(cell.id)@\(targetIso)")
             ?? store.getClassCheckInDetail(agendaItemId: "lecture-\(cell.id)")
     }
