@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 private enum ProfileSubtab: String, CaseIterable, Identifiable {
     case summary = "Resumo"
+    case dynamicGrid = "Grade Dinâmica"
     case calendar = "Calendário"
     case settings = "Ajustes"
     case faq = "FAQ"
@@ -70,25 +71,42 @@ public struct ProfileView: View {
         ZStack {
             LiquidGlassBackdrop(accent: activeAppearance.accentColor, highContrast: hc)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
-                    headerSection
-                    subtabPickerSection
-
-                    switch selectedSubtab {
-                    case .summary:
-                        summarySubtabContent
-                    case .calendar:
-                        calendarSubtabContent
-                    case .settings:
-                        settingsSubtabContent
-                    case .faq:
-                        faqSubtabContent
+            if selectedSubtab == .dynamicGrid {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        headerSection
+                        subtabPickerSection
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 18)
+
+                    DynamicCurriculumGridView(store: activeStore)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 108)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        headerSection
+                        subtabPickerSection
+
+                        switch selectedSubtab {
+                        case .summary:
+                            summarySubtabContent
+                        case .dynamicGrid:
+                            EmptyView()
+                        case .calendar:
+                            calendarSubtabContent
+                        case .settings:
+                            settingsSubtabContent
+                        case .faq:
+                            faqSubtabContent
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 18)
+                    .padding(.bottom, 108)
+                }
             }
         }
         .sheet(isPresented: $isMatrixPresented) {
@@ -223,6 +241,7 @@ public struct ProfileView: View {
         campusSelectorCard(summary: summary)
         metricsGrid(summary: summary)
         creAndTranscriptCard(creReport: creReport)
+        dynamicGridShortcutCard
         shareScheduleCard
     }
 
@@ -400,6 +419,67 @@ public struct ProfileView: View {
         }
         .padding(16)
         .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+    }
+
+    private var dynamicGridShortcutCard: some View {
+        let matrix = DynamicCurriculumCatalog.defaultMatrix
+        let completed = activeStore.dynamicGridCompletedSet(for: matrix.id)
+        let gridSummary = DynamicGridEngine.summarize(matrix: matrix, completedCodes: completed)
+
+        return Button {
+            if activeAppearance.accessibility.reduceMotion {
+                selectedSubtab = .dynamicGrid
+            } else {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    selectedSubtab = .dynamicGrid
+                }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.grid.3x3.topleft.filled")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Grade Dinâmica")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        Text("\(matrix.courseName) · \(gridSummary.completedHours)/\(gridSummary.totalGridHours)h · \(gridSummary.completionPercent)%")
+                            .font(.system(size: 12))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                }
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule(style: .continuous)
+                            .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                        Capsule(style: .continuous)
+                            .fill(primaryAccent)
+                            .frame(
+                                width: max(
+                                    gridSummary.completedHours > 0 ? 8 : 0,
+                                    proxy.size.width * gridSummary.progressFraction
+                                )
+                            )
+                    }
+                }
+                .frame(height: 6)
+                .accessibilityHidden(true)
+            }
+            .padding(16)
+            .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, interactive: true, highContrast: hc)
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget(minTouch)
+        .accessibilityLabel("Grade Dinâmica, \(matrix.courseName), \(gridSummary.completedHours) de \(gridSummary.totalGridHours) horas, \(gridSummary.completionPercent) por cento concluído")
     }
 
     private var shareScheduleCard: some View {

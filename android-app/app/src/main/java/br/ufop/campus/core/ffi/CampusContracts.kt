@@ -1191,6 +1191,11 @@ interface CampusCoreRepository {
 
     // Sprint 14 APIs
     fun applyRoomAllocationIndex(index: UfopRoomAllocationIndex, enrichExisting: Boolean = true): Int
+
+    // v1.9.8: Grade Dinâmica Interativa
+    fun getDynamicGridCompletedCodes(matrixId: String): Set<String>
+    fun saveDynamicGridCompletedCodes(matrixId: String, completedCodes: Set<String>)
+    fun getDynamicGridAllCompleted(): Map<String, Set<String>>
 }
 
 typealias InMemoryCampusCoreRepository = InMemoryCampusRepository
@@ -2545,6 +2550,9 @@ class InMemoryCampusRepository(
     // Sprint 14 state
     private var roomAllocationIndex: UfopRoomAllocationIndex? = null
 
+    // v1.9.8: Grade Dinâmica Interativa (matrixId -> códigos concluídos)
+    private val dynamicGridCompletedByMatrix: MutableMap<String, MutableSet<String>> = linkedMapOf()
+
     private val defaultCoursesSnapshot = LinkedHashMap(courses)
     private val defaultSlotsSnapshot = slots.toList()
     private val defaultCommitmentsSnapshot = commitments.toList()
@@ -2593,6 +2601,7 @@ class InMemoryCampusRepository(
         accessibilitySettings = CampusAccessibilitySettings()
         guidedTourCompleted = false
         lastSeenReleaseVersion = ""
+        dynamicGridCompletedByMatrix.clear()
         departmentSwatches.forEach { swatch ->
             departmentColorOverrides[swatch.id] = swatch.colorHex
         }
@@ -3922,6 +3931,50 @@ class InMemoryCampusRepository(
         _mutationVersion.value += 1L
     }
 
+    override fun getDynamicGridCompletedCodes(matrixId: String): Set<String> = synchronized(lock) {
+        val cleanMatrixId = matrixId.trim()
+        if (cleanMatrixId.isEmpty()) return@synchronized emptySet()
+        dynamicGridCompletedByMatrix[cleanMatrixId]?.toSet() ?: emptySet()
+    }
+
+    override fun saveDynamicGridCompletedCodes(matrixId: String, completedCodes: Set<String>) = synchronized(lock) {
+        val cleanMatrixId = matrixId.trim()
+        if (cleanMatrixId.isEmpty()) return@synchronized
+        val normalized = linkedSetOf<String>()
+        completedCodes.forEach { raw ->
+            val clean = raw.trim().uppercase()
+            if (clean.isNotEmpty()) {
+                normalized.add(clean)
+            }
+        }
+        val previous = dynamicGridCompletedByMatrix[cleanMatrixId]
+        if (normalized.isEmpty()) {
+            if (previous == null || previous.isEmpty()) {
+                dynamicGridCompletedByMatrix.remove(cleanMatrixId)
+                return@synchronized
+            }
+            dynamicGridCompletedByMatrix.remove(cleanMatrixId)
+        } else {
+            if (previous != null && previous == normalized) {
+                return@synchronized
+            }
+            dynamicGridCompletedByMatrix[cleanMatrixId] = normalized
+        }
+        persistStateLocked()
+        _mutationVersion.value += 1L
+        onMutation?.invoke()
+    }
+
+    override fun getDynamicGridAllCompleted(): Map<String, Set<String>> = synchronized(lock) {
+        val snapshot = linkedMapOf<String, Set<String>>()
+        dynamicGridCompletedByMatrix.forEach { (matrixId, codes) ->
+            if (codes.isNotEmpty()) {
+                snapshot[matrixId] = codes.toSet()
+            }
+        }
+        snapshot
+    }
+
     override fun exportFullAccountSnapshotJson(): String = synchronized(lock) {
         buildPersistedJsonLocked().toString()
     }
@@ -3938,7 +3991,8 @@ class InMemoryCampusRepository(
         val hasValidData = schemaVersion >= 1 ||
             root.has("courses") ||
             root.has("studentProfile") ||
-            root.has("transcriptEntries")
+            root.has("transcriptEntries") ||
+            root.has("dynamicGridCompletedByMatrix")
         if (!hasValidData) return@synchronized false
 
         val restored = runCatching {
@@ -8406,6 +8460,31 @@ class InMemoryCampusRepository(
             }
         }.getOrDefault(CampusAccessibilitySettings())
 
+        val loadedDynamicGrid = linkedMapOf<String, MutableSet<String>>()
+        runCatching {
+            val dgObj = root.optJSONObject("dynamicGridCompletedByMatrix") ?: return@runCatching
+            val matrixKeys = dgObj.keys()
+            while (matrixKeys.hasNext()) {
+                runCatching {
+                    val mId = matrixKeys.next().trim()
+                    if (mId.isEmpty()) return@runCatching
+                    val arr = dgObj.optJSONArray(mId) ?: return@runCatching
+                    val set = linkedSetOf<String>()
+                    for (i in 0 until arr.length()) {
+                        if (!arr.isNull(i)) {
+                            val code = arr.optString(i, "").trim().uppercase()
+                            if (code.isNotEmpty()) {
+                                set.add(code)
+                            }
+                        }
+                    }
+                    if (set.isNotEmpty()) {
+                        loadedDynamicGrid[mId] = set
+                    }
+                }
+            }
+        }
+
         courses.clear()
         loadedCourses.forEach { (id, seed) ->
             courses[id] = seed.copy(assessments = loadedAssessmentsByCourse[id].orEmpty().toList())
@@ -8447,6 +8526,8 @@ class InMemoryCampusRepository(
         accessibilitySettings = loadedAccessibilitySettings
         guidedTourCompleted = loadedGuidedTourCompleted
         lastSeenReleaseVersion = loadedLastSeenReleaseVersion
+        dynamicGridCompletedByMatrix.clear()
+        dynamicGridCompletedByMatrix.putAll(loadedDynamicGrid)
         roomAllocationIndex?.let { index ->
             enrichExistingRoomAllocationsLocked(index)
         }
@@ -8689,6 +8770,14 @@ class InMemoryCampusRepository(
                 put("boldTextBoost", accessibilitySettings.boldTextBoost)
             }
         )
+
+        val dynamicGridJson = JSONObject()
+        dynamicGridCompletedByMatrix.forEach { (matrixId, codes) ->
+            val arr = JSONArray()
+            codes.forEach { code -> arr.put(code) }
+            dynamicGridJson.put(matrixId, arr)
+        }
+        root.put("dynamicGridCompletedByMatrix", dynamicGridJson)
 
         return root
     }
@@ -9555,6 +9644,20 @@ class CampusEngineBridgeRepository(
             _mutationVersion.value += 1L
         }
         count
+    }
+
+    // v1.9.8: Grade Dinâmica Interativa
+    override fun getDynamicGridCompletedCodes(matrixId: String): Set<String> = synchronized(lock) {
+        fallback.getDynamicGridCompletedCodes(matrixId)
+    }
+
+    override fun saveDynamicGridCompletedCodes(matrixId: String, completedCodes: Set<String>): Unit = synchronized(lock) {
+        fallback.saveDynamicGridCompletedCodes(matrixId, completedCodes)
+        _mutationVersion.value += 1L
+    }
+
+    override fun getDynamicGridAllCompleted(): Map<String, Set<String>> = synchronized(lock) {
+        fallback.getDynamicGridAllCompleted()
     }
 
     private fun mapCampusException(

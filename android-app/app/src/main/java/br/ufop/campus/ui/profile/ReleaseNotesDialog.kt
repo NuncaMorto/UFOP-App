@@ -55,10 +55,21 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.7",
-            title = "Atualizador In-App, Licença GPLv3 & Página Web",
+            version = "v1.9.8",
+            title = "Grade Dinâmica Interativa (Matriz 2023 de Automação)",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Nova aba Grade Dinâmica no Perfil (logo abaixo de Métricas & CRE), iniciando com a Matriz 2023 (Currículo 2) de Eng. de Controle e Automação (54 disciplinas · 2970h);",
+                "Toque para concluir disciplinas e liberar pré-requisitos em tempo real, com desmarcação automática em cascata para dependentes e aviso dos requisitos faltantes ao tocar em matérias bloqueadas;",
+                "Alternância persistida entre visualização Horizontal (colunas por período) e Vertical (linhas por período), ambas com rolagem livre horizontal e vertical, modo tela cheia e salvamento local criptografado."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.7",
+            title = "Atualizador In-App, Licença GPLv3 & Página Web",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Novo atualizador automático dentro do app (via GitHub Releases): baixa em segundo plano com barra de progresso, valida integridade via SHA-256 e reinicia preservando 100% dos seus dados;",
                 "Nova opção Verificar atualizações (GitHub) em Perfil → FAQ e aviso discreto no topo quando houver nova versão;",

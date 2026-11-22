@@ -10,14 +10,25 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.7"
+    public static let currentVersionString = "1.9.8"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.7",
-            title: "Licença GPLv3, Conformidade & Melhorias",
+            version: "v1.9.8",
+            title: "Grade Dinâmica Interativa (Matriz 2023)",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Nova Grade Dinâmica Interativa na aba Perfil com a matriz completa de Eng. de Controle e Automação (Matriz 2023 · 54 disciplinas, 2970h).",
+                "Desbloqueio automático por pré-requisitos ao marcar disciplinas concluídas e remoção transitiva em cascata ao desmarcar dependentes.",
+                "Alternância persistente entre modos Horizontal e Vertical com rolagem bidirecional livre (horizontal e vertical), tela cheia opcional e persistência criptografada (.enc / .ufopbackup)."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.7",
+            title: "Licença GPLv3, Conformidade & Melhorias",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Adequação completa de nomes, identificadores e avisos de aplicativo independente para estudantes.",
                 "Projeto publicado sob licença GNU GPLv3."

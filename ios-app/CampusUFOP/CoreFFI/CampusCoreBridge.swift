@@ -940,6 +940,7 @@ public final class CampusStore {
     public var transcriptEntries: [TranscriptCourseEntry] = []
     public var isEadByCourseId: [String: Bool] = [:]
     public var turmaByCourseId: [String: String] = [:]
+    public var dynamicGridCompletedByMatrix: [String: [String]] = [:]
 
     public var disciplinesLayoutMode: String {
         didSet { UserDefaults.standard.set(disciplinesLayoutMode, forKey: "campus.ufop.disciplinesLayoutMode") }
@@ -947,6 +948,10 @@ public final class CampusStore {
 
     public var timetableOrientation: String {
         didSet { UserDefaults.standard.set(timetableOrientation, forKey: "campus.ufop.timetableOrientation") }
+    }
+
+    public var dynamicGridOrientation: String {
+        didSet { UserDefaults.standard.set(dynamicGridOrientation, forKey: "campus.ufop.dynamicGridOrientation") }
     }
 
     public var guidedTourCompleted: Bool {
@@ -981,6 +986,7 @@ public final class CampusStore {
         let defaults = UserDefaults.standard
         self.disciplinesLayoutMode = defaults.string(forKey: "campus.ufop.disciplinesLayoutMode") ?? "grid"
         self.timetableOrientation = defaults.string(forKey: "campus.ufop.timetableOrientation") ?? "vertical"
+        self.dynamicGridOrientation = defaults.string(forKey: "campus.ufop.dynamicGridOrientation") ?? "horizontal"
         self.guidedTourCompleted = defaults.bool(forKey: "campus.ufop.guidedTourCompleted")
         self.lastSeenReleaseVersion = defaults.string(forKey: "campus.ufop.lastSeenReleaseVersion") ?? ""
 
@@ -2803,6 +2809,63 @@ public final class CampusStore {
 
     public var academicProfileSummary: AcademicProfileSummary {
         getAcademicProfileSummary(semester: selectedSemesterFilter)
+    }
+
+    // MARK: - Queries & Commands (Dynamic Interactive Curriculum Grid)
+
+    public func dynamicGridCompletedSet(for matrixId: String) -> Set<String> {
+        if let matrix = DynamicCurriculumCatalog.find(byId: matrixId) {
+            let raw = Set(dynamicGridCompletedByMatrix[matrix.id] ?? dynamicGridCompletedByMatrix[matrixId] ?? [])
+            return DynamicGridEngine.sanitizeCompleted(matrix: matrix, completedCodes: raw)
+        }
+        return Set(
+            (dynamicGridCompletedByMatrix[matrixId] ?? [])
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
+                .filter { !$0.isEmpty }
+        )
+    }
+
+    @discardableResult
+    public func toggleDynamicGridCourse(matrixId: String, courseCode: String) -> DynamicGridToggleResult {
+        guard let matrix = DynamicCurriculumCatalog.find(byId: matrixId) else {
+            let cleanCode = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            return DynamicGridToggleResult(
+                updatedCompletedCodes: dynamicGridCompletedSet(for: matrixId),
+                action: .noChange,
+                affectedCode: cleanCode,
+                cascadeRemovedCodes: [],
+                missingPrerequisites: [],
+                missingHours: 0
+            )
+        }
+
+        let current = dynamicGridCompletedSet(for: matrix.id)
+        let result = DynamicGridEngine.toggleCourse(
+            matrix: matrix,
+            courseCode: courseCode,
+            completedCodes: current
+        )
+
+        if result.action == .markedCompleted || result.action == .unmarkedWithCascade {
+            let sorted = result.updatedCompletedCodes.sorted()
+            if sorted.isEmpty {
+                dynamicGridCompletedByMatrix.removeValue(forKey: matrix.id)
+            } else {
+                dynamicGridCompletedByMatrix[matrix.id] = sorted
+            }
+            persistEncryptedState()
+        }
+
+        return result
+    }
+
+    public func clearDynamicGrid(matrixId: String) {
+        let canonicalId = DynamicCurriculumCatalog.find(byId: matrixId)?.id ?? matrixId
+        dynamicGridCompletedByMatrix.removeValue(forKey: canonicalId)
+        if canonicalId != matrixId {
+            dynamicGridCompletedByMatrix.removeValue(forKey: matrixId)
+        }
+        persistEncryptedState()
     }
 
     /// Exporta a grade horária e disciplinas do semestre em formato JSON.

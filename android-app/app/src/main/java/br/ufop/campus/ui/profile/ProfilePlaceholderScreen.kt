@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Analytics
@@ -151,6 +152,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import br.ufop.campus.core.curriculum.DynamicCurriculumCatalog
+import br.ufop.campus.core.curriculum.DynamicGridEngine
 import br.ufop.campus.core.curriculum.UfopCourseCurriculum
 import br.ufop.campus.core.curriculum.UfopCurriculumCatalog
 import br.ufop.campus.core.ffi.AcademicCalendarEvent
@@ -171,6 +174,7 @@ import br.ufop.campus.core.security.CampusCryptoEngine
 import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
+import br.ufop.campus.ui.curriculum.DynamicCurriculumGridScreen
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
 import br.ufop.campus.ui.theme.CampusAccentColor
 import br.ufop.campus.ui.theme.DepartmentMathBlue
@@ -191,6 +195,7 @@ import java.util.Locale
 
 private enum class ProfileDestination(val title: String) {
     METRICS_CRE("Métricas & CRE"),
+    DYNAMIC_GRID("Grade Dinâmica"),
     SETTINGS("Configurações"),
     FAQ("FAQ & Ajuda")
 }
@@ -351,6 +356,16 @@ fun ProfilePlaceholderScreen(
     val exportFolderConfig = remember(mutationVersion) {
         repository.getExportFolderConfig()
     }
+    val defaultDynamicMatrix = DynamicCurriculumCatalog.defaultMatrix
+    val dynamicGridSummary = remember(mutationVersion, defaultDynamicMatrix.id) {
+        val completed = DynamicGridEngine.sanitizeCompleted(
+            matrix = defaultDynamicMatrix,
+            completedCodes = repository.getDynamicGridCompletedCodes(defaultDynamicMatrix.id)
+        )
+        DynamicGridEngine.summarize(defaultDynamicMatrix, completed)
+    }
+    val dynamicGridSubtitle =
+        "${defaultDynamicMatrix.courseName} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
 
     var avatarRevision by remember { mutableIntStateOf(0) }
     val avatarBitmap = rememberAvatarBitmap(studentProfile.avatarPath, avatarRevision)
@@ -627,6 +642,13 @@ fun ProfilePlaceholderScreen(
                     onBack = { activeDestination = null }
                 )
             }
+            activeDestination == ProfileDestination.DYNAMIC_GRID -> {
+                SettingsSubViewHeader(
+                    title = ProfileDestination.DYNAMIC_GRID.title,
+                    backLabel = "Voltar para Perfil",
+                    onBack = { activeDestination = null }
+                )
+            }
             activeDestination == ProfileDestination.SETTINGS && activeSettingsSection == null -> {
                 SettingsSubViewHeader(
                     title = ProfileDestination.SETTINGS.title,
@@ -650,21 +672,29 @@ fun ProfilePlaceholderScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(contentScrollState)
-                .padding(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = if (activeDestination == null) 20.dp else 14.dp
-                )
-                .navigationBarsPadding()
-                .padding(bottom = 136.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            when (activeDestination) {
+        if (activeDestination == ProfileDestination.DYNAMIC_GRID) {
+            DynamicCurriculumGridScreen(
+                repository = repository,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(contentScrollState)
+                    .padding(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = if (activeDestination == null) 20.dp else 14.dp
+                    )
+                    .navigationBarsPadding()
+                    .padding(bottom = 136.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when (activeDestination) {
                 null -> {
                     // Header principal do Perfil
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -715,7 +745,7 @@ fun ProfilePlaceholderScreen(
                         onEditProfile = { showEditProfileSheet = true }
                     )
 
-                    // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Configurações, FAQ & Ajuda, Sair da conta)
+                    // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, FAQ & Ajuda, Sair da conta)
                     SettingsCategoryGroup(title = "Central do Perfil") {
                         SettingsMenuRow(
                             icon = Icons.Outlined.Analytics,
@@ -723,6 +753,17 @@ fun ProfilePlaceholderScreen(
                             title = "Métricas & CRE",
                             subtitle = "CRE ${formatScore(creReport.overallCre, 2)} · ${profileSummary.totalAbsences}/${profileSummary.totalMaxAbsences} faltas · ${creReport.completedHours}/${creReport.totalRequiredHours}h",
                             onClick = { activeDestination = ProfileDestination.METRICS_CRE }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+                        )
+                        SettingsMenuRow(
+                            icon = Icons.Outlined.AccountTree,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            title = "Grade Dinâmica",
+                            subtitle = dynamicGridSubtitle,
+                            onClick = { activeDestination = ProfileDestination.DYNAMIC_GRID }
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -877,6 +918,9 @@ fun ProfilePlaceholderScreen(
                         onReplayGuidedTour = onReplayGuidedTour,
                         onCheckForUpdates = onCheckForUpdates
                     )
+                }
+
+                ProfileDestination.DYNAMIC_GRID -> Unit
                 }
             }
         }

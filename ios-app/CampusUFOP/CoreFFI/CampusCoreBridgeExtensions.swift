@@ -18,6 +18,7 @@ private struct PersistedCampusState: Codable {
     var transcriptEntries: [TranscriptCourseEntry]
     var isEadByCourseId: [String: Bool]
     var turmaByCourseId: [String: String]
+    var dynamicGridCompletedByMatrix: [String: [String]]?
 }
 
 public struct AgendaClassSpotlight: Equatable, Sendable {
@@ -66,7 +67,8 @@ public extension CampusStore {
             absenceHistoryBySession: absenceHistoryBySession,
             transcriptEntries: transcriptEntries,
             isEadByCourseId: isEadByCourseId,
-            turmaByCourseId: turmaByCourseId
+            turmaByCourseId: turmaByCourseId,
+            dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -111,7 +113,8 @@ public extension CampusStore {
             absenceHistoryBySession: absenceHistoryBySession,
             transcriptEntries: transcriptEntries,
             isEadByCourseId: isEadByCourseId,
-            turmaByCourseId: turmaByCourseId
+            turmaByCourseId: turmaByCourseId,
+            dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -146,6 +149,7 @@ public extension CampusStore {
         transcriptEntries = []
         isEadByCourseId = [:]
         turmaByCourseId = [:]
+        dynamicGridCompletedByMatrix = [:]
         guidedTourCompleted = false
         seedUFOP2026_2Data()
         ensureOfficialCalendarEventsLoaded()
@@ -167,6 +171,7 @@ public extension CampusStore {
         self.transcriptEntries = snapshot.transcriptEntries
         self.isEadByCourseId = snapshot.isEadByCourseId
         self.turmaByCourseId = snapshot.turmaByCourseId
+        self.dynamicGridCompletedByMatrix = snapshot.dynamicGridCompletedByMatrix ?? [:]
         rebuildAcademicActivitiesFromAssessments()
     }
 

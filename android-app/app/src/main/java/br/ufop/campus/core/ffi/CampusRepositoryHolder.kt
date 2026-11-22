@@ -19,7 +19,7 @@ import java.io.File
 object CampusRepositoryHolder {
 
     const val PREFS_NAME = "vida_academica_prefs"
-    const val CURRENT_APP_VERSION = "1.9.7"
+    const val CURRENT_APP_VERSION = "1.9.8"
     const val KEY_DARK_THEME_MODE = "dark_theme_mode"
     const val KEY_ACCENT_COLOR = "accent_color_key"
     const val KEY_GUIDED_TOUR_COMPLETED = "guided_tour_completed"
@@ -32,6 +32,7 @@ object CampusRepositoryHolder {
     const val KEY_A11Y_BOLD_TEXT = "a11y_bold_text_boost"
     const val KEY_TIMETABLE_ORIENTATION = "timetable_orientation_pref"
     const val KEY_DISCIPLINES_LAYOUT_MODE = "disciplines_layout_mode"
+    const val KEY_DYNAMIC_GRID_ORIENTATION = "dynamic_grid_orientation_pref"
 
     @Volatile
     private var instance: CampusCoreRepository? = null
@@ -525,6 +526,53 @@ object CampusRepositoryHolder {
         return saveDisciplinesLayoutModeToPrefs(prefs, mode)
     }
 
+    internal fun loadDynamicGridIsHorizontalFromPrefs(
+        prefs: SharedPreferences?
+    ): Boolean {
+        if (prefs == null) return true
+        val rawString = runCatching {
+            prefs.getString(KEY_DYNAMIC_GRID_ORIENTATION, null)
+        }.getOrNull()?.trim()?.uppercase()
+        return when (rawString) {
+            "VERTICAL" -> false
+            "HORIZONTAL" -> true
+            else -> runCatching {
+                if (prefs.contains(KEY_DYNAMIC_GRID_ORIENTATION)) {
+                    prefs.getBoolean(KEY_DYNAMIC_GRID_ORIENTATION, true)
+                } else {
+                    true
+                }
+            }.getOrDefault(true)
+        }
+    }
+
+    fun loadDynamicGridIsHorizontal(context: Context): Boolean {
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull()
+        return loadDynamicGridIsHorizontalFromPrefs(prefs)
+    }
+
+    internal fun saveDynamicGridIsHorizontalToPrefs(
+        prefs: SharedPreferences?,
+        isHorizontal: Boolean
+    ): Boolean {
+        val mode = if (isHorizontal) "HORIZONTAL" else "VERTICAL"
+        runCatching {
+            prefs?.edit()
+                ?.putString(KEY_DYNAMIC_GRID_ORIENTATION, mode)
+                ?.commit()
+        }
+        return isHorizontal
+    }
+
+    fun saveDynamicGridIsHorizontal(context: Context, isHorizontal: Boolean) {
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull()
+        saveDynamicGridIsHorizontalToPrefs(prefs, isHorizontal)
+    }
+
     internal fun clearAllLocalPreferencesFromPrefs(prefs: SharedPreferences?) {
         runCatching {
             prefs?.edit()
@@ -540,6 +588,7 @@ object CampusRepositoryHolder {
                 ?.remove(KEY_A11Y_BOLD_TEXT)
                 ?.remove(KEY_TIMETABLE_ORIENTATION)
                 ?.remove(KEY_DISCIPLINES_LAYOUT_MODE)
+                ?.remove(KEY_DYNAMIC_GRID_ORIENTATION)
                 ?.clear()
                 ?.commit()
         }

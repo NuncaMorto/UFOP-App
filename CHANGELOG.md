@@ -10,6 +10,17 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.8 — Grade Dinâmica Interativa (Matriz 2023 de Automação)
+
+- **Android (`1.9.8` · Beta · Material 3 Expressive) & iOS (`1.9.8` · Apple Liquid Glass):**
+  - **Nova aba Grade Dinâmica no Perfil (logo abaixo de Métricas & CRE / resumo de CRE):** teste inicial com a **Matriz Curricular 2023 (Currículo 2) de Engenharia de Controle e Automação** (`54` disciplinas · `2970h` na grade · `10` períodos).
+  - **Desbloqueio interativo e cascata transitiva:** marque disciplinas concluídas para liberar automaticamente as próximas matérias que cumprem pré-requisitos, veja os requisitos pendentes ao tocar em disciplinas bloqueadas e desmarque dependentes automaticamente em cascata quando remover um pré-requisito.
+  - **Modos Horizontal e Vertical com rolagem livre:** alterne entre colunas por período (Horizontal) ou linhas por período (Vertical) com preferência salva, rolagem livre horizontal e vertical nos dois modos (além de modo tela cheia) e salvamento automático na persistência local criptografada.
+
+<!-- versionCode: 25 -->
+
+---
+
 ## v1.9.7 — Atualizador In-App, GPLv3 & Adequação para Lojas
 
 - **Android (`1.9.7` · Beta):**
