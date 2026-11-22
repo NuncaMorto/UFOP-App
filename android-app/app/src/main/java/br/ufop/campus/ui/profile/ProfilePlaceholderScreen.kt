@@ -240,9 +240,9 @@ private enum class SettingsSection(val title: String) {
     PERSONALIZATION("Personalização"),
     SECURITY("Segurança & Privacidade"),
     ACCESSIBILITY("Acessibilidade"),
-    CAMPUS_WEATHER("Campus & Clima Online (UFOP)"),
+    CAMPUS_WEATHER("Campus & Clima Online"),
     DOCUMENTS_PDF("Documentos Acadêmicos (PDF)"),
-    ACADEMIC_CALENDAR("Calendário Acadêmico UFOP"),
+    ACADEMIC_CALENDAR("Calendário Acadêmico"),
     STORAGE_SHARE("Armazenamento & Compartilhamento"),
     FEEDBACK("Feedback & Suporte")
 }
@@ -251,7 +251,7 @@ private fun shareBackupUri(context: Context, uri: Uri, filename: String) {
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = "application/octet-stream"
         putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_SUBJECT, "Backup Criptografado Vida Acadêmica UFOP ($filename)")
+        putExtra(Intent.EXTRA_SUBJECT, "Backup Criptografado Vida Acadêmica ($filename)")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     runCatching {
@@ -453,11 +453,11 @@ fun ProfilePlaceholderScreen(
                 lastPublishedPackage = pkg
                 adminFeedbackIsError = false
                 adminFeedbackMessage =
-                    "Calendário ${pkg.semester} publicado e verificado (${pkg.events.size} eventos oficiais)."
+                    "Calendário ${pkg.semester} importado e verificado (${pkg.events.size} eventos)."
             }.onFailure { error ->
                 adminFeedbackIsError = true
                 adminFeedbackMessage =
-                    error.message ?: "Falha ao processar o PDF do Calendário Oficial UFOP."
+                    error.message ?: "Falha ao processar o PDF do Calendário Acadêmico."
             }
         }
     }
@@ -482,7 +482,7 @@ fun ProfilePlaceholderScreen(
             result.onSuccess {
                 adminFeedbackIsError = false
                 adminFeedbackMessage =
-                    "Arquivo do calendário oficial exportado! Compartilhe com os estudantes."
+                    "Arquivo do calendário exportado! Compartilhe com outros estudantes."
             }.onFailure { error ->
                 adminFeedbackIsError = true
                 adminFeedbackMessage =
@@ -669,7 +669,7 @@ fun ProfilePlaceholderScreen(
                     // Header principal do Perfil
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "UNIVERSIDADE FEDERAL DE OURO PRETO",
+                            text = "APP INDEPENDENTE PARA ESTUDANTES",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -844,7 +844,7 @@ fun ProfilePlaceholderScreen(
                                 adminPinInput = ""
                                 adminFeedbackIsError = false
                                 adminFeedbackMessage =
-                                    "Modo administrador desbloqueado. Agora você pode publicar o PDF oficial."
+                                    "Modo administrador desbloqueado. Agora você pode importar o calendário em PDF."
                             } else {
                                 adminFeedbackIsError = true
                                 adminFeedbackMessage = "PIN inválido. Acesso administrador negado."
@@ -1060,7 +1060,7 @@ private fun PendingCalendarUpdateBanner(
                     modifier = Modifier.size(22.dp)
                 )
                 Text(
-                    text = "Atualização do Calendário Acadêmico UFOP disponível — Semestre ${pkg.semester} · ${pkg.events.size} eventos",
+                    text = "Atualização do Calendário Acadêmico disponível — Semestre ${pkg.semester} · ${pkg.events.size} eventos",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -1160,7 +1160,7 @@ private fun AcademicIdentityCard(
             }
 
             Text(
-                text = studentProfile.fullName.ifBlank { "Estudante UFOP" },
+                text = studentProfile.fullName.ifBlank { "Estudante" },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -1753,7 +1753,7 @@ private fun CreHeroAndImportCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Abrir Matriz Curricular UFOP (2026/2)",
+                    text = "Abrir Matriz Curricular (2026/2)",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -1783,7 +1783,7 @@ private fun CreHeroAndImportCard(
             },
             title = {
                 Text(
-                    text = "Fórmula Oficial do CRE · UFOP",
+                    text = "Fórmula do CRE (ref. acadêmica)",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -1820,7 +1820,7 @@ private fun CreHeroAndImportCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "• CH: carga horária oficial da disciplina em horas (ex.: 30h, 60h, 90h).",
+                            text = "• CH: carga horária da disciplina em horas (ex.: 30h, 60h, 90h).",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2576,9 +2576,9 @@ private fun ProfileSettingsTab(
                 "${matchedCourse.code} · ${matchedCourse.name} · ${formatCurriculumHours(matchedCourse.chTotal)}h"
             }
             studentProfile.courseName.isNotBlank() -> {
-                "${normalizeUfopPortugueseText(studentProfile.courseName)} · Consultar matrizes UFOP"
+                "${normalizeUfopPortugueseText(studentProfile.courseName)} · Consultar matrizes"
             }
-            else -> "Consultar os 54 cursos oficiais da UFOP"
+            else -> "Consultar catálogo com 54 cursos (ref. UFOP)"
         }
     }
 
@@ -2639,7 +2639,7 @@ private fun ProfileSettingsTab(
                 SettingsMenuRow(
                     icon = Icons.Outlined.LocationOn,
                     iconTint = MaterialTheme.colorScheme.primary,
-                    title = "Campus & Clima Online (UFOP)",
+                    title = "Campus & Clima Online",
                     subtitle = "${profileSummary.activeCampus.city} · ${profileSummary.activeCampus.weatherTempC} °C",
                     onClick = { onSelectSection(SettingsSection.CAMPUS_WEATHER) }
                 )
@@ -2660,17 +2660,17 @@ private fun ProfileSettingsTab(
                 SettingsMenuRow(
                     icon = Icons.AutoMirrored.Outlined.MenuBook,
                     iconTint = StatusAttendingGreen,
-                    title = "Matriz Curricular UFOP (2026/2)",
+                    title = "Matriz Curricular (2026/2)",
                     subtitle = matrixSubtitle,
                     onClick = onOpenCurriculumMatrix
                 )
             }
 
-            SettingsCategoryGroup(title = "Calendário Oficial") {
+            SettingsCategoryGroup(title = "Calendário de Referência") {
                 SettingsMenuRow(
                     icon = Icons.Outlined.CalendarMonth,
                     iconTint = DepartmentMathBlue,
-                    title = "Calendário Acadêmico UFOP",
+                    title = "Calendário Acadêmico",
                     subtitle = "2026.2, 2027.1 e 2027.2 · ${profileSummary.calendarEvents.size} marcos ativos",
                     onClick = { onSelectSection(SettingsSection.ACADEMIC_CALENDAR) }
                 )
@@ -2842,7 +2842,7 @@ private fun ProfileSettingsTab(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "Envie o PDF do Minha UFOP para sincronizar disciplinas atuais ou importar todo o Histórico Escolar e calcular o CRE.",
+                                text = "Envie o PDF do seu atestado (compatível com o Minha UFOP) para sincronizar disciplinas atuais ou importar o Histórico Escolar e calcular o CRE.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2971,7 +2971,7 @@ private fun ProfileSettingsTab(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "Exporte ou importe sua grade UFOP $activeSemester para compartilhar com amigos, ou envie arquivos .ufopgrade pela aba Horários.",
+                                text = "Exporte ou importe sua grade acadêmica $activeSemester para compartilhar com amigos, ou envie arquivos .ufopgrade pela aba Horários.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -3022,7 +3022,7 @@ private fun ProfileSettingsTab(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Compartilhar ou importar grade UFOP",
+                                    text = "Compartilhar ou importar grade",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -3296,9 +3296,9 @@ private fun AcademicCalendarSubView(
     }
 
     val officialSourceLabel = when (selectedCalendarSemester) {
-        "2026.2" -> "Resolução CUNI 2945"
-        "2027.1", "2027.2" -> "Calendário Presencial UFOP 2027"
-        else -> "Calendário Oficial UFOP"
+        "2026.2" -> "Resolução CUNI 2945 (ref. pública)"
+        "2027.1", "2027.2" -> "Calendário Presencial 2027 (ref. UFOP)"
+        else -> "Calendário Acadêmico (ref. UFOP)"
     }
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -3402,7 +3402,7 @@ private fun AcademicCalendarSubView(
                         modifier = Modifier.semantics { heading() }
                     )
                     Text(
-                        text = "Fonte oficial: $officialSourceLabel",
+                        text = "Referência: $officialSourceLabel",
                         style = MaterialTheme.typography.labelMedium,
                         color = accessibleBlue,
                         fontWeight = FontWeight.SemiBold
@@ -3558,7 +3558,7 @@ private fun AcademicCalendarSubView(
 
                         if (!isAdminUnlocked) {
                             Text(
-                                text = "Área restrita para publicar um novo PDF do Calendário Oficial UFOP, ou importar um arquivo de atualização enviado pelo representante.",
+                                text = "Área avançada para importar um novo PDF de Calendário Acadêmico, ou aplicar um pacote compartilhado entre estudantes.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -3567,8 +3567,8 @@ private fun AcademicCalendarSubView(
                                 value = adminPinInput,
                                 onValueChange = onAdminPinChange,
                                 modifier = Modifier.fillMaxWidth(),
-                                label = { Text("PIN do Administrador") },
-                                placeholder = { Text("Informe o PIN oficial") },
+                                label = { Text("PIN de manutenção") },
+                                placeholder = { Text("Informe o PIN de manutenção") },
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 shape = RoundedCornerShape(18.dp)
@@ -3598,7 +3598,7 @@ private fun AcademicCalendarSubView(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                             Text(
-                                text = "Recebeu um arquivo de atualização do calendário oficial?",
+                                text = "Recebeu um arquivo de atualização do calendário?",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -3626,7 +3626,7 @@ private fun AcademicCalendarSubView(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Importar arquivo de calendário oficial",
+                                    text = "Importar arquivo de calendário",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -3732,7 +3732,7 @@ private fun AcademicCalendarSubView(
                                     color = surfaceColor
                                 ) {
                                     Text(
-                                        text = "Versão ${activePkg.version} · ${activePkg.events.size} eventos oficiais verificados",
+                                        text = "Versão ${activePkg.version} · ${activePkg.events.size} eventos sincronizados",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -4050,7 +4050,7 @@ private fun EditStudentProfileBottomSheet(
             }
 
             Text(
-                text = "Campus da UFOP",
+                text = "Campus universitário",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
@@ -4302,7 +4302,7 @@ private fun CalendarMilestoneRow(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "Data oficial: ${event.eventDate.ifBlank { "${event.dayNumber} ${event.monthShort}" }}",
+                            text = "Data: ${event.eventDate.ifBlank { "${event.dayNumber} ${event.monthShort}" }}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = accessibleBlue
@@ -4363,7 +4363,7 @@ private fun ScheduleJsonShareBottomSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "GRADE UFOP · COMPARTILHAMENTO",
+                        text = "GRADE ACADÊMICA · COMPARTILHAMENTO",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -6195,7 +6195,7 @@ private val PROFILE_FAQ_ITEMS = listOf(
     FaqAccordionItem(
         id = "android_widget",
         question = "Como adicionar o widget de horários na tela inicial do Android?",
-        answer = "Mantenha pressionado um espaço vazio na tela inicial do seu Android, toque em \"Widgets\" e procure por \"Vida Acadêmica UFOP\". Arraste o widget de horários para a tela inicial para acompanhar suas próximas aulas do dia sem abrir o app — ele se adapta automaticamente ao seu tema, cor de destaque e mudanças na grade."
+        answer = "Mantenha pressionado um espaço vazio na tela inicial do seu Android, toque em \"Widgets\" e procure por \"Vida Acadêmica\". Arraste o widget de horários para a tela inicial para acompanhar suas próximas aulas do dia sem abrir o app — ele se adapta automaticamente ao seu tema, cor de destaque e mudanças na grade."
     ),
     FaqAccordionItem(
         id = "share_compare_schedule",
@@ -6204,8 +6204,8 @@ private val PROFILE_FAQ_ITEMS = listOf(
     ),
     FaqAccordionItem(
         id = "official_calendar_2026_2027",
-        question = "Como consultar o calendário oficial de 2026.2 e 2027.1?",
-        answer = "Acesse Perfil → Configurações → Calendário Acadêmico UFOP. No topo da tela, alterne entre os semestres 2026.2 (Resolução CUNI 2945), 2027.1 e 2027.2 (Calendário Presencial UFOP 2027) e use os filtros de categoria (Feriados & Recessos, Prazos & Matrícula, Avaliações) ou a busca para encontrar rapidamente qualquer data oficial."
+        question = "Como consultar o calendário acadêmico de 2026.2 e 2027.1?",
+        answer = "Acesse Perfil → Configurações → Calendário Acadêmico. No topo da tela, alterne entre os semestres 2026.2, 2027.1 e 2027.2 (com referência às datas públicas divulgadas para o calendário acadêmico) e use os filtros de categoria ou a busca para encontrar qualquer marco."
     ),
     FaqAccordionItem(
         id = "security_pdfs",
@@ -6253,6 +6253,38 @@ private fun ProfileFaqSubView(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "AVISO DE INDEPENDÊNCIA",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Projeto estudantil sem vínculo institucional",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Este é um aplicativo independente, desenvolvido por estudantes e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),

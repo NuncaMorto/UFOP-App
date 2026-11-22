@@ -627,7 +627,7 @@ fun TimetableModalScreen(
                                     )
                                     val courseLabel = activeFriend.courseName
                                         .takeIf { it.isNotBlank() }
-                                        ?: "Graduando(a) UFOP"
+                                        ?: "Estudante"
                                     Text(
                                         text = "${activeFriend.friendName} · $courseLabel · ${timetable.semester}",
                                         style = MaterialTheme.typography.bodySmall,
@@ -1204,7 +1204,7 @@ fun TimetableModalScreen(
                                             }
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                             clipboard?.setPrimaryClip(
-                                                ClipData.newPlainText("Grade UFOP (.ufopgrade)", payload)
+                                                ClipData.newPlainText("Grade Acadêmica (.ufopgrade)", payload)
                                             )
                                             showShareDialog = false
                                             feedbackBannerMessage =
@@ -2070,7 +2070,7 @@ private fun FriendScheduleFooterCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = friend.courseName.ifBlank { "Graduando(a) UFOP" },
+                        text = friend.courseName.ifBlank { "Estudante" },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary

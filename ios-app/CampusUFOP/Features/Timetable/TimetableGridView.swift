@@ -150,7 +150,7 @@ public struct TimetableGridView: View {
             )
         }
         .confirmationDialog(
-            "Aplicar modelo UFOP?",
+            "Aplicar modelo de grade?",
             isPresented: Binding(
                 get: { pendingTemplateConfirm != nil },
                 set: { if !$0 { pendingTemplateConfirm = nil } }
@@ -167,7 +167,7 @@ public struct TimetableGridView: View {
                 pendingTemplateConfirm = nil
             }
         } message: {
-            Text("Isso substituirá as disciplinas do semestre \(store.selectedSemesterFilter) pelo modelo oficial escolhido.")
+            Text("Isso substituirá as disciplinas do semestre \(store.selectedSemesterFilter) pelo modelo de grade escolhido.")
         }
     }
 
@@ -451,7 +451,7 @@ public struct TimetableGridView: View {
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-            Text("Adicione horários nas disciplinas ou escolha um modelo oficial UFOP acima.")
+            Text("Adicione horários nas disciplinas ou escolha um modelo de grade acima.")
                 .font(.system(size: 13))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 .multilineTextAlignment(.center)

@@ -1705,7 +1705,7 @@ private fun AcademicEventsAccordionCard(
                 ) {
                     if (displayedEvents.isEmpty()) {
                         Text(
-                            text = "Nenhum evento carregado ainda. Feriados, recessos e marcos do calendário oficial da UFOP aparecem aqui quando o calendário é atualizado.",
+                            text = "Nenhum evento carregado ainda. Feriados, recessos e marcos do calendário acadêmico de referência aparecem aqui quando o calendário é atualizado.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

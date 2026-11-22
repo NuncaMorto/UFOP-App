@@ -346,7 +346,7 @@ public struct DisciplineDetailSheetView: View {
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                Text("Importe o PDF do plano da UFOP para cadastrar provas, seminários e trabalhos automaticamente. O arquivo é processado em memória e excluído.")
+                Text("Importe o PDF do plano de ensino para cadastrar provas, seminários e trabalhos automaticamente. O arquivo é processado em memória e excluído.")
                     .font(.system(size: 12))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 

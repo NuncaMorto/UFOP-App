@@ -655,7 +655,7 @@ fun DisciplineDetailBottomSheet(
                         icon = Icons.Outlined.LocationOn,
                         label = "Prédio / Sala",
                         value = effectiveDetail.buildingAndRoom.ifBlank {
-                            effectiveDetail.shortLocation.ifBlank { "Campus UFOP" }
+                            effectiveDetail.shortLocation.ifBlank { "Campus" }
                         },
                         accentColor = accessibleAccent
                     )
@@ -2556,7 +2556,7 @@ private fun DetailScheduleSlotEditorFields(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Prédio da UFOP",
+                    text = "Prédio / Unidade",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -2598,14 +2598,14 @@ private fun DetailScheduleSlotEditorFields(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = matchedBuilding?.shortName ?: draft.building.ifBlank { "Selecionar prédio da UFOP" },
+                                text = matchedBuilding?.shortName ?: draft.building.ifBlank { "Selecionar prédio ou local" },
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = matchedBuilding?.let { "${it.fullName} (${it.campusName})" }
-                                    ?: "Toque para ver todos os prédios oficiais da UFOP",
+                                    ?: "Toque para escolher prédio ou unidade",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -2616,7 +2616,7 @@ private fun DetailScheduleSlotEditorFields(
 
                     Icon(
                         imageVector = Icons.Outlined.KeyboardArrowDown,
-                        contentDescription = "Escolher prédio UFOP",
+                        contentDescription = "Escolher prédio",
                         tint = accentColor,
                         modifier = Modifier.size(18.dp)
                     )
@@ -2739,7 +2739,7 @@ private fun DetailUfopBuildingPickerDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Prédios de Ensino UFOP",
+                    text = "Prédios e Unidades",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )

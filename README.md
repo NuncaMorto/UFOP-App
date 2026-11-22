@@ -1,4 +1,7 @@
-# Vida Acadêmica · UFOP (`UFOP-App`)
+# Vida Acadêmica (app independente para estudantes da UFOP)
+
+> [!NOTE]
+> **Aviso de Independência:** Este é um aplicativo independente, desenvolvido por estudantes sob licença **GNU GPLv3** e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).
 
 Aplicativo acadêmico offline-first para estudantes da **UFOP** (Universidade Federal de Ouro Preto), construído sobre um núcleo compartilhado de alto desempenho em **Rust + SQLite + UniFFI**, com clientes nativos em **Kotlin / Jetpack Compose** (Android) e **Swift / SwiftUI** (iOS).
 
@@ -31,7 +34,7 @@ Este projeto é distribuído sob a licença **GNU General Public License v3.0 (G
 2. [Visão Geral e Arquitetura](#visão-geral-e-arquitetura)
 3. [Estrutura do Repositório](#estrutura-do-repositório)
 4. [Núcleo Compartilhado (`rust-core`)](#núcleo-compartilhado-rust-core)
-   - [Regra de Faltas da UFOP](#regra-de-faltas-da-ufop)
+   - [Regra de Faltas (25%)](#regra-de-faltas-25)
    - [Migrações SQLite (001 a 004)](#migrações-sqlite-001-a-004)
    - [API `CampusEngine` e UniFFI](#api-campusengine-e-uniffi)
 5. [Aplicativo Android (`android-app`)](#aplicativo-android-android-app)
@@ -94,14 +97,14 @@ O projeto CAMPUS unifica as regras acadêmicas, modelo relacional e lógica de n
 │   │   ├── 001_initial_schema.sql             # Tabelas: departments, courses, schedule_slots, class_sessions, commitments, assessments
 │   │   ├── 002_seed_ufop_2026_2.sql           # Dados base do semestre 2026.2 (Cálculo II, Algoritmos, Álgebra Linear, Física I)
 │   │   ├── 003_sprint2_ufop_scale.sql         # Campi UFOP (Ouro Preto, Mariana, João Monlevade) e calendário acadêmico
-│   │   └── 004_sprint3_course_templates.sql   # Templates curriculares oficiais (BCC DECOM, ENGC DECSI, Ciclo Básico EM)
+│   │   └── 004_sprint3_course_templates.sql   # Templates curriculares (BCC DECOM, ENGC DECSI, Ciclo Básico EM)
 │   └── src/
 │       ├── lib.rs                             # CampusEngine, setup_scaffolding! e 17 testes unitários
 │       ├── db.rs                              # Gerenciador SQLite e execução de migrações idempotentes
 │       ├── models.rs                          # Estruturas de dados exportadas via UniFFI
 │       ├── repository.rs                      # Operações CRUD, busca, transações e templates
 │       ├── domain/
-│       │   ├── attendance.rs                  # Regra oficial de faltas da UFOP
+│       │   ├── attendance.rs                  # Cálculo do limite de 25% de faltas
 │       │   └── agenda.rs                      # Formatação de datas em português
 │       └── bin/
 │           └── uniffi-bindgen.rs              # CLI do uniffi-bindgen
@@ -120,12 +123,12 @@ O projeto CAMPUS unifica as regras acadêmicas, modelo relacional e lógica de n
 │               │       └── campus_core.kt     # Bindings Kotlin gerados via UniFFI
 │               └── ui/
 │                   ├── navigation/            # Barra inferior com 4 abas
-│                   ├── theme/                 # Paleta de cores UFOP, tipografia e tema Material 3
+│                   ├── theme/                 # Paleta de cores por departamento, tipografia e tema Material 3
 │                   ├── agenda/                # Aba 1: Linha do tempo diária, clima e check-in de presença
 │                   ├── disciplines/           # Aba 2: Cards, busca rápida, detalhes e histórico de faltas/cancelamentos
 │                   ├── activities/            # Aba 3: Central de avaliações e compromissos extras
 │                   ├── profile/               # Aba 4: Perfil acadêmico, status de risco e troca de campus
-│                   └── timetable/             # Modal: Matriz semanal, templates UFOP e restauração de padrão
+│                   └── timetable/             # Modal: Matriz semanal, modelos pré-carregados e restauração de padrão
 ├── ios-app/                                   # Cliente iOS (Swift 5.9+ / SwiftUI iOS 17+)
 │   ├── Package.swift                          # SPM com isolamento de build (`exclude: ["CoreFFI/Generated"]`)
 │   └── CampusUFOP/
@@ -138,10 +141,10 @@ O projeto CAMPUS unifica as regras acadêmicas, modelo relacional e lógica de n
 │           ├── Agenda/                        # AgendaView e ClassCheckInSheetView
 │           ├── Disciplines/                   # DisciplinesView, DisciplineDetailSheetView com histórico de marcações
 │           ├── Activities/                    # Central de avaliações e compromissos
-│           ├── Profile/                       # Resumo acadêmico, campi e calendário UFOP
+│           ├── Profile/                       # Resumo acadêmico, campi e calendário acadêmico
 │           └── Timetable/                     # TimetableGridView com matriz, templates e restauração 2026.2
 ├── dist/                                      # Pacotes prontos para distribuição e instalação
-│   └── CAMPUS-UFOP-v1.0-debug.apk             # Pacote APK instalável em smartphones Android
+│   └── Vida-Academica-UFOP-vX.Y.Z-debug.apk   # Pacote APK instalável em smartphones Android
 └── scripts/
     ├── build-apk.ps1                          # Geração do APK debug Android e instalação via adb
     ├── verify-core.ps1                        # Verificação (fmt, clippy, tests) com auto-detecção MSVC vcvars64.bat
@@ -153,9 +156,9 @@ O projeto CAMPUS unifica as regras acadêmicas, modelo relacional e lógica de n
 
 ## Núcleo Compartilhado (`rust-core`)
 
-### Regra de Faltas da UFOP
+### Regra de Faltas (25%)
 
-De acordo com as normas acadêmicas da UFOP, o limite de infrequência corresponde a no máximo **25% da carga horária** expressa em horas-aula de 50 minutos. A fórmula exata implementada em `domain/attendance.rs` é:
+Seguindo o padrão acadêmico de 25% da carga horária expressa em horas-aula de 50 minutos, a fórmula implementada em `domain/attendance.rs` é:
 
 $$\text{max\_absences} = \frac{\text{workload\_hours} \times 3}{10}$$
 
@@ -172,8 +175,8 @@ Exemplos práticos:
 
 1. **`001_initial_schema.sql`**: Define as entidades relacionais fundamentais (`departments`, `courses`, `schedule_slots`, `class_sessions`, `commitments`, `assessments`) com chaves estrangeiras e índices otimizados para busca por data e semestre.
 2. **`002_seed_ufop_2026_2.sql`**: Popula o semestre base `2026.2` com 4 disciplinas (Cálculo II, Algoritmos, Álgebra Linear, Física I), slots semanais, sessões de aula, compromissos e avaliações com datas de exemplo.
-3. **`003_sprint2_ufop_scale.sql`**: Introduz as tabelas `campuses` (com suporte aos campi de Ouro Preto - Morro do Cruzeiro, Mariana - ICHS e João Monlevade - ICEA) e `academic_calendar_events` (marcos do calendário escolar da UFOP).
-4. **`004_sprint3_course_templates.sql`**: Cria o catálogo de grades curriculares padrão da UFOP (`tpl_bcc_decom` para Ciência da Computação, `tpl_ec_decsi` para Engenharia de Computação e `tpl_eng_basico` para Ciclo Básico da Escola de Minas), permitindo substituição controlada da grade.
+3. **`003_sprint2_ufop_scale.sql`**: Introduz as tabelas `campuses` (com suporte aos campi de Ouro Preto - Morro do Cruzeiro, Mariana - ICHS e João Monlevade - ICEA) e `academic_calendar_events` (marcos do calendário acadêmico).
+4. **`004_sprint3_course_templates.sql`**: Cria o catálogo de modelos de grade pré-carregados (`tpl_bcc_decom` para Ciência da Computação, `tpl_ec_decsi` para Engenharia de Computação e `tpl_eng_basico` para Ciclo Básico da Escola de Minas), permitindo substituição controlada da grade.
 
 ### API `CampusEngine` e UniFFI
 
@@ -211,7 +214,7 @@ O cliente Android é desenvolvido com **Kotlin 2.0** e **Jetpack Compose Materia
   4. **Perfil:** Resumo com totalizador de faltas, disciplinas em situação de risco (>= 75% do limite de faltas), seletor de campus ativo (Ouro Preto, Mariana, João Monlevade) e calendário acadêmico.
 - **Grade de Horários (`TimetableModalScreen`):**
   - Matriz visual semanal de horários.
-  - Diálogo de confirmação para aplicação de templates oficiais da UFOP.
+  - Diálogo de confirmação para aplicação de modelos de grade pré-carregados.
   - Opção no menu de ações para **Restaurar grade padrão 2026.2**.
 - **Camada de Integração FFI / JNA e Persistência On-Device:**
   - `CampusContracts.kt`: Interface unificada `CampusCoreRepository` consumida por todas as ViewModels (`DisciplinesViewModel`, `AgendaViewModel`, `ActivitiesViewModel`, `TimetableViewModel`, `ProfileViewModel`).
@@ -229,7 +232,7 @@ O cliente iOS é construído em **Swift 5.9+ / SwiftUI** com suporte a **iOS 17+
   - 4 abas estruturadas em `MainTabView` (Agenda, Disciplinas, Atividades e Perfil).
   - Folha de detalhes `DisciplineDetailSheetView` com visualização do **Histórico de marcações** (faltas e cancelamentos) e anotações.
   - Barra de busca rápida em `DisciplinesView` para filtragem ágil por nome ou professor.
-  - Matriz semanal `TimetableGridView` com importação/exportação JSON, aplicação de templates com alerta de confirmação e restauração de padrão 2026.2.
+  - Matriz semanal `TimetableGridView` com importação/exportação JSON, aplicação de modelos com alerta de confirmação e restauração de padrão 2026.2.
 - **Isolamento de Compilação SPM (`Package.swift`):**
   - Configurado com `exclude: ["CoreFFI/Generated"]` para prevenir colisões de símbolos entre os bindings UniFFI pré-gerados e a implementação do bridge `CampusCoreBridge.swift`.
   - O bridge atua como `CampusStore` observável (`@Observable`), permitindo reatividade automática em toda a hierarquia de Views.
@@ -238,7 +241,7 @@ O cliente iOS é construído em **Swift 5.9+ / SwiftUI** com suporte a **iOS 17+
 
 ## Como Instalar no Celular Android (Sideloading & ADB)
 
-O aplicativo **Vida Acadêmica · UFOP** pode ser instalado diretamente em qualquer smartphone ou tablet Android (versão 8.0 / API 26 ou superior). O pacote distribuível gerado em `dist/Vida-Academica-UFOP-vX.Y.Z-debug.apk` (também publicado na página de [**Releases**](https://github.com/NuncaMorto/UFOP-App/releases)) contém o aplicativo completo com ícone adaptativo da UFOP, suporte aos temas Claro/Escuro (Material 3) e arquitetura offline-first resiliente.
+O aplicativo **Vida Acadêmica** pode ser instalado diretamente em qualquer smartphone ou tablet Android (versão 8.0 / API 26 ou superior). O pacote distribuível gerado em `dist/Vida-Academica-UFOP-vX.Y.Z-debug.apk` (também publicado na página de [**Releases**](https://github.com/NuncaMorto/UFOP-App/releases)) contém o aplicativo completo com ícone adaptativo, suporte aos temas Claro/Escuro (Material 3) e arquitetura offline-first resiliente.
 
 ### 1. Gerando o Pacote APK (`scripts/build-apk.ps1`)
 
@@ -284,7 +287,7 @@ Não exige cabo nem comandos no celular:
    - Habilite a opção **"Permitir desta fonte"** (ou **"Instalar apps desconhecidos"**).
    - Volte para a tela anterior.
 4. Toque em **Instalar** (ou **Atualizar**) e aguarde a conclusão.
-5. Toque em **Abrir** para iniciar o **Vida Acadêmica UFOP**.
+5. Toque em **Abrir** para iniciar o **Vida Acadêmica**.
 
 ---
 
@@ -300,7 +303,7 @@ Para assegurar total estabilidade e portabilidade em aparelhos onde a biblioteca
   - Compromissos acadêmicos e extracurriculares adicionados.
   - Campus ativo selecionado (Ouro Preto - Morro do Cruzeiro, Mariana - ICHS ou João Monlevade - ICEA).
   - Horários customizados ou alterações na grade de disciplinas.
-- **Restauração Limpa:** Se desejar redefinir todas as informações e voltar ao estado original do semestre `2026.2`, acesse a **Grade de Horários** (ícone no cabeçalho), abra o menu de opções e toque em **"Restaurar grade padrão 2026.2"**. O arquivo de persistência será reescrito com a semente padrão da UFOP.
+- **Restauração Limpa:** Se desejar redefinir todas as informações e voltar ao estado original do semestre `2026.2`, acesse a **Grade de Horários** (ícone no cabeçalho), abra o menu de opções e toque em **"Restaurar grade padrão 2026.2"**. O arquivo de persistência será reescrito com a semente de demonstração.
 
 ---
 

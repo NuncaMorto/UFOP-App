@@ -6789,7 +6789,7 @@ class InMemoryCampusRepository(
         }
         return synchronized(lock) {
             if (!adminUnlocked) {
-                throw IllegalStateException("Modo administrador bloqueado. Informe o PIN oficial antes de publicar.")
+                throw IllegalStateException("Modo administrador bloqueado. Informe o PIN de administração antes de publicar.")
             }
             val cleanSemester = semester.trim().ifBlank { studentProfile.activeSemester.ifBlank { "2026.2" } }
             val defaultYear = resolveSemesterDefaultYear(cleanSemester)
@@ -6802,8 +6802,8 @@ class InMemoryCampusRepository(
             val version = "$cleanSemester-v$generatedIdCounter"
             val publishedBy = studentProfile.fullName.trim()
                 .takeIf { it.isNotEmpty() }
-                ?.let { "Admin UFOP · $it" }
-                ?: "Admin UFOP"
+                ?.let { "Admin Local · $it" }
+                ?: "Admin Local"
             val publishedAt = Instant.now().toString()
             val signature = computeCalendarSignatureSha256(
                 version = version,
@@ -6838,7 +6838,7 @@ class InMemoryCampusRepository(
             val cleanSemester = studentProfile.activeSemester.ifBlank { "2026.2" }
             val activeEvents = getAcademicCalendarEventsLocked(cleanSemester)
             val version = "$cleanSemester-v1"
-            val publishedBy = "UFOP Oficial"
+            val publishedBy = "Catálogo do App"
             val publishedAt = Instant.now().toString()
             val signature = computeCalendarSignatureSha256(
                 version = version,

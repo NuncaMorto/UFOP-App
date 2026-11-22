@@ -470,7 +470,7 @@ public final class AppLockManager {
         context.localizedFallbackTitle = "Usar senha do app"
         context.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
-            localizedReason: "Confirmar identidade para acessar o Vida Acadêmica UFOP"
+            localizedReason: "Confirmar identidade para acessar o Vida Acadêmica"
         ) { [weak self] success, evalError in
             DispatchQueue.main.async {
                 if success {

@@ -330,7 +330,7 @@ internal object WidgetScheduleLoader {
                     locationStr.isNotEmpty() ->
                         locationStr
                     else ->
-                        "Campus UFOP"
+                        "Campus"
                 }
 
                 val sessionStatus = statusBySlotId[slotId]

@@ -95,7 +95,7 @@ private fun buildMultipartBody(payload: FeedbackPayload, boundary: String): Byte
         writeText("\r\n")
     }
 
-    field("_subject", "[Vida Acadêmica UFOP] Feedback: ${payload.category}")
+    field("_subject", "[Vida Acadêmica] Feedback: ${payload.category}")
     field("_captcha", "false")
     field("_template", "table")
     field("categoria", payload.category)
@@ -133,8 +133,8 @@ private fun postPayload(payload: FeedbackPayload) {
         connection.doOutput = true
         connection.setRequestProperty("Accept", "application/json")
         connection.setRequestProperty("User-Agent", "VidaAcademica-Android/$FEEDBACK_APP_VERSION")
-        connection.setRequestProperty("Origin", "https://vidaacademica.ufop.app")
-        connection.setRequestProperty("Referer", "https://vidaacademica.ufop.app/")
+        connection.setRequestProperty("Origin", "https://nuncamorto.github.io")
+        connection.setRequestProperty("Referer", "https://nuncamorto.github.io/UFOP-App/")
         connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
         connection.setFixedLengthStreamingMode(body.size)
         connection.outputStream.use { it.write(body) }

@@ -547,7 +547,7 @@ object AppUpdateManager {
                 readTimeout = READ_TIMEOUT_MS
                 requestMethod = "GET"
                 setRequestProperty("Accept", acceptHeader)
-                setRequestProperty("User-Agent", "VidaAcademicaUFOP-Android/${BuildConfig.VERSION_NAME}")
+                setRequestProperty("User-Agent", "VidaAcademica-Android/${BuildConfig.VERSION_NAME}")
             }
             val code = conn.responseCode
             if (code == HttpURLConnection.HTTP_MOVED_PERM ||

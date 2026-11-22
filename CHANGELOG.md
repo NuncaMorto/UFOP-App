@@ -1,20 +1,23 @@
-# Changelog & Patch Notes — Vida Acadêmica UFOP
+# Changelog & Patch Notes — Vida Acadêmica
+
+> **Aviso de Independência:** Aplicativo independente, desenvolvido por estudantes sob licença **GNU GPLv3** e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).
 
 Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) ficam disponíveis na página de [Releases do repositório](https://github.com/NuncaMorto/UFOP-App/releases).
 
 > **Sobre os formatos distribuídos:**
 > - **Android (`Vida-Academica-UFOP-vX.Y.Z-debug.apk`):** APK direto para instalação no Android 8.0+.
-> - **iOS (`Vida-Academica-UFOP-vX.Y.Z-unsigned.ipa`):** IPA compilado sem assinatura paga da Apple; instalável via AltStore, SideStore, Sideloadly, TrollStore ou Xcode.
+> - **iOS (`Vida-Academica-vX.Y.Z-unsigned.ipa`):** IPA compilado sem assinatura paga da Apple; instalável via AltStore, SideStore, Sideloadly, TrollStore ou Xcode.
 
 ---
 
-## v1.9.7 — Atualizador In-App, Licença GPLv3 & Página Web
+## v1.9.7 — Atualizador In-App, GPLv3 & Adequação para Lojas
 
 - **Android (`1.9.7` · Beta):**
   - **Atualização automática dentro do app:** verificação silenciosa via GitHub Releases, barra de progresso em segundo plano (com opção de continuar usando o app), checagem criptográfica **SHA-256** antes de instalar e reinicialização automática preservando 100% das disciplinas, faltas e dados criptografados.
   - **Botão manual em Perfil → FAQ:** `Verificar atualizações (GitHub)` com status em tempo real e sem poluir a barra de notificações do Android.
-- **Projeto & Página de Downloads:**
-  - Licença oficial **GNU GPLv3** adicionada (`LICENSE`) e nova página web estática de downloads em **`nuncamorto.github.io/UFOP-App`**.
+- **Compliance, Privacidade & Projeto:**
+  - Adequação de identificadores (`io.github.nuncamorto.vidaacademica`), metadados e textos às políticas de propriedade intelectual da App Store (5.2.1) e Google Play, com aviso explícito de projeto estudantil independente.
+  - Licença **GNU GPLv3** adicionada (`LICENSE`) e nova página web estática de downloads em **`nuncamorto.github.io/UFOP-App`**.
 
 <!-- versionCode: 24 -->
 

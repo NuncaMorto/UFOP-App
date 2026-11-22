@@ -108,7 +108,7 @@ public struct CurriculumMatrixView: View {
     private func topBar(accent: Color, highContrast: Bool) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("MATRIZ CURRICULAR · UFOP")
+                Text("MATRIZ CURRICULAR · GRADUAÇÃO")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .tracking(1.3)
                     .foregroundStyle(accent)
@@ -138,12 +138,12 @@ public struct CurriculumMatrixView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 Spacer()
-                Text("\(UfopCurriculumCatalog.allCourses.count) cursos UFOP")
+                Text("\(UfopCurriculumCatalog.allCourses.count) cursos no catálogo")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(accent)
             }
 
-            Picker("Curso UFOP", selection: $selectedCourseCode) {
+            Picker("Curso de graduação", selection: $selectedCourseCode) {
                 ForEach(UfopCurriculumCatalog.allCourses) { c in
                     Text("\(c.name) · \(c.campus)").tag(c.code)
                 }

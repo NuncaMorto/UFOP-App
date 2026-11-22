@@ -12,13 +12,13 @@ private let guidedTourSteps: [GuidedTourStepItem] = [
         tab: .agenda,
         icon: "calendar",
         title: "Sua Agenda do Dia",
-        description: "Acompanhe as aulas de hoje, horários, salas oficiais do ICEB/Bloco de Salas ou marcação EAD, clima do campus e faça check-in de presença, falta ou aula cancelada."
+        description: "Acompanhe as aulas de hoje, horários, salas previstas do ICEB/Bloco de Salas ou marcação EAD, clima do campus e faça check-in de presença, falta ou aula cancelada."
     ),
     GuidedTourStepItem(
         tab: .disciplines,
         icon: "book.closed.fill",
         title: "Disciplinas & Grade Horária",
-        description: "Alterne entre Grade e Barras, controle o limite de faltas (25% UFOP), envie Planos de Ensino em PDF e abra sua grade semanal vertical ou horizontal."
+        description: "Alterne entre Grade e Barras, controle o limite de faltas (25%), envie Planos de Ensino em PDF e abra sua grade semanal vertical ou horizontal."
     ),
     GuidedTourStepItem(
         tab: .activities,
@@ -29,8 +29,8 @@ private let guidedTourSteps: [GuidedTourStepItem] = [
     GuidedTourStepItem(
         tab: .profile,
         icon: "person.crop.circle",
-        title: "Perfil, CRE & Matriz UFOP",
-        description: "Acompanhe seu CRE pelo Histórico Escolar, simule notas futuras, explore as 54 matrizes da UFOP e consulte os Calendários 2026.2 a 2027.2."
+        title: "Perfil, CRE & Matriz Curricular",
+        description: "Acompanhe seu CRE pelo Histórico Escolar, simule notas futuras, explore as 54 matrizes curriculares de graduação e consulte os Calendários 2026.2 a 2027.2."
     ),
     GuidedTourStepItem(
         tab: .profile,

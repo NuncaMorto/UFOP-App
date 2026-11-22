@@ -1,13 +1,13 @@
-name: VidaAcademicaUFOP
+name: VidaAcademica
 options:
-  bundleIdPrefix: br.ufop
+  bundleIdPrefix: io.github.nuncamorto
   deploymentTarget:
     iOS: "17.0"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
 
 targets:
-  VidaAcademicaUFOP:
+  VidaAcademica:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
@@ -25,10 +25,10 @@ targets:
         buildPhase: resources
     settings:
       base:
-        PRODUCT_NAME: VidaAcademicaUFOP
-        PRODUCT_BUNDLE_IDENTIFIER: br.ufop.campus
-        MARKETING_VERSION: "1.9.6"
-        CURRENT_PROJECT_VERSION: "23"
+        PRODUCT_NAME: VidaAcademica
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.nuncamorto.vidaacademica
+        MARKETING_VERSION: "1.9.7"
+        CURRENT_PROJECT_VERSION: "24"
         SWIFT_VERSION: "5.9"
         SWIFT_STRICT_CONCURRENCY: minimal
         INFOPLIST_FILE: CampusUFOP/Resources/Info.plist
@@ -42,10 +42,10 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
 
 schemes:
-  VidaAcademicaUFOP:
+  VidaAcademica:
     build:
       targets:
-        VidaAcademicaUFOP: all
+        VidaAcademica: all
     run:
       config: Debug
     archive:

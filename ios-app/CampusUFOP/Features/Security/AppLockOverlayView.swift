@@ -35,7 +35,7 @@ public struct AppLockOverlayView: View {
                     }
 
                     VStack(spacing: 6) {
-                        Text("Vida Acadêmica UFOP")
+                        Text("Vida Acadêmica")
                             .font(.system(size: 22, weight: .bold, design: .rounded))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
@@ -177,7 +177,7 @@ public struct PrivacyBlurOverlayView: View {
                 Image(systemName: "lock.shield.fill")
                     .font(.system(size: 40, weight: .semibold))
                     .foregroundStyle(.secondary)
-                Text("Vida Acadêmica UFOP")
+                Text("Vida Acadêmica")
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }

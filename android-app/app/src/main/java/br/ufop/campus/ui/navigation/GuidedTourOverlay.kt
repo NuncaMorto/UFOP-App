@@ -125,7 +125,7 @@ private val GUIDED_TOUR_STEPS = listOf(
     ),
     GuidedTourStep(
         targetTab = CampusTab.PROFILE,
-        title = "Perfil, CRE & Matriz UFOP",
+        title = "Perfil, CRE & Matriz",
         description = "Acompanhe seu CRE, horas integralizadas, Histórico Escolar e a Matriz do seu curso, além de personalizar cores e tema.",
         icon = Icons.Default.Person,
         spotlightMode = TourSpotlightMode.TAB

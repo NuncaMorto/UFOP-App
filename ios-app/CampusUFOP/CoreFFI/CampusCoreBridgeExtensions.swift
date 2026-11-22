@@ -487,14 +487,14 @@ public extension CampusStore {
             return AcademicTermBannerInfo(
                 badge: "PERÍODO LETIVO",
                 title: "Semestre 2026.2 em andamento",
-                detail: "Aulas regulares · Resolução CUNI 2945",
+                detail: "Aulas regulares · Calendário acadêmico",
                 isRecessOrBreak: false
             )
         }
         if dateIso >= "2026-12-24" && dateIso <= "2027-02-21" {
             return AcademicTermBannerInfo(
                 badge: "RECESSO",
-                title: "Recesso Acadêmico UFOP",
+                title: "Recesso Acadêmico",
                 detail: "Início de 2027.1 em 22/02/2027",
                 isRecessOrBreak: true
             )
@@ -503,7 +503,7 @@ public extension CampusStore {
             return AcademicTermBannerInfo(
                 badge: "PERÍODO LETIVO",
                 title: "Semestre 2027.1 em andamento",
-                detail: "Calendário Presencial UFOP 2027",
+                detail: "Calendário acadêmico 2027 (ref.)",
                 isRecessOrBreak: false
             )
         }
@@ -511,14 +511,14 @@ public extension CampusStore {
             return AcademicTermBannerInfo(
                 badge: "PERÍODO LETIVO",
                 title: "Semestre 2027.2 em andamento",
-                detail: "Calendário Presencial UFOP 2027",
+                detail: "Calendário acadêmico 2027 (ref.)",
                 isRecessOrBreak: false
             )
         }
         return AcademicTermBannerInfo(
-            badge: "CALENDÁRIO UFOP",
+            badge: "CALENDÁRIO",
             title: "Fora do período letivo regular",
-            detail: "Consulte a aba Perfil → Calendário para datas oficiais",
+            detail: "Consulte a aba Perfil → Calendário para datas de referência",
             isRecessOrBreak: true
         )
     }

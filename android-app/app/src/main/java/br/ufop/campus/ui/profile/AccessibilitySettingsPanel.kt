@@ -285,7 +285,7 @@ fun AccessibilitySettingsPanel(
                             fontWeight = if (settings.boldTextBoost) FontWeight.Bold else FontWeight.SemiBold
                         )
                         Text(
-                            text = "Aulas e horários com alta legibilidade no padrão UFOP.",
+                            text = "Aulas e horários com alta legibilidade no aplicativo.",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontSize = (14 * settings.fontScaleMultiplier).sp,
                                 lineHeight = (20 * settings.fontScaleMultiplier).sp

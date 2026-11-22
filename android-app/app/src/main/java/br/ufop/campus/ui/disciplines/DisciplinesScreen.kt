@@ -234,7 +234,7 @@ fun DisciplinesScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                                    contentDescription = "Abrir Matriz Curricular UFOP",
+                                    contentDescription = "Abrir Matriz Curricular",
                                     modifier = Modifier.size(17.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -574,7 +574,7 @@ fun DisciplinesScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Cores padronizadas por departamento UFOP · status de faltas em semáforo acessível.",
+                        text = "Cores padronizadas por departamento · status de faltas em semáforo acessível.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )

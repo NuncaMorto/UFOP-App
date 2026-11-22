@@ -25,7 +25,7 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Usado para desbloquear o Vida Acadêmica UFOP com Face ID ou Touch ID.</string>
+	<string>Usado para desbloquear o Vida Acadêmica com Face ID ou Touch ID.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

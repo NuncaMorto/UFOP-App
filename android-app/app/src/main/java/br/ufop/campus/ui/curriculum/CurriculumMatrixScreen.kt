@@ -440,7 +440,7 @@ fun CurriculumMatrixModal(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "MATRIZ CURRICULAR · UFOP 2026/2",
+                        text = "MATRIZ CURRICULAR · 2026/2",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -490,7 +490,7 @@ fun CurriculumMatrixModal(
                     ) {
                         CircularProgressIndicator()
                         Text(
-                            text = "Carregando catálogo oficial da UFOP...",
+                            text = "Carregando catálogo curricular...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -582,14 +582,14 @@ fun CurriculumMatrixModal(
                                             tint = accessibleTextColor(StatusCancelledAmber, isDark)
                                         )
                                         Text(
-                                            text = "Resumo oficial 2026/2 · Detalhamento PDF pendente na fonte UFOP",
+                                            text = "Resumo 2026/2 · Detalhamento PDF pendente na fonte pública",
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                     Text(
-                                        text = "As cargas horárias totais oficiais de ${normalizeCurriculumDisplayName(selectedCourse.name)} já estão sincronizadas com o catálogo 2026/2 (${formatHoursPtBr(selectedCourse.chTotal)}h totais). A lista individual de componentes curriculares deste curso aguarda publicação detalhada pela Pró-Reitoria de Graduação.",
+                                        text = "As cargas horárias totais de ${normalizeCurriculumDisplayName(selectedCourse.name)} já estão sincronizadas com o catálogo 2026/2 (${formatHoursPtBr(selectedCourse.chTotal)}h totais). A lista individual de componentes curriculares aguarda disponibilidade na grade pública.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -598,7 +598,7 @@ fun CurriculumMatrixModal(
                                         modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
                                         shape = RoundedCornerShape(22.dp)
                                     ) {
-                                        Text("Explorar outro dos ${catalogCourses.size} cursos UFOP")
+                                        Text("Explorar outro dos ${catalogCourses.size} cursos")
                                     }
                                 }
                             }
@@ -1422,7 +1422,7 @@ private fun CourseCatalogSwitcherDialog(
         },
         title = {
             Text(
-                text = "Selecionar Curso UFOP (${courses.size})",
+                text = "Selecionar Curso (${courses.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )

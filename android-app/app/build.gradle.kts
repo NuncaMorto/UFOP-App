@@ -61,7 +61,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "br.ufop.campus"
+        applicationId = "io.github.nuncamorto.vidaacademica"
         minSdk = 26
         targetSdk = 35
         versionCode = 24

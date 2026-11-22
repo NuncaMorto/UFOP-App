@@ -385,13 +385,13 @@ fun AddCourseBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Departamento UFOP",
+                        text = "Departamento",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${resolvedDepartments.size} departamentos oficiais",
+                        text = "${resolvedDepartments.size} departamentos disponíveis",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -434,7 +434,7 @@ fun AddCourseBottomSheet(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Toque para pesquisar entre os ${resolvedDepartments.size} departamentos da UFOP",
+                                    text = "Toque para pesquisar entre ${resolvedDepartments.size} departamentos",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -460,7 +460,7 @@ fun AddCourseBottomSheet(
                                 )
                                 Icon(
                                     imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = "Selecionar departamento UFOP",
+                                    contentDescription = "Selecionar departamento",
                                     tint = accessibleAccent,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -771,12 +771,12 @@ private fun UfopDepartmentPickerDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Departamento UFOP",
+                    text = "Departamento",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "${filteredDepartments.size} de ${departments.size} departamentos oficiais",
+                    text = "${filteredDepartments.size} de ${departments.size} departamentos",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1064,7 +1064,7 @@ internal fun ScheduleSlotEditorFields(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Prédio da UFOP",
+                    text = "Prédio / Unidade",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -1107,14 +1107,14 @@ internal fun ScheduleSlotEditorFields(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = matchedBuilding?.shortName ?: draft.building.ifBlank { "Selecionar prédio da UFOP" },
+                                text = matchedBuilding?.shortName ?: draft.building.ifBlank { "Selecionar prédio ou local" },
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = matchedBuilding?.let { "${it.fullName} (${it.campusName})" }
-                                    ?: "Toque para ver todos os prédios oficiais da UFOP",
+                                    ?: "Toque para escolher prédio ou unidade",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -1125,7 +1125,7 @@ internal fun ScheduleSlotEditorFields(
 
                     Icon(
                         imageVector = Icons.Outlined.KeyboardArrowDown,
-                        contentDescription = "Escolher prédio UFOP",
+                        contentDescription = "Escolher prédio",
                         tint = accentColor,
                         modifier = Modifier.size(18.dp)
                     )
@@ -1239,7 +1239,7 @@ private fun UfopBuildingPickerDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Prédios de Ensino UFOP",
+                    text = "Prédios e Unidades",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )

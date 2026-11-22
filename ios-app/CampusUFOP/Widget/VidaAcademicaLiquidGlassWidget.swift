@@ -53,7 +53,7 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
             return CampusClassEntry(
                 date: Date(),
                 disciplineName: spotlight.item.title,
-                location: spotlight.item.location.isEmpty ? "Campus UFOP" : spotlight.item.location,
+                location: spotlight.item.location.isEmpty ? "Campus" : spotlight.item.location,
                 timeRange: "\(spotlight.dayLabel) · \(spotlight.item.timeRangeLabel)",
                 weatherTempC: spotlight.item.weatherTempC,
                 weatherSymbol: "sun.max.fill",
@@ -205,7 +205,7 @@ private struct WidgetGlassModifier: ViewModifier {
 // MARK: - Widget Configuration
 
 public struct VidaAcademicaLiquidGlassWidget: Widget {
-    public let kind: String = "br.ufop.campus.nextclass.widget"
+    public let kind: String = "io.github.nuncamorto.vidaacademica.nextclass.widget"
 
     public init() {}
 
@@ -213,8 +213,8 @@ public struct VidaAcademicaLiquidGlassWidget: Widget {
         StaticConfiguration(kind: kind, provider: VidaAcademicaTimelineProvider()) { entry in
             VidaAcademicaWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Vida Acadêmica UFOP")
-        .description("Próxima aula, sala e temperatura no seu campus da UFOP.")
+        .configurationDisplayName("Vida Acadêmica")
+        .description("Próxima aula, sala e clima do campus para estudantes da UFOP.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

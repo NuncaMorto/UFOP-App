@@ -114,7 +114,7 @@ object GitHubReleaseParser {
             tagName = tagName,
             versionName = normalizeVersionName(tagName),
             versionCode = parsedVersionCode,
-            title = releaseObj.optString("name", "").trim().ifEmpty { "Vida Acadêmica UFOP $tagName" },
+            title = releaseObj.optString("name", "").trim().ifEmpty { "Vida Acadêmica $tagName" },
             releaseNotes = cleanNotes,
             isPrerelease = releaseObj.optBoolean("prerelease", false) || tagName.contains("-"),
             publishedAt = releaseObj.optString("published_at", "").trim(),

@@ -144,7 +144,7 @@ public struct ProfileView: View {
             }
             Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("Substitui as disciplinas atuais do semestre pelo conjunto padrão de demonstração UFOP 2026.2.")
+            Text("Substitui as disciplinas atuais do semestre pelo conjunto padrão de demonstração 2026.2.")
         }
         .alert("Deseja baixar backup antes de sair?", isPresented: $showSignOutFirstAlert) {
             Button("Fazer backup antes") {
@@ -228,7 +228,7 @@ public struct ProfileView: View {
 
     private func studentIdentityCard(profile: StudentProfile, summary: AcademicProfileSummary) -> some View {
         let displayName = profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Estudante UFOP"
+            ? "Estudante"
             : profile.fullName
         let initials = displayName
             .split(separator: " ")
@@ -242,7 +242,7 @@ public struct ProfileView: View {
                 Circle()
                     .fill(primaryAccent)
                     .frame(width: 54, height: 54)
-                Text(initials.isEmpty ? "UF" : initials)
+                Text(initials.isEmpty ? "VA" : initials)
                     .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(onPrimaryAccent)
             }
@@ -279,7 +279,7 @@ public struct ProfileView: View {
     private func campusSelectorCard(summary: AcademicProfileSummary) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Campus UFOP")
+                Text("Campus")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                 Spacer()
@@ -445,7 +445,7 @@ public struct ProfileView: View {
         }
 
         VStack(alignment: .leading, spacing: 12) {
-            Text("Calendários Acadêmicos Oficiais UFOP")
+            Text("Calendários Acadêmicos")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
@@ -735,7 +735,7 @@ public struct ProfileView: View {
         Button {
             showResetSeedConfirmation = true
         } label: {
-            Label("Restaurar grade de demonstração UFOP 2026.2", systemImage: "arrow.counterclockwise")
+            Label("Restaurar grade de demonstração 2026.2", systemImage: "arrow.counterclockwise")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -762,7 +762,7 @@ public struct ProfileView: View {
             FaqEntry(
                 id: "absences",
                 question: "Como funciona o cálculo de faltas e aulas canceladas?",
-                answer: "O limite oficial da UFOP corresponde a 25% da carga horária (ex.: 60h = 18 faltas). Marcar uma aula como cancelada na Agenda nunca adiciona falta."
+                answer: "A referência de 25% da carga horária corresponde ao limite padrão (ex.: 60h = 18 faltas). Marcar uma aula como cancelada na Agenda nunca adiciona falta."
             ),
             FaqEntry(
                 id: "cre",
@@ -779,6 +779,23 @@ public struct ProfileView: View {
 
     @ViewBuilder
     private var faqSubtabContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("AVISO DE INDEPENDÊNCIA")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+
+            Text("Projeto estudantil sem vínculo institucional")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+            Text("Este é um aplicativo independente, desenvolvido por estudantes e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).")
+                .font(.system(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+
         VStack(alignment: .leading, spacing: 10) {
             Text("Novidades & Tour Guiado")
                 .font(.system(size: 15, weight: .bold, design: .rounded))

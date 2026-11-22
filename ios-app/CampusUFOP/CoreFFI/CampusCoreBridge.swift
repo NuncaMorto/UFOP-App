@@ -2638,7 +2638,7 @@ public final class CampusStore {
 
             disciplines.append(card)
             assessmentsByDiscipline[courseId] = []
-            notesByDiscipline[courseId] = "Grade oficial \(blueprint.code) · \(blueprint.campusName)."
+            notesByDiscipline[courseId] = "Grade sugerida \(blueprint.code) · \(blueprint.campusName)."
 
             for slotSpec in templateCourse.slots {
                 _ = try? addScheduleSlot(

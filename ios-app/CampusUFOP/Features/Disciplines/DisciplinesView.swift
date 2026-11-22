@@ -636,7 +636,7 @@ public struct DisciplinesView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
-            Text("Cores por departamento UFOP · semáforo acessível de faltas.")
+            Text("Cores por departamento · semáforo acessível de faltas.")
                 .font(.system(size: 11, weight: .regular))
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
         }

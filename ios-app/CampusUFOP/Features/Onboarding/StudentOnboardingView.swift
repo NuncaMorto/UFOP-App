@@ -285,13 +285,17 @@ public struct StudentOnboardingView: View {
     private func step1IdentityAndCertificate(accent: Color, highContrast: Bool) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Bem-vindo ao Vida Acadêmica UFOP")
+                Text("Bem-vindo ao Vida Acadêmica")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 Text("Importe seu Atestado de Matrícula (PDF), configure manualmente ou restaure um backup criptografado.")
                     .font(.system(size: 14))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+
+                Text("Aplicativo independente para estudantes, sem vínculo oficial ou afiliação com a UFOP.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
             }
 
             Picker("Método de cadastro", selection: $setupMethod) {
@@ -319,7 +323,7 @@ public struct StudentOnboardingView: View {
                             .foregroundStyle(accent)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Atestado de Matrícula (Minha UFOP)")
+                            Text("Atestado de Matrícula (PDF)")
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                             Text("O PDF é lido localmente em memória e descartado logo em seguida. Disciplinas EAD e salas do ICEB / Bloco de Salas são detectadas automaticamente.")
@@ -399,7 +403,7 @@ public struct StudentOnboardingView: View {
 
                     if !UfopCurriculumCatalog.allCourses.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Curso na UFOP")
+                            Text("Curso")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 

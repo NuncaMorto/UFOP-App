@@ -463,7 +463,7 @@ fun AppUpdateDialog(
 
                     is AppUpdateUiState.NeedsInstallPermission -> {
                         Text(
-                            text = "Falta apenas autorizar \"Instalar apps desconhecidos\" para o Vida Acadêmica UFOP instalar a atualização ${state.info.tagName} diretamente.",
+                            text = "Falta apenas autorizar \"Instalar apps desconhecidos\" para o Vida Acadêmica instalar a atualização ${state.info.tagName} diretamente.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )

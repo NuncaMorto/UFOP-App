@@ -181,7 +181,7 @@ fun AddCommitmentBottomSheet(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "AGENDA UFOP · $campusLabel",
+                                text = "AGENDA ACADÊMICA · $campusLabel",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = accessibleTextColor(MaterialTheme.colorScheme.primary, isDark),
                                 fontWeight = FontWeight.SemiBold,
@@ -437,7 +437,7 @@ fun AddCommitmentBottomSheet(
                             commitmentDate.trim().ifBlank { selectedIsoDate.ifBlank { defaultTodayIsoDate() } },
                             startTime.trim().ifBlank { "14:00" },
                             endTime.trim().ifBlank { "15:30" },
-                            location.trim().ifBlank { "Campus UFOP" }
+                            location.trim().ifBlank { "Campus" }
                         )
                     },
                     enabled = isTimeRangeValid,
@@ -507,7 +507,7 @@ fun CommitmentDetailBottomSheet(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "COMPROMISSO · AGENDA UFOP",
+                            text = "COMPROMISSO ACADÊMICO",
                             style = MaterialTheme.typography.labelMedium,
                             color = accessibleTextColor(MaterialTheme.colorScheme.primary, isDark),
                             fontWeight = FontWeight.SemiBold

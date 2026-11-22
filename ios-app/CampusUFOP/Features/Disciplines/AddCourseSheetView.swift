@@ -245,7 +245,7 @@ public struct AddCourseSheetView: View {
                 }
             }
 
-            Text("Limite de 25% da UFOP: até \(previewMaxAbsences) faltas.")
+            Text("Limite de 25%: até \(previewMaxAbsences) faltas.")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
         }

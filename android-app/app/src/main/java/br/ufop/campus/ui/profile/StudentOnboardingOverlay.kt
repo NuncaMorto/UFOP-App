@@ -235,7 +235,7 @@ internal fun UfopCourseSuggestionAndPickerBlock(
                 border = BorderStroke(1.dp, StatusAttendingGreen.copy(alpha = 0.35f))
             ) {
                 Text(
-                    text = "✓ Matriz UFOP identificada: ${resolvedIdentified.code} (${resolvedIdentified.chTotal}h)",
+                    text = "✓ Matriz identificada: ${resolvedIdentified.code} (${resolvedIdentified.chTotal}h)",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = StatusAttendingGreen,
@@ -279,7 +279,7 @@ internal fun UfopCourseSuggestionAndPickerBlock(
             },
             label = {
                 Text(
-                    text = "Selecionar dos ${catalogCourses.size.takeIf { it > 0 } ?: 54} cursos UFOP",
+                    text = "Selecionar dos ${catalogCourses.size.takeIf { it > 0 } ?: 54} cursos (ref. UFOP)",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -324,7 +324,7 @@ private fun UfopCourseCatalogPickerDialog(
         },
         title = {
             Text(
-                text = "Cursos Oficiais UFOP (${courses.size})",
+                text = "Cursos disponíveis (${courses.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -554,7 +554,7 @@ private enum class OnboardingStep(
     PROFILE_AND_ATTESTATION(
         stepNumber = 1,
         shortLabel = "Cadastro & Atestado",
-        title = "Bem-vindo ao Campus UFOP",
+        title = "Bem-vindo ao Vida Acadêmica",
         subtitle = "Importe seu Atestado de Matrícula (PDF), restaure um backup criptografado ou configure seu perfil manualmente."
     ),
     SYLLABUS_UPLOAD(
@@ -928,7 +928,7 @@ fun StudentOnboardingOverlay(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
                         ) {
                             Text(
-                                text = "UFOP",
+                                text = "INDEPENDENTE",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1420,13 +1420,13 @@ private fun OnboardingStep1ProfileAndAttestation(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "ATALHO RÁPIDO · MINHA UFOP",
+                text = "ATALHO · ATESTADO DE MATRÍCULA",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = DepartmentMathBlue
             )
             Text(
-                text = "Importe seu Atestado de Matrícula em PDF para preencher nome, matrícula, curso, disciplinas, prédios e grade horária automaticamente. Disciplinas EAD são identificadas automaticamente e nenhum arquivo PDF fica salvo no aparelho.",
+                text = "Compatível com o Atestado de Matrícula em PDF (ex.: Minha UFOP) para preencher nome, matrícula, curso, disciplinas, prédios e grade horária. Disciplinas EAD são detectadas automaticamente e nenhum arquivo PDF fica salvo no aparelho.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1450,7 +1450,7 @@ private fun OnboardingStep1ProfileAndAttestation(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Lendo atestado UFOP...",
+                        text = "Lendo atestado em PDF...",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -1644,7 +1644,7 @@ private fun OnboardingStep1ProfileAndAttestation(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Campus da UFOP",
+                    text = "Campus universitário",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -1711,6 +1711,13 @@ private fun OnboardingStep1ProfileAndAttestation(
             modifier = Modifier.size(18.dp)
         )
     }
+
+    Text(
+        text = "Aplicativo independente para estudantes, sem vínculo oficial ou afiliação com a Universidade Federal de Ouro Preto (UFOP).",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    )
 }
 
 @Composable

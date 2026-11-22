@@ -24,7 +24,7 @@ import java.util.Locale
 class VidaAcademicaWidgetProvider : AppWidgetProvider() {
 
     companion object {
-        const val ACTION_UPDATE_WIDGET = "br.ufop.campus.ACTION_UPDATE_WIDGET"
+        const val ACTION_UPDATE_WIDGET = "io.github.nuncamorto.vidaacademica.ACTION_UPDATE_WIDGET"
         private val SYNC_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 
         private val AUTO_REFRESH_ACTIONS = setOf(

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Compila o cliente iOS SwiftUI (`VidaAcademicaUFOP`) para iOS Device (Release sem assinatura)
-# e empacota o .ipa distribuível em `dist/Vida-Academica-UFOP-v<versao>-unsigned.ipa`.
+# Compila o cliente iOS SwiftUI (`VidaAcademica`) para iOS Device (Release sem assinatura)
+# e empacota o .ipa distribuível em `dist/Vida-Academica-v<versao>-unsigned.ipa`.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -48,10 +48,10 @@ rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}" "${DIST_DIR}"
 xcodegen generate --spec "${IOS_DIR}/project.yml" --project "${IOS_DIR}"
 
-echo "==> Compilando VidaAcademicaUFOP (Release / iphoneos sem code signing)"
+echo "==> Compilando VidaAcademica (Release / iphoneos sem code signing)"
 xcodebuild \
-  -project "${IOS_DIR}/VidaAcademicaUFOP.xcodeproj" \
-  -scheme VidaAcademicaUFOP \
+  -project "${IOS_DIR}/VidaAcademica.xcodeproj" \
+  -scheme VidaAcademica \
   -configuration Release \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
@@ -63,19 +63,19 @@ xcodebuild \
   CODE_SIGN_IDENTITY="" \
   build
 
-APP_PATH="${BUILD_DIR}/DerivedData/Build/Products/Release-iphoneos/VidaAcademicaUFOP.app"
+APP_PATH="${BUILD_DIR}/DerivedData/Build/Products/Release-iphoneos/VidaAcademica.app"
 if [[ ! -d "${APP_PATH}" ]]; then
   echo "Erro: bundle compilado não encontrado em '${APP_PATH}'." >&2
   exit 1
 fi
 
 STAGE_DIR="${BUILD_DIR}/ipa-stage"
-IPA_NAME="Vida-Academica-UFOP-v${VERSION}-unsigned.ipa"
+IPA_NAME="Vida-Academica-v${VERSION}-unsigned.ipa"
 IPA_OUT="${DIST_DIR}/${IPA_NAME}"
 
 rm -rf "${STAGE_DIR}"
 mkdir -p "${STAGE_DIR}/Payload"
-cp -R "${APP_PATH}" "${STAGE_DIR}/Payload/VidaAcademicaUFOP.app"
+cp -R "${APP_PATH}" "${STAGE_DIR}/Payload/VidaAcademica.app"
 
 echo "==> Empacotando ${IPA_NAME}"
 rm -f "${IPA_OUT}" "${IPA_OUT}.sha256"

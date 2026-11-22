@@ -10,39 +10,49 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.6"
+    public static let currentVersionString = "1.9.7"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.6",
-            title: "Paridade iOS Liquid Glass, Filtro Multi-Tipo & Disciplinas",
+            version: "v1.9.7",
+            title: "Licença GPLv3, Conformidade & Melhorias",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Adequação completa de nomes, identificadores e avisos de aplicativo independente para estudantes.",
+                "Projeto publicado sob licença GNU GPLv3."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.6",
+            title: "Paridade iOS Liquid Glass, Filtro Multi-Tipo & Disciplinas",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Visual Apple Liquid Glass nativo para iOS 26 com fallback translúcido em iOS 17–18, 7 cores de destaque e modo claro/escuro.",
                 "Segurança e privacidade: criptografia AES-256-GCM com chave no Keychain, exclusão imediata de PDFs temporários, bloqueio por senha e Face ID / Touch ID.",
                 "Cadastro em 4 etapas (Atestado PDF com detecção EAD, Planos de Ensino opcionais com validação, Personalização e Acessibilidade), Tour Guiado e Notas de Atualização.",
-                "Salas oficiais 2026.2 do ICEB e Bloco de Salas, Disciplinas em Grade ou Barras, Agenda com 7 dias completos e Calendários Oficiais UFOP 2026.2, 2027.1 e 2027.2.",
+                "Salas 2026.2 do ICEB e Bloco de Salas, Disciplinas em Grade ou Barras, Agenda com 7 dias completos e Calendários Acadêmicos 2026.2, 2027.1 e 2027.2.",
                 "Filtro multi-tipo em Atividades (Todos os tipos ▾) e ficha de avaliação alinhada com edição e confirmação antes de excluir."
             ]
         ),
         ReleaseNoteEntry(
             version: "v1.9.5",
-            title: "Salas Oficiais 2026.2, Disciplinas em Grade/Barras & Polimento",
+            title: "Salas 2026.2, Disciplinas em Grade/Barras & Polimento",
             badge: "ANTERIOR",
             isLatest: false,
             items: [
-                "Mapeamento automático de salas oficiais (ICEB e Bloco de Salas) a partir do Atestado de Matrícula.",
+                "Mapeamento automático de salas (ICEB e Bloco de Salas) a partir do Atestado de Matrícula.",
                 "Alternância persistente entre Grade e Barras em Disciplinas e Vertical/Horizontal na Grade Horária."
             ]
         ),
         ReleaseNoteEntry(
             version: "v1.9.0",
-            title: "Calendários Oficiais, Agenda Redesenhada & Acessibilidade",
+            title: "Calendários Acadêmicos, Agenda Redesenhada & Acessibilidade",
             badge: "ANTERIOR",
             isLatest: false,
             items: [
-                "Calendários Oficiais UFOP 2026.2, 2027.1 e 2027.2 integrados (Resolução CUNI 2945 e Calendário Presencial 2027).",
+                "Calendários Acadêmicos 2026.2, 2027.1 e 2027.2 integrados para consulta dos estudantes.",
                 "Agenda com 7 dias visíveis, aviso Agora / Próxima aula e melhorias de acessibilidade WCAG AA."
             ]
         ),
@@ -89,7 +99,7 @@ public struct ReleaseNotesSheetView: View {
                         Text("Notas de Atualização")
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                        Text("Novidades do Vida Acadêmica UFOP")
+                        Text("Novidades do Vida Acadêmica")
                             .font(.system(size: 12))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }

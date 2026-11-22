@@ -78,11 +78,11 @@ object CampusReleaseNotes {
         ),
         ReleaseNoteEntry(
             version = "v1.9.5",
-            title = "Salas Oficiais 2026.2, Disciplinas em Grade/Barras & Polimento Visual",
+            title = "Salas 2026.2, Disciplinas em Grade/Barras & Polimento Visual",
             badge = "ANTERIOR",
             isLatest = false,
             items = listOf(
-                "Salas oficiais 2026.2 (ICEB e Bloco de Salas): identificação automática da sala real no atestado e na grade; outros prédios permanecem sem sala fixa até nova tabela;",
+                "Salas de aula 2026.2 (ICEB e Bloco de Salas): identificação automática da sala no atestado e na grade; outros prédios permanecem sem sala fixa até nova tabela;",
                 "Disciplinas em Grade ou Barras: novo modo de exibição escolhido pelo aluno e cartões mais limpos, sem excesso de selos;",
                 "Agenda sem redundância: aviso \"Agora / Próxima aula\" integrado diretamente no card da aula quando você já está no dia dela;",
                 "Grade Horária com memória de orientação: o app lembra se você prefere Vertical ou Horizontal ao sair e voltar;",
@@ -91,11 +91,11 @@ object CampusReleaseNotes {
         ),
         ReleaseNoteEntry(
             version = "v1.9.0",
-            title = "Calendários Oficiais, Agenda Redesenhada & Acessibilidade",
+            title = "Calendários Acadêmicos, Agenda Redesenhada & Acessibilidade",
             badge = "ANTERIOR",
             isLatest = false,
             items = listOf(
-                "Calendários Acadêmicos Oficiais UFOP 2026.2, 2027.1 e 2027.2 integrados com suporte à Resolução CUNI 2945 e Calendário Presencial 2027.",
+                "Calendários Acadêmicos 2026.2, 2027.1 e 2027.2 integrados (com referência pública à Resolução CUNI 2945 e calendário presencial 2027).",
                 "Agenda redesenhada: 7 dias da semana visíveis sem corte, card inteligente 'Agora / Próxima aula', aviso de período letivo/recesso e remoção do relógio analógico redundante.",
                 "Seletores nativos Material 3 de Data e Hora com compensação de fuso horário UTC-3 (sem retroceder dias ao selecionar datas) e entrada por relógio ou teclado.",
                 "Grade Horária semanal interativa: toque na aula para detalhes completos, filtro de horários vazios, modo compacto legível e suporte a rotação livre de tela.",
@@ -129,10 +129,10 @@ object CampusReleaseNotes {
         ),
         ReleaseNoteEntry(
             version = "v1.7",
-            title = "Catálogo UFOP, Matriz Curricular & Histórico",
+            title = "Catálogo Curricular, Matriz & Histórico",
             badge = "HISTÓRICO",
             items = listOf(
-                "Catálogo oficial com 54 cursos da UFOP para seleção rápida e acompanhamento detalhado da matriz curricular.",
+                "Catálogo com 54 cursos (ref. UFOP) para seleção rápida e acompanhamento detalhado da matriz curricular.",
                 "Importação de Histórico Escolar (PDF) com cálculo automático de CRE, carga horária integralizada e simulação de notas.",
                 "Exportação e compartilhamento de grades horárias (.ufopgrade) com amigos e escolha de pasta de armazenamento."
             )
@@ -142,8 +142,8 @@ object CampusReleaseNotes {
             title = "Atestado PDF, Planos de Ensino & Calendário",
             badge = "HISTÓRICO",
             items = listOf(
-                "Leitura inteligente do Atestado de Matrícula (PDF) do Minha UFOP para importar disciplinas, prédios e grade semanal.",
-                "Importação de avaliações a partir de Planos de Ensino (PDF) e Calendário Acadêmico oficial assinado (SHA-256).",
+                "Leitura inteligente do Atestado de Matrícula (PDF) compatível com o Minha UFOP para importar disciplinas, prédios e grade semanal.",
+                "Importação de avaliações a partir de Planos de Ensino (PDF) e pacote de Calendário Acadêmico verificado via SHA-256.",
                 "Controle completo de presenças, faltas e aulas canceladas com cores por departamento."
             )
         )
@@ -213,7 +213,7 @@ fun ReleaseNotesDialog(
                                 modifier = Modifier.semantics { heading() }
                             )
                             Text(
-                                text = "Novidades e evolução do Vida Acadêmica UFOP",
+                                text = "Novidades e evolução do Vida Acadêmica",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
