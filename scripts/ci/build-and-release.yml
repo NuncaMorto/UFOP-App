@@ -1,0 +1,190 @@
+name: Build and Release (Android & iOS)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Plataforma para compilar"
+        required: true
+        default: "ios"
+        type: choice
+        options:
+          - ios
+          - android
+          - both
+      release_tag:
+        description: "Tag da Release (ex.: v1.9.6) para anexar os binários compilados (opcional)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  ios-ipa:
+    name: Build iOS (.ipa unsigned)
+    runs-on: macos-15
+    timeout-minutes: 25
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure XcodeGen is installed
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+
+      - name: Resolve version metadata
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+            [[ "${TAG}" == v* ]] || TAG="v${TAG}"
+          else
+            RAW_VER="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-app/app/build.gradle.kts | head -n 1)"
+            TAG="v${RAW_VER:-1.9.6}"
+          fi
+          VERSION="${TAG#v}"
+          echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build iOS .ipa (unsigned)
+        env:
+          VERSION_OVERRIDE: ${{ steps.meta.outputs.version }}
+        run: |
+          chmod +x scripts/build-ios-ipa.sh
+          ./scripts/build-ios-ipa.sh
+
+      - name: Upload iOS .ipa workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vida-academica-ufop-ios-ipa
+          path: dist/*.ipa*
+
+      - name: Attach .ipa to GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.release_tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            NOTES_FILE="$(mktemp)"
+            python3 - "${VERSION}" "${NOTES_FILE}" << 'PY'
+          import re, sys
+          from pathlib import Path
+          version, out_path = sys.argv[1], sys.argv[2]
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+          pat = re.compile(rf"^##\s+(?:\[)?v?{re.escape(version)}(?:\b|\]|\s|$)")
+          cap, active = [], False
+          for line in lines:
+              if not active:
+                  if pat.match(line):
+                      active = True
+                      cap.append(line)
+              else:
+                  if line.startswith("## "):
+                      break
+                  cap.append(line)
+          while cap and cap[-1].strip() in ("", "---"):
+              cap.pop()
+          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica UFOP v{version}\n"
+          Path(out_path).write_text(text, encoding="utf-8")
+          PY
+            gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --notes-file "${NOTES_FILE}"
+          fi
+          gh release upload "${TAG}" dist/*.ipa dist/*.ipa.sha256 --clobber
+
+  android-apk:
+    name: Verify Rust + Test & Build Android (.apk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Verify Rust core
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Resolve version metadata
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+            [[ "${TAG}" == v* ]] || TAG="v${TAG}"
+          else
+            RAW_VER="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-app/app/build.gradle.kts | head -n 1)"
+            TAG="v${RAW_VER:-1.9.6}"
+          fi
+          VERSION="${TAG#v}"
+          echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run Android unit tests & assemble debug APK
+        env:
+          FEEDBACK_RECIPIENT: ${{ secrets.FEEDBACK_RECIPIENT }}
+        run: |
+          chmod +x android-app/gradlew
+          cd android-app
+          ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+
+      - name: Package APK & SHA-256
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          mkdir -p dist
+          APK_NAME="Vida-Academica-UFOP-v${VERSION}-debug.apk"
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
+          (cd dist && sha256sum "${APK_NAME}" > "${APK_NAME}.sha256")
+
+      - name: Upload Android .apk workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vida-academica-ufop-android-apk
+          path: dist/*.apk*
+
+      - name: Attach .apk to GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.release_tag }}
+        run: |
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --generate-notes
+          fi
+          gh release upload "${TAG}" dist/*.apk dist/*.apk.sha256 --clobber

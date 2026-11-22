@@ -1,21 +1,34 @@
-# CAMPUS · UFOP
+# Vida Acadêmica · UFOP (`UFOP-App`)
 
 Aplicativo acadêmico offline-first para estudantes da **UFOP** (Universidade Federal de Ouro Preto), construído sobre um núcleo compartilhado de alto desempenho em **Rust + SQLite + UniFFI**, com clientes nativos em **Kotlin / Jetpack Compose** (Android) e **Swift / SwiftUI** (iOS).
 
 ---
 
+## Downloads & Patch Notes (Releases)
+
+Todos os pacotes instaláveis e o histórico completo de notas de atualização ficam publicados na aba oficial de [**Releases do repositório**](https://github.com/NuncaMorto/UFOP-App/releases) e documentados em [CHANGELOG.md](./CHANGELOG.md):
+
+- **Android (`.apk`):** baixe `Vida-Academica-UFOP-vX.Y.Z-debug.apk` na página de Releases e abra no aparelho para instalar (habilite *"Instalar apps desconhecidos"* se solicitado). Confira a integridade via `SHA256SUMS.txt`.
+- **iOS (`.ipa` não assinado):** baixe `Vida-Academica-UFOP-vX.Y.Z-unsigned.ipa` na página de Releases e instale via **AltStore**, **SideStore**, **Sideloadly**, **TrollStore** ou **Xcode**. *(Compilações em CI sem conta paga do Apple Developer Program geram `.ipa` não assinado — o conteúdo do app é idêntico e pode ser assinado localmente para o seu iPhone.)*
+- **Como publicar uma nova versão:**
+  1. Atualize a versão e as notas de atualização em [CHANGELOG.md](./CHANGELOG.md), crie a tag anotada (`git tag -a vX.Y.Z -m "Vida Acadêmica UFOP vX.Y.Z"`) e envie com `git push origin vX.Y.Z`, **ou**
+  2. Use `scripts/publish-release.ps1 -Tag vX.Y.Z` para criar/atualizar a Release com os binários de `dist/` e `SHA256SUMS.txt` automaticamente (o workflow de CI em `scripts/ci/build-and-release.yml` automatiza os builds Android `.apk` e iOS `.ipa` no GitHub Actions quando ativo em `.github/workflows/`).
+
+---
+
 ## Índice
 
-1. [Visão Geral e Arquitetura](#visão-geral-e-arquitetura)
-2. [Estrutura do Repositório](#estrutura-do-repositório)
-3. [Núcleo Compartilhado (`rust-core`)](#núcleo-compartilhado-rust-core)
+1. [Downloads & Patch Notes (Releases)](#downloads--patch-notes-releases)
+2. [Visão Geral e Arquitetura](#visão-geral-e-arquitetura)
+3. [Estrutura do Repositório](#estrutura-do-repositório)
+4. [Núcleo Compartilhado (`rust-core`)](#núcleo-compartilhado-rust-core)
    - [Regra de Faltas da UFOP](#regra-de-faltas-da-ufop)
    - [Migrações SQLite (001 a 004)](#migrações-sqlite-001-a-004)
    - [API `CampusEngine` e UniFFI](#api-campusengine-e-uniffi)
-4. [Aplicativo Android (`android-app`)](#aplicativo-android-android-app)
-5. [Aplicativo iOS (`ios-app`)](#aplicativo-ios-ios-app)
-6. [Como Instalar no Celular Android (`dist/CAMPUS-UFOP-v1.0-debug.apk`)](#como-instalar-no-celular-android-distcampus-ufop-v10-debugapk)
-7. [Scripts e Comandos Rápidos](#scripts-e-comandos-rápidos)
+5. [Aplicativo Android (`android-app`)](#aplicativo-android-android-app)
+6. [Aplicativo iOS (`ios-app`)](#aplicativo-ios-ios-app)
+7. [Como Instalar no Celular Android (Sideloading & ADB)](#como-instalar-no-celular-android-sideloading--adb)
+8. [Scripts e Comandos Rápidos](#scripts-e-comandos-rápidos)
    - [Geração do APK Android](#1-geração-do-apk-android-windows--powershell)
    - [Verificação do Núcleo Rust](#2-verificação-do-núcleo-rust-windows--powershell)
    - [Compilação FFI e Bindings Android](#3-compilação-ffi-e-bindings-android)
@@ -214,9 +227,9 @@ O cliente iOS é construído em **Swift 5.9+ / SwiftUI** com suporte a **iOS 17+
 
 ---
 
-## Como Instalar no Celular Android (`dist/CAMPUS-UFOP-v1.0-debug.apk`)
+## Como Instalar no Celular Android (Sideloading & ADB)
 
-O aplicativo **CAMPUS · UFOP** pode ser instalado diretamente em qualquer smartphone ou tablet Android (versão 8.0 / API 26 ou superior). O pacote distribuível gerado em `dist/CAMPUS-UFOP-v1.0-debug.apk` contém o aplicativo completo com ícone adaptativo da UFOP, suporte aos temas Claro/Escuro (Material 3) e arquitetura offline-first resiliente.
+O aplicativo **Vida Acadêmica · UFOP** pode ser instalado diretamente em qualquer smartphone ou tablet Android (versão 8.0 / API 26 ou superior). O pacote distribuível gerado em `dist/Vida-Academica-UFOP-vX.Y.Z-debug.apk` (também publicado na página de [**Releases**](https://github.com/NuncaMorto/UFOP-App/releases)) contém o aplicativo completo com ícone adaptativo da UFOP, suporte aos temas Claro/Escuro (Material 3) e arquitetura offline-first resiliente.
 
 ### 1. Gerando o Pacote APK (`scripts/build-apk.ps1`)
 
@@ -229,7 +242,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1
 O script automatiza:
 - Configuração do Java JDK/JBR (`JAVA_HOME`) e do Android SDK (`ANDROID_HOME`).
 - Compilação via Gradle Wrapper (`.\gradlew.bat :app:assembleDebug`).
-- Cópia do binário para `dist\CAMPUS-UFOP-v1.0-debug.apk`.
+- Cópia do binário para `dist\Vida-Academica-UFOP-vX.Y.Z-debug.apk`.
 - Cálculo e exibição do tamanho em MB e do hash criptográfico SHA-256 para auditoria de integridade.
 - Detecção automática de dispositivos conectados via `adb devices` e instalação direta caso um celular esteja plugado via USB.
 
@@ -246,23 +259,23 @@ O script automatiza:
    ```powershell
    adb devices
    ```
-5. Instale ou atualize o aplicativo mantendo os dados salvos:
+5. Instale ou atualize o aplicativo mantendo os dados salvos (substitua `v1.9.6` pela versão atual):
    ```powershell
-   adb install -r dist\CAMPUS-UFOP-v1.0-debug.apk
+   adb install -r dist\Vida-Academica-UFOP-v1.9.6-debug.apk
    ```
 
 #### Opção B: Instalação Manual Direta no Aparelho (Sideloading)
 
 Não exige cabo nem comandos no celular:
 
-1. Transfira o arquivo `dist/CAMPUS-UFOP-v1.0-debug.apk` para a memória do celular (via cabo USB, Google Drive, WhatsApp, Telegram ou compartilhamento local).
-2. No celular, abra o aplicativo de **Arquivos** (ou Gerenciador de Arquivos / Downloads) e toque sobre `CAMPUS-UFOP-v1.0-debug.apk`.
+1. Baixe `Vida-Academica-UFOP-vX.Y.Z-debug.apk` direto da página de [**Releases**](https://github.com/NuncaMorto/UFOP-App/releases) (ou transfira de `dist/` para o aparelho via USB ou Google Drive).
+2. No celular, abra o aplicativo de **Arquivos** (ou Gerenciador de Arquivos / Downloads) e toque sobre o `.apk`.
 3. Se o Android exibir a mensagem *"Para sua segurança, seu smartphone não tem permissão para instalar apps desconhecidos desta fonte"*:
    - Toque em **Configurações**.
    - Habilite a opção **"Permitir desta fonte"** (ou **"Instalar apps desconhecidos"**).
    - Volte para a tela anterior.
 4. Toque em **Instalar** (ou **Atualizar**) e aguarde a conclusão.
-5. Toque em **Abrir** para iniciar o **CAMPUS UFOP**.
+5. Toque em **Abrir** para iniciar o **Vida Acadêmica UFOP**.
 
 ---
 

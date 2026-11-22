@@ -37,6 +37,9 @@ local.properties
 *.pdf
 
 # iOS / Xcode
+*.ipa
+ios-app/*.xcodeproj/
+ios-app/CampusUFOP/Resources/Data/*.json
 ios-app/build/
 ios-app/.build/
 DerivedData/
