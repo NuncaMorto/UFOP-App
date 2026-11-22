@@ -2,10 +2,10 @@
 
 > **Aviso de Independência:** Aplicativo independente, desenvolvido por estudantes sob licença **GNU GPLv3** e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).
 
-Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) ficam disponíveis na página de [Releases do repositório](https://github.com/NuncaMorto/UFOP-App/releases).
+Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) ficam disponíveis na página de [Releases do repositório](https://github.com/NuncaMorto/Vida-Academica/releases).
 
 > **Sobre os formatos distribuídos:**
-> - **Android (`Vida-Academica-UFOP-vX.Y.Z-debug.apk`):** APK direto para instalação no Android 8.0+.
+> - **Android (`Vida-Academica-vX.Y.Z-debug.apk`):** APK direto para instalação no Android 8.0+.
 > - **iOS (`Vida-Academica-vX.Y.Z-unsigned.ipa`):** IPA compilado sem assinatura paga da Apple; instalável via AltStore, SideStore, Sideloadly, TrollStore ou Xcode.
 
 ---
@@ -17,7 +17,7 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
   - **Botão manual em Perfil → FAQ:** `Verificar atualizações (GitHub)` com status em tempo real e sem poluir a barra de notificações do Android.
 - **Compliance, Privacidade & Projeto:**
   - Adequação de identificadores (`io.github.nuncamorto.vidaacademica`), metadados e textos às políticas de propriedade intelectual da App Store (5.2.1) e Google Play, com aviso explícito de projeto estudantil independente.
-  - Licença **GNU GPLv3** adicionada (`LICENSE`) e nova página web estática de downloads em **`nuncamorto.github.io/UFOP-App`**.
+  - Licença **GNU GPLv3** adicionada (`LICENSE`) e nova página web estática de downloads em **`nuncamorto.github.io/Vida-Academica`**.
 
 <!-- versionCode: 24 -->
 

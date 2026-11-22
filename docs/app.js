@@ -1,7 +1,7 @@
 (function () {
   "use strict";
-  var API = "https://api.github.com/repos/NuncaMorto/UFOP-App/releases?per_page=10";
-  var FALLBACK = "https://github.com/NuncaMorto/UFOP-App/releases/tag/v1.9.7";
+  var API = "https://api.github.com/repos/NuncaMorto/Vida-Academica/releases?per_page=10";
+  var FALLBACK = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.7";
   var $ = function (id) { return document.getElementById(id); };
 
   // Theme toggle

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Cria ou atualiza uma Release no GitHub (NuncaMorto/UFOP-App) com APK, IPA, SHA256SUMS.txt e patch notes do CHANGELOG.md.
+    Cria ou atualiza uma Release no GitHub (NuncaMorto/Vida-Academica) com APK, IPA, SHA256SUMS.txt e patch notes do CHANGELOG.md.
 .PARAMETER Tag
     Tag da release (ex.: v1.9.6). Quando omitida, usa v<versionName> de android-app/app/build.gradle.kts.
 .PARAMETER NotesFile
@@ -55,10 +55,10 @@ if (Test-Path $BuildGradleKts) {
     }
 }
 
-$ReleaseApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag.apk"
-$DebugApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-debug.apk"
+$ReleaseApkPath = Join-Path $DistDir "Vida-Academica-$Tag.apk"
+$DebugApkPath = Join-Path $DistDir "Vida-Academica-$Tag-debug.apk"
 $ApkPath = if (Test-Path $ReleaseApkPath) { $ReleaseApkPath } else { $DebugApkPath }
-$IpaPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-unsigned.ipa"
+$IpaPath = Join-Path $DistDir "Vida-Academica-$Tag-unsigned.ipa"
 
 $Assets = New-Object System.Collections.Generic.List[string]
 if (Test-Path $ApkPath) { $Assets.Add($ApkPath) }
@@ -111,7 +111,7 @@ try {
             }
         }
         if (-not $ExtractedNotes) {
-            $ExtractedNotes = "## Vida Acadêmica UFOP $Tag`n`nRelease publicada a partir de \`dist/\`."
+            $ExtractedNotes = "## Vida Acadêmica $Tag`n`nRelease publicada a partir de \`dist/\`."
         }
         if ($VersionCode -and $ExtractedNotes -notmatch '<!--\s*versionCode\s*:') {
             $ExtractedNotes = $ExtractedNotes.TrimEnd() + "`n`n<!-- versionCode: $VersionCode -->`n"
@@ -120,7 +120,7 @@ try {
         [IO.File]::WriteAllText($ResolvedNotesPath, $ExtractedNotes, [Text.UTF8Encoding]::new($false))
     }
 
-    $Title = "Vida Acadêmica UFOP $Tag"
+    $Title = "Vida Acadêmica $Tag"
 
     $PreviousPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"

@@ -7,7 +7,7 @@ import java.security.MessageDigest
 import java.util.Locale
 
 /**
- * Metadados de uma versão Android publicada em `NuncaMorto/UFOP-App` (GitHub Releases).
+ * Metadados de uma versão Android publicada em `NuncaMorto/Vida-Academica` (GitHub Releases).
  */
 data class AppUpdateReleaseInfo(
     val tagName: String,
@@ -28,7 +28,7 @@ data class AppUpdateReleaseInfo(
 object GitHubReleaseParser {
 
     const val REPO_OWNER = "NuncaMorto"
-    const val REPO_NAME = "UFOP-App"
+    const val REPO_NAME = "Vida-Academica"
     const val RELEASES_API_URL =
         "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases?per_page=10"
 

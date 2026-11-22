@@ -111,7 +111,7 @@ jobs:
       - name: Upload iOS .ipa workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vida-academica-ufop-ios-ipa
+          name: vida-academica-ios-ipa
           path: dist/*.ipa*
 
       - name: Attach .ipa to GitHub Release
@@ -142,13 +142,13 @@ jobs:
                   cap.append(line)
           while cap and cap[-1].strip() in ("", "---"):
               cap.pop()
-          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica UFOP v{version}\n"
+          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica v{version}\n"
           Path(out_path).write_text(text, encoding="utf-8")
           PY
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
+              gh release create "${TAG}" --title "Vida Acadêmica ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
             else
-              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --notes-file "${NOTES_FILE}" --latest
+              gh release create "${TAG}" --title "Vida Acadêmica ${TAG}" --notes-file "${NOTES_FILE}" --latest
             fi
           else
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
@@ -275,10 +275,10 @@ jobs:
         run: |
           mkdir -p dist
           if [[ "${BUILD_TYPE}" == "release" ]]; then
-            APK_NAME="Vida-Academica-UFOP-v${VERSION}.apk"
+            APK_NAME="Vida-Academica-v${VERSION}.apk"
             cp android-app/app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
           else
-            APK_NAME="Vida-Academica-UFOP-v${VERSION}-debug.apk"
+            APK_NAME="Vida-Academica-v${VERSION}-debug.apk"
             cp android-app/app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
           fi
           (cd dist && sha256sum "${APK_NAME}" > "${APK_NAME}.sha256")
@@ -286,7 +286,7 @@ jobs:
       - name: Upload Android .apk workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vida-academica-ufop-android-apk
+          name: vida-academica-android-apk
           path: dist/*.apk*
 
       - name: Attach .apk to GitHub Release
@@ -317,13 +317,13 @@ jobs:
                   cap.append(line)
           while cap and cap[-1].strip() in ("", "---"):
               cap.pop()
-          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica UFOP v{version}\n"
+          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica v{version}\n"
           Path(out_path).write_text(text, encoding="utf-8")
           PY
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
+              gh release create "${TAG}" --title "Vida Acadêmica ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
             else
-              gh release create "${TAG}" --title "Vida Acadêmica UFOP ${TAG}" --notes-file "${NOTES_FILE}" --latest
+              gh release create "${TAG}" --title "Vida Acadêmica ${TAG}" --notes-file "${NOTES_FILE}" --latest
             fi
           else
             if [[ "${IS_PRERELEASE}" == "true" ]]; then

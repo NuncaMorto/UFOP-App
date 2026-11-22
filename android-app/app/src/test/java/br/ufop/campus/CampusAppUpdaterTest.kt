@@ -16,28 +16,30 @@ class CampusAppUpdaterTest {
             [
               {
                 "tag_name": "v1.9.7",
-                "name": "Vida Acadêmica UFOP v1.9.7",
+                "name": "Vida Acadêmica v1.9.7",
                 "draft": false,
                 "prerelease": true,
                 "published_at": "2026-11-22T15:00:00Z",
-                "html_url": "https://github.com/NuncaMorto/UFOP-App/releases/tag/v1.9.7",
+                "html_url": "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.7",
                 "body": "## Novidades\n- Atualizador automático\n<!-- versionCode: 24 -->",
                 "assets": [
                   {
-                    "name": "Vida-Academica-UFOP-v1.9.7-debug.apk",
+                    "name": "Vida-Academica-v1.9.7-debug.apk",
                     "size": 29100000,
                     "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                    "browser_download_url": "https://github.com/NuncaMorto/UFOP-App/releases/download/v1.9.7/Vida-Academica-UFOP-v1.9.7-debug.apk"
+                    "browser_download_url": "https://github.com/NuncaMorto/Vida-Academica/releases/download/v1.9.7/Vida-Academica-v1.9.7-debug.apk"
                   },
                   {
                     "name": "SHA256SUMS.txt",
                     "size": 108,
-                    "browser_download_url": "https://github.com/NuncaMorto/UFOP-App/releases/download/v1.9.7/SHA256SUMS.txt"
+                    "browser_download_url": "https://github.com/NuncaMorto/Vida-Academica/releases/download/v1.9.7/SHA256SUMS.txt"
                   }
                 ]
               }
             ]
         """.trimIndent()
+
+        assertEquals("Vida-Academica", GitHubReleaseParser.REPO_NAME)
 
         val found = GitHubReleaseParser.parseLatestApplicableRelease(
             releasesJson = sampleJson,
@@ -95,14 +97,14 @@ class CampusAppUpdaterTest {
                 "body": "<!-- versionCode: 25 -->",
                 "assets": [
                   {
-                    "name": "Vida-Academica-UFOP-v1.0.0-debug.apk",
+                    "name": "Vida-Academica-v1.0.0-debug.apk",
                     "size": 28000000,
-                    "browser_download_url": "https://github.com/NuncaMorto/UFOP-App/releases/download/v1.0.0/Vida-Academica-UFOP-v1.0.0-debug.apk"
+                    "browser_download_url": "https://github.com/NuncaMorto/Vida-Academica/releases/download/v1.0.0/Vida-Academica-v1.0.0-debug.apk"
                   },
                   {
-                    "name": "Vida-Academica-UFOP-v1.0.0.apk",
+                    "name": "Vida-Academica-v1.0.0.apk",
                     "size": 14000000,
-                    "browser_download_url": "https://github.com/NuncaMorto/UFOP-App/releases/download/v1.0.0/Vida-Academica-UFOP-v1.0.0.apk"
+                    "browser_download_url": "https://github.com/NuncaMorto/Vida-Academica/releases/download/v1.0.0/Vida-Academica-v1.0.0.apk"
                   }
                 ]
               }
@@ -115,7 +117,7 @@ class CampusAppUpdaterTest {
             currentVersionCode = 24,
             includePrereleases = false
         )
-        assertEquals("Vida-Academica-UFOP-v1.0.0.apk", found?.apkName)
+        assertEquals("Vida-Academica-v1.0.0.apk", found?.apkName)
     }
 
     @Test
@@ -123,13 +125,13 @@ class CampusAppUpdaterTest {
         val hashA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         val hashB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         val sums = """
-            $hashA  Vida-Academica-UFOP-v1.9.7-debug.apk
-            $hashB  Vida-Academica-UFOP-v1.9.7-unsigned.ipa
+            $hashA  Vida-Academica-v1.9.7-debug.apk
+            $hashB  Vida-Academica-v1.9.7-unsigned.ipa
         """.trimIndent()
 
         assertEquals(
             hashA,
-            GitHubReleaseParser.extractSha256FromChecksumText(sums, "Vida-Academica-UFOP-v1.9.7-debug.apk")
+            GitHubReleaseParser.extractSha256FromChecksumText(sums, "Vida-Academica-v1.9.7-debug.apk")
         )
         assertTrue(GitHubReleaseParser.verifySha256Hex(hashA.uppercase(), hashA))
         assertFalse(GitHubReleaseParser.verifySha256Hex(hashB, hashA))

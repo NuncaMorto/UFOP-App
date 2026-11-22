@@ -1,25 +1,25 @@
-# Vida Acadêmica (app independente para estudantes da UFOP)
+# Vida Acadêmica
 
 > [!NOTE]
-> **Aviso de Independência:** Este é um aplicativo independente, desenvolvido por estudantes sob licença **GNU GPLv3** e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).
+> **Projeto Independente:** O **Vida Acadêmica** é um aplicativo independente e de código aberto (**GNU GPLv3**), feito por estudantes e **sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP)**, criado para ajudar na organização da vida acadêmica.
 
-Aplicativo acadêmico offline-first para estudantes da **UFOP** (Universidade Federal de Ouro Preto), construído sobre um núcleo compartilhado de alto desempenho em **Rust + SQLite + UniFFI**, com clientes nativos em **Kotlin / Jetpack Compose** (Android) e **Swift / SwiftUI** (iOS).
+Aplicativo offline-first de apoio à rotina universitária (Ouro Preto, Mariana e João Monlevade), construído sobre um núcleo compartilhado em **Rust + SQLite + UniFFI**, com clientes nativos em **Kotlin / Jetpack Compose** (Android) e **Swift / SwiftUI** (iOS).
 
 ---
 
 ## Downloads & Patch Notes (Releases)
 
-Todos os pacotes instaláveis e o histórico completo de notas de atualização ficam disponíveis na página web de downloads (**[nuncamorto.github.io/UFOP-App](https://nuncamorto.github.io/UFOP-App/)**) e na aba de [**Releases do repositório**](https://github.com/NuncaMorto/UFOP-App/releases), documentados em [CHANGELOG.md](./CHANGELOG.md):
+Todos os pacotes instaláveis e o histórico completo de notas de atualização ficam disponíveis na página web de downloads (**[nuncamorto.github.io/Vida-Academica](https://nuncamorto.github.io/Vida-Academica/)**) e na aba de [**Releases do repositório**](https://github.com/NuncaMorto/Vida-Academica/releases), documentados em [CHANGELOG.md](./CHANGELOG.md):
 
 - **Canal atual (Beta Android · branch `develop`):** as compilações de teste são distribuídas apenas para **Android** como **Pre-release**, com suporte a **atualização automática dentro do próprio aplicativo** (download com progresso, verificação SHA-256 e reinício preservando todos os dados).
 - **iOS (`Apple Liquid Glass`):** o código-fonte SwiftUI segue mantido no repositório com previsão de lançamento oficial **v1.0.0 na App Store** quando a publicação estiver disponível.
 - **Fluxo de branches:**
   - **`develop` (Beta / Testes):** concentra o desenvolvimento contínuo. Builds desta fase (como `v1.9.7`) são publicados como **Pre-release** com `.apk` de testes.
-  - **`main` (Estável / Produção):** receberá merge da `develop` no lançamento oficial (**`v1.0.0`**), marcando a Release como **Latest** e gerando o APK assinado sem `-debug` no nome (`Vida-Academica-UFOP-vX.Y.Z.apk`).
-- **Android (`.apk`):** acesse [nuncamorto.github.io/UFOP-App](https://nuncamorto.github.io/UFOP-App/) (ou baixe `Vida-Academica-UFOP-vX.Y.Z.apk` / `-debug.apk` nas Releases) e abra no aparelho para instalar (habilite *"Instalar apps desconhecidos"* se solicitado). Confira a integridade via `SHA256SUMS.txt` / `.sha256`.
+  - **`main` (Estável / Produção):** receberá merge da `develop` no lançamento oficial (**`v1.0.0`**), marcando a Release como **Latest** e gerando o APK assinado sem `-debug` no nome (`Vida-Academica-vX.Y.Z.apk`).
+- **Android (`.apk`):** acesse [nuncamorto.github.io/Vida-Academica](https://nuncamorto.github.io/Vida-Academica/) (ou baixe `Vida-Academica-vX.Y.Z.apk` / `-debug.apk` nas Releases) e abra no aparelho para instalar (habilite *"Instalar apps desconhecidos"* se solicitado). Confira a integridade via `SHA256SUMS.txt` / `.sha256`.
 - **APK Release assinado no CI (para `v1.0.0+`):** o workflow `.github/workflows/build-and-release.yml` gera o APK `release` limpo (sem `-debug`) automaticamente quando os 4 secrets opcionais estão configurados no repositório: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` (localmente via `release.storeFile`, `release.storePassword`, `release.keyAlias` e `release.keyPassword` em `android-app/local.properties`).
 - **Como publicar uma nova versão Beta Android:**
-  1. Atualize versão e notas em [CHANGELOG.md](./CHANGELOG.md), crie a tag anotada (`git tag -a vX.Y.Z -m "Vida Acadêmica UFOP vX.Y.Z"`) e envie para `origin/develop`.
+  1. Atualize versão e notas em [CHANGELOG.md](./CHANGELOG.md), crie a tag anotada (`git tag -a vX.Y.Z -m "Vida Acadêmica vX.Y.Z"`) e envie para `origin/develop`.
   2. Use `scripts/publish-release.ps1 -Tag vX.Y.Z -Prerelease -AndroidOnly` (ou dispare manualmente o workflow `Build and Release (Android & iOS)`).
 
 ## Licença
@@ -60,7 +60,7 @@ O projeto CAMPUS unifica as regras acadêmicas, modelo relacional e lógica de n
 
 ```text
 ┌────────────────────────────────────────────────────────┐
-│                      CAMPUS · UFOP                     │
+│                     VIDA ACADÊMICA                     │
 ├───────────────────────────┬────────────────────────────┤
 │   Android (Jetpack Compose)│     iOS (SwiftUI / iOS 17+) │
 │   - Material 3 (Dark/Light)│     - Adaptive Theme       │
@@ -144,7 +144,7 @@ O projeto CAMPUS unifica as regras acadêmicas, modelo relacional e lógica de n
 │           ├── Profile/                       # Resumo acadêmico, campi e calendário acadêmico
 │           └── Timetable/                     # TimetableGridView com matriz, templates e restauração 2026.2
 ├── dist/                                      # Pacotes prontos para distribuição e instalação
-│   └── Vida-Academica-UFOP-vX.Y.Z-debug.apk   # Pacote APK instalável em smartphones Android
+│   └── Vida-Academica-vX.Y.Z-debug.apk        # Pacote APK instalável em smartphones Android
 └── scripts/
     ├── build-apk.ps1                          # Geração do APK debug Android e instalação via adb
     ├── verify-core.ps1                        # Verificação (fmt, clippy, tests) com auto-detecção MSVC vcvars64.bat
@@ -241,7 +241,7 @@ O cliente iOS é construído em **Swift 5.9+ / SwiftUI** com suporte a **iOS 17+
 
 ## Como Instalar no Celular Android (Sideloading & ADB)
 
-O aplicativo **Vida Acadêmica** pode ser instalado diretamente em qualquer smartphone ou tablet Android (versão 8.0 / API 26 ou superior). O pacote distribuível gerado em `dist/Vida-Academica-UFOP-vX.Y.Z-debug.apk` (também publicado na página de [**Releases**](https://github.com/NuncaMorto/UFOP-App/releases)) contém o aplicativo completo com ícone adaptativo, suporte aos temas Claro/Escuro (Material 3) e arquitetura offline-first resiliente.
+O aplicativo **Vida Acadêmica** pode ser instalado diretamente em qualquer smartphone ou tablet Android (versão 8.0 / API 26 ou superior). O pacote distribuível gerado em `dist/Vida-Academica-vX.Y.Z-debug.apk` (também publicado na página de [**Releases**](https://github.com/NuncaMorto/Vida-Academica/releases)) contém o aplicativo completo com ícone adaptativo, suporte aos temas Claro/Escuro (Material 3) e arquitetura offline-first resiliente.
 
 ### 1. Gerando o Pacote APK (`scripts/build-apk.ps1`)
 
@@ -254,7 +254,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1
 O script automatiza:
 - Configuração do Java JDK/JBR (`JAVA_HOME`) e do Android SDK (`ANDROID_HOME`).
 - Compilação via Gradle Wrapper (`.\gradlew.bat :app:assembleDebug`).
-- Cópia do binário para `dist\Vida-Academica-UFOP-vX.Y.Z-debug.apk`.
+- Cópia do binário para `dist\Vida-Academica-vX.Y.Z-debug.apk`.
 - Cálculo e exibição do tamanho em MB e do hash criptográfico SHA-256 para auditoria de integridade.
 - Detecção automática de dispositivos conectados via `adb devices` e instalação direta caso um celular esteja plugado via USB.
 
@@ -271,16 +271,16 @@ O script automatiza:
    ```powershell
    adb devices
    ```
-5. Instale ou atualize o aplicativo mantendo os dados salvos (substitua `v1.9.6` pela versão atual):
+5. Instale ou atualize o aplicativo mantendo os dados salvos (substitua `v1.9.7` pela versão atual):
    ```powershell
-   adb install -r dist\Vida-Academica-UFOP-v1.9.6-debug.apk
+   adb install -r dist\Vida-Academica-v1.9.7-debug.apk
    ```
 
 #### Opção B: Instalação Manual Direta no Aparelho (Sideloading)
 
 Não exige cabo nem comandos no celular:
 
-1. Baixe `Vida-Academica-UFOP-vX.Y.Z-debug.apk` direto da página de [**Releases**](https://github.com/NuncaMorto/UFOP-App/releases) (ou transfira de `dist/` para o aparelho via USB ou Google Drive).
+1. Baixe `Vida-Academica-vX.Y.Z-debug.apk` direto da página de [**Releases**](https://github.com/NuncaMorto/Vida-Academica/releases) (ou transfira de `dist/` para o aparelho via USB ou Google Drive).
 2. No celular, abra o aplicativo de **Arquivos** (ou Gerenciador de Arquivos / Downloads) e toque sobre o `.apk`.
 3. Se o Android exibir a mensagem *"Para sua segurança, seu smartphone não tem permissão para instalar apps desconhecidos desta fonte"*:
    - Toque em **Configurações**.

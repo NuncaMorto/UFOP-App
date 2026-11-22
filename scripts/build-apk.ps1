@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Compila o APK de debug do Vida Acadêmica UFOP (`android-app`) e exporta com o número de versão em `dist\`.
+    Compila o APK de debug do Vida Acadêmica (`android-app`) e exporta com o número de versão em `dist\`.
 #>
 $ErrorActionPreference = "Stop"
 
@@ -16,8 +16,7 @@ if (Test-Path $BuildGradleKts) {
         $VersionName = $Matches[1]
     }
 }
-$OutputApk = Join-Path $DistDir "Vida-Academica-UFOP-v$VersionName-debug.apk"
-$CompatApk = Join-Path $DistDir "CAMPUS-UFOP-v$VersionName-debug.apk"
+$OutputApk = Join-Path $DistDir "Vida-Academica-v$VersionName-debug.apk"
 $BuiltApk = Join-Path $AndroidDir "app\build\outputs\apk\debug\app-debug.apk"
 
 $DefaultJavaHome = "C:\Program Files\Android\Android Studio\jbr"
@@ -64,7 +63,6 @@ if (-not (Test-Path $BuiltApk)) {
 
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 Copy-Item -Path $BuiltApk -Destination $OutputApk -Force
-Copy-Item -Path $BuiltApk -Destination $CompatApk -Force
 
 $FileInfo = Get-Item $OutputApk
 $SizeBytes = $FileInfo.Length
@@ -76,6 +74,5 @@ $Sha256 = (Get-FileHash -Path $OutputApk -Algorithm SHA256).Hash
 
 Write-Host "==> APK gerado com sucesso (v$VersionName)!" -ForegroundColor Green
 Write-Host "    Caminho principal: $OutputApk"
-Write-Host "    Cópia compatível:  $CompatApk"
 Write-Host "    Tamanho:           $SizeBytes bytes ($SizeMb MB)"
 Write-Host "    SHA256:            $Sha256"

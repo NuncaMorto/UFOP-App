@@ -134,7 +134,7 @@ private fun postPayload(payload: FeedbackPayload) {
         connection.setRequestProperty("Accept", "application/json")
         connection.setRequestProperty("User-Agent", "VidaAcademica-Android/$FEEDBACK_APP_VERSION")
         connection.setRequestProperty("Origin", "https://nuncamorto.github.io")
-        connection.setRequestProperty("Referer", "https://nuncamorto.github.io/UFOP-App/")
+        connection.setRequestProperty("Referer", "https://nuncamorto.github.io/Vida-Academica/")
         connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
         connection.setFixedLengthStreamingMode(body.size)
         connection.outputStream.use { it.write(body) }
