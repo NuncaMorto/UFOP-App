@@ -64,8 +64,8 @@ android {
         applicationId = "br.ufop.campus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.9.6"
+        versionCode = 24
+        versionName = "1.9.7"
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", "\"$feedbackEndpoint\"")
 

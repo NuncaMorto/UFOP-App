@@ -8,6 +8,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.7 — Atualizador In-App, Licença GPLv3 & Página Web
+
+- **Android (`1.9.7` · Beta):**
+  - **Atualização automática dentro do app:** verificação silenciosa via GitHub Releases, barra de progresso em segundo plano (com opção de continuar usando o app), checagem criptográfica **SHA-256** antes de instalar e reinicialização automática preservando 100% das disciplinas, faltas e dados criptografados.
+  - **Botão manual em Perfil → FAQ:** `Verificar atualizações (GitHub)` com status em tempo real e sem poluir a barra de notificações do Android.
+- **Projeto & Página de Downloads:**
+  - Licença oficial **GNU GPLv3** adicionada (`LICENSE`) e nova página web estática de downloads em **`nuncamorto.github.io/UFOP-App`**.
+
+<!-- versionCode: 24 -->
+
+---
+
 ## v1.9.6 — Paridade iOS Liquid Glass, Filtro Multi-Tipo & Disciplinas
 
 - **iOS (`Vida Academica UFOP` · Apple Liquid Glass):** paridade completa das atualizações **v1.5 → v1.9.6** adotando design **Apple Liquid Glass** (Xcode 26 / iOS 26 SDK com fallback `.ultraThinMaterial` para iOS 17–18):

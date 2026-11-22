@@ -55,10 +55,21 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.6",
-            title = "Filtro Multi-Tipo em Atividades, Disciplinas & Alinhamento",
+            version = "v1.9.7",
+            title = "Atualizador In-App, Licença GPLv3 & Página Web",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Novo atualizador automático dentro do app (via GitHub Releases): baixa em segundo plano com barra de progresso, valida integridade via SHA-256 e reinicia preservando 100% dos seus dados;",
+                "Nova opção Verificar atualizações (GitHub) em Perfil → FAQ e aviso discreto no topo quando houver nova versão;",
+                "Repositório aberto sob licença GNU GPLv3 com nova página web de download direto para Android."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.6",
+            title = "Filtro Multi-Tipo em Atividades, Disciplinas & Alinhamento",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Correção na aba Disciplinas ao alternar entre Grade e Barras (sem ocultar matérias ou fechar ao abrir detalhes) e leitura limpa de 12/18 · Atenção;",
                 "Novo seletor multi-tipo em Atividades (Todos os tipos ▾) para filtrar um ou mais tipos (Provas, Trabalhos, Seminários e Concluídas) na mesma linha;",

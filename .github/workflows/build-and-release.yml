@@ -1,9 +1,7 @@
 name: Build and Release (Android & iOS)
 
+# Disparo automático por tags ficará ativo após a v1.0.0; durante o beta usamos disparo manual / scripts locais.
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       platform:

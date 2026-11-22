@@ -6,17 +6,22 @@ Aplicativo acadêmico offline-first para estudantes da **UFOP** (Universidade Fe
 
 ## Downloads & Patch Notes (Releases)
 
-Todos os pacotes instaláveis e o histórico completo de notas de atualização ficam publicados na aba oficial de [**Releases do repositório**](https://github.com/NuncaMorto/UFOP-App/releases) e documentados em [CHANGELOG.md](./CHANGELOG.md):
+Todos os pacotes instaláveis e o histórico completo de notas de atualização ficam disponíveis na página web de downloads (**[nuncamorto.github.io/UFOP-App](https://nuncamorto.github.io/UFOP-App/)**) e na aba de [**Releases do repositório**](https://github.com/NuncaMorto/UFOP-App/releases), documentados em [CHANGELOG.md](./CHANGELOG.md):
 
-- **Fluxo de branches e canais:**
-  - **`develop` (Beta / Testes):** concentra o desenvolvimento contínuo mantendo Android e iOS sincronizados. Builds desta fase (como `v1.9.6`) são publicados como **Pre-release** com `.apk` (`-debug`) e `.ipa` não assinado para testes.
-  - **`main` (Estável / Produção):** recebe merge da `develop` quando tudo estiver redondo para lançamento oficial (a partir da **`v1.0.0`**), marcando a Release como **Latest** e gerando o APK assinado sem `-debug` no nome (`Vida-Academica-UFOP-vX.Y.Z.apk`).
-- **Android (`.apk`):** baixe `Vida-Academica-UFOP-vX.Y.Z.apk` (release) ou `Vida-Academica-UFOP-vX.Y.Z-debug.apk` (pre-release/testes) na página de Releases e abra no aparelho para instalar (habilite *"Instalar apps desconhecidos"* se solicitado). Confira a integridade via `SHA256SUMS.txt` / `.sha256`.
-- **iOS (`.ipa` não assinado):** baixe `Vida-Academica-UFOP-vX.Y.Z-unsigned.ipa` na página de Releases e instale via **AltStore**, **SideStore**, **Sideloadly**, **TrollStore** ou **Xcode**. *(Compilações em CI sem conta paga do Apple Developer Program geram `.ipa` não assinado — o conteúdo do app é idêntico e pode ser assinado localmente para o seu iPhone.)*
-- **APK Release assinado no CI (opcional para `v1.0.0+`):** o workflow `.github/workflows/build-and-release.yml` gera o APK `release` limpo (sem `-debug`) automaticamente quando os 4 secrets opcionais estão configurados no repositório: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` (localmente via `release.storeFile`, `release.storePassword`, `release.keyAlias` e `release.keyPassword` em `android-app/local.properties`).
-- **Como publicar uma nova versão:**
-  1. Atualize a versão e as notas de atualização em [CHANGELOG.md](./CHANGELOG.md), crie a tag anotada (`git tag -a vX.Y.Z -m "Vida Acadêmica UFOP vX.Y.Z"`) e envie com `git push origin vX.Y.Z`, **ou**
-  2. Dispare manualmente o workflow `Build and Release (Android & iOS)` escolhendo `platform`, `release_tag`, `prerelease` e `android_build_type` (`debug` ou `release`), ou use `scripts/publish-release.ps1 -Tag vX.Y.Z [-Prerelease]`.
+- **Canal atual (Beta Android · branch `develop`):** as compilações de teste são distribuídas apenas para **Android** como **Pre-release**, com suporte a **atualização automática dentro do próprio aplicativo** (download com progresso, verificação SHA-256 e reinício preservando todos os dados).
+- **iOS (`Apple Liquid Glass`):** o código-fonte SwiftUI segue mantido no repositório com previsão de lançamento oficial **v1.0.0 na App Store** quando a publicação estiver disponível.
+- **Fluxo de branches:**
+  - **`develop` (Beta / Testes):** concentra o desenvolvimento contínuo. Builds desta fase (como `v1.9.7`) são publicados como **Pre-release** com `.apk` de testes.
+  - **`main` (Estável / Produção):** receberá merge da `develop` no lançamento oficial (**`v1.0.0`**), marcando a Release como **Latest** e gerando o APK assinado sem `-debug` no nome (`Vida-Academica-UFOP-vX.Y.Z.apk`).
+- **Android (`.apk`):** acesse [nuncamorto.github.io/UFOP-App](https://nuncamorto.github.io/UFOP-App/) (ou baixe `Vida-Academica-UFOP-vX.Y.Z.apk` / `-debug.apk` nas Releases) e abra no aparelho para instalar (habilite *"Instalar apps desconhecidos"* se solicitado). Confira a integridade via `SHA256SUMS.txt` / `.sha256`.
+- **APK Release assinado no CI (para `v1.0.0+`):** o workflow `.github/workflows/build-and-release.yml` gera o APK `release` limpo (sem `-debug`) automaticamente quando os 4 secrets opcionais estão configurados no repositório: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` (localmente via `release.storeFile`, `release.storePassword`, `release.keyAlias` e `release.keyPassword` em `android-app/local.properties`).
+- **Como publicar uma nova versão Beta Android:**
+  1. Atualize versão e notas em [CHANGELOG.md](./CHANGELOG.md), crie a tag anotada (`git tag -a vX.Y.Z -m "Vida Acadêmica UFOP vX.Y.Z"`) e envie para `origin/develop`.
+  2. Use `scripts/publish-release.ps1 -Tag vX.Y.Z -Prerelease -AndroidOnly` (ou dispare manualmente o workflow `Build and Release (Android & iOS)`).
+
+## Licença
+
+Este projeto é distribuído sob a licença **GNU General Public License v3.0 (GPLv3)** — consulte o arquivo [LICENSE](./LICENSE) para o texto integral.
 
 ---
 

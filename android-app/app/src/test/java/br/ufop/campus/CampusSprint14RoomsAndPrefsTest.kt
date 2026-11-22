@@ -276,7 +276,7 @@ class CampusSprint14RoomsAndPrefsTest {
 
     @Test
     fun repositoryHolderPreferenceHelpers_persistTimetableOrientationAndDisciplinesLayoutMode() {
-        assertEquals("1.9.6", CampusRepositoryHolder.CURRENT_APP_VERSION)
+        assertEquals("1.9.7", CampusRepositoryHolder.CURRENT_APP_VERSION)
 
         val prefs = InMemorySharedPreferences()
 

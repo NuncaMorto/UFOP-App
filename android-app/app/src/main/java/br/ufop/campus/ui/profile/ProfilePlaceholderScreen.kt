@@ -79,6 +79,7 @@ import androidx.compose.material.icons.outlined.SettingsAccessibility
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -324,6 +325,7 @@ fun ProfilePlaceholderScreen(
     modifier: Modifier = Modifier,
     onOpenReleaseNotes: () -> Unit = {},
     onReplayGuidedTour: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
     onAppSecurityChanged: () -> Unit = {},
     onExitApp: () -> Unit = {}
 ) {
@@ -872,7 +874,8 @@ fun ProfilePlaceholderScreen(
                 ProfileDestination.FAQ -> {
                     ProfileFaqSubView(
                         onOpenReleaseNotes = onOpenReleaseNotes,
-                        onReplayGuidedTour = onReplayGuidedTour
+                        onReplayGuidedTour = onReplayGuidedTour,
+                        onCheckForUpdates = onCheckForUpdates
                     )
                 }
             }
@@ -6239,10 +6242,12 @@ private val PROFILE_FAQ_ITEMS = listOf(
 @Composable
 private fun ProfileFaqSubView(
     onOpenReleaseNotes: () -> Unit,
-    onReplayGuidedTour: () -> Unit
+    onReplayGuidedTour: () -> Unit,
+    onCheckForUpdates: () -> Unit
 ) {
     val minTouchTarget = campusMinTouchTarget()
     val expandedIds = remember { mutableStateMapOf<String, Boolean>() }
+    val appUpdateState by br.ufop.campus.core.update.AppUpdateManager.state.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -6308,6 +6313,31 @@ private fun ProfileFaqSubView(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Rever Tour Guiado do App",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onCheckForUpdates,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minTouchTarget),
+                    shape = RoundedCornerShape(22.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.SystemUpdate,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = when (val st = appUpdateState) {
+                            is br.ufop.campus.core.update.AppUpdateUiState.Checking -> "Verificando atualizações..."
+                            is br.ufop.campus.core.update.AppUpdateUiState.Available -> "Atualização ${st.info.tagName} disponível"
+                            is br.ufop.campus.core.update.AppUpdateUiState.UpToDate -> "App atualizado (v${CampusRepositoryHolder.CURRENT_APP_VERSION})"
+                            else -> "Verificar atualizações (GitHub)"
+                        },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )

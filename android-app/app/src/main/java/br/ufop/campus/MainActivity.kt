@@ -28,6 +28,7 @@ import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.security.AppLockManager
 import br.ufop.campus.core.security.SecurePdfProcessor
+import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.navigation.CampusNavigation
 import br.ufop.campus.ui.security.AppLockOverlay
 import br.ufop.campus.ui.theme.CampusAccentColor
@@ -72,6 +73,10 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching {
                 SecurePdfProcessor.purgeResidualPdfFiles(applicationContext)
+            }
+            runCatching {
+                AppUpdateManager.purgeCachedApks(applicationContext)
+                AppUpdateManager.checkForUpdates(applicationContext, force = false)
             }
         }
 
@@ -242,6 +247,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         runCatching {
             VidaAcademicaWidgetProvider.requestWidgetUpdate(applicationContext)
+        }
+        runCatching {
+            AppUpdateManager.onAppResumed(applicationContext)
         }
     }
 

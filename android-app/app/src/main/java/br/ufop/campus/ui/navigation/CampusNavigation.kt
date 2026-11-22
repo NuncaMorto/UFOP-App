@@ -67,10 +67,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.agenda.AgendaScreen
 import br.ufop.campus.ui.profile.ReleaseNotesDialog
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.update.AppUpdateDialog
+import br.ufop.campus.ui.update.InAppUpdateBanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -113,6 +116,8 @@ fun CampusNavigation(
     val isDark = LocalCampusThemeController.current.isDark
     val a11y = LocalCampusAccessibility.current.settings
     val mutationVersion by repository.mutationVersion.collectAsState()
+    val appUpdateState by AppUpdateManager.state.collectAsState()
+    val isUpdateDialogOpen by AppUpdateManager.isDialogOpen.collectAsState()
     var onboardingRefreshTick by remember { mutableIntStateOf(0) }
     var tourReplayTrigger by remember { mutableIntStateOf(0) }
     var tourDismissTick by remember { mutableIntStateOf(0) }
@@ -181,6 +186,10 @@ fun CampusNavigation(
                             CampusRepositoryHolder.setGuidedTourCompleted(context, repository, false)
                             selectedTab = CampusTab.AGENDA
                             tourReplayTrigger += 1
+                        },
+                        onCheckForUpdates = {
+                            AppUpdateManager.checkForUpdates(context, force = true)
+                            AppUpdateManager.openUpdateDialog()
                         },
                         onAppSecurityChanged = onAppSecurityChanged,
                         onExitApp = onExitApp
@@ -264,6 +273,25 @@ fun CampusNavigation(
                         version = CampusRepositoryHolder.CURRENT_APP_VERSION
                     )
                 }
+            )
+        }
+
+        if (studentProfile.onboardingCompleted && !shouldShowGuidedTour) {
+            InAppUpdateBanner(
+                state = appUpdateState,
+                onOpenDetails = { AppUpdateManager.openUpdateDialog() },
+                onDismissBanner = { AppUpdateManager.dismissBannerForCurrentRelease(context) },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            )
+        }
+
+        if (isUpdateDialogOpen) {
+            AppUpdateDialog(
+                state = appUpdateState,
+                onDismiss = { AppUpdateManager.closeUpdateDialog() }
             )
         }
     }

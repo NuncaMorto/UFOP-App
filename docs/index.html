@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vida Acadêmica · UFOP — Baixar para Android</title>
+<meta name="description" content="App independente e de código aberto para estudantes da UFOP em Ouro Preto, Mariana e João Monlevade. Offline-first, matrizes, salas, calendários e atestado em PDF.">
+<meta name="theme-color" content="#1c1917">
+<meta property="og:title" content="Vida Acadêmica · UFOP">
+<meta property="og:description" content="Baixe o app para Android: offline, seguro e feito para estudantes da UFOP.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://nuncamorto.github.io/UFOP-App/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%238B1E3F'/%3E%3Cpath d='M8 12l8-4 8 4-8 4zM11 15v5c3 2 7 2 10 0v-5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 01-14 5.3M4 12a8 8 0 0114-5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></symbol>
+    <symbol id="i-access" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M5 9l7 1 7-1M12 10v5l-3 6M12 15l3 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16 3c0 2-1.5 3.5-3.4 3.5C12.5 4.600 14 3 16 3zM18.500 16.500c-1 2.500-2.500 4.500-4 4.500-1 0-1.500-.6-2.500-.6s-1.600.6-2.600.6C7.300 21 5 17 5 13.500 5 10.500 7 9 9 9c1.100 0 2 .7 3 .7S13.900 9 15 9c1.200 0 2.600.7 3.400 2-2 1.200-2.200 4-.9 5.500z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.500 1.500M17.500 17.500L19 19M5 19l1.500-1.500M17.500 6.500L19 5"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.500A8 8 0 019.500 4 8 8 0 1020 14.500z"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4 1.500-4-2-6-2.500M15 21v-3.500c0-1 .1-1.500-.5-2 2.800-.3 5.500-1.400 5.500-6 0-1.200-.4-2.300-1.200-3.200.3-.9.3-2.200-.1-3.200 0 0-1-.3-3.300 1.300a11.500 11.500 0 00-6 0C7.100 2.300 6.100 2.600 6.100 2.600c-.4 1-.4 2.300-.1 3.200A4.600 4.600 0 004.800 9c0 4.600 2.700 5.700 5.500 6-.6.500-.6 1.200-.5 2V21"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="#" aria-label="Vida Acadêmica UFOP">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M6 12l10-5 10 5-10 5zM10 16v5c4 3 8 3 12 0v-5" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg></span>
+      <span>Vida Acadêmica <b>UFOP</b></span>
+    </a>
+    <button id="theme" class="icon-btn" type="button" aria-label="Alternar tema claro/escuro">
+      <svg class="ico sun"><use href="#i-sun"/></svg><svg class="ico moon"><use href="#i-moon"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="conteudo">
+<section class="hero wrap">
+  <div class="hero-text">
+    <span class="chip">Ouro Preto · Mariana · João Monlevade</span>
+    <h1>Sua vida acadêmica na UFOP, <span class="grad">offline e no seu bolso.</span></h1>
+    <p class="lead">Matrizes, salas, calendários e atestado em PDF em um app independente, de código aberto e feito por e para estudantes.</p>
+
+    <div class="card glass dl" id="download" aria-live="polite">
+      <div class="dl-head">
+        <span class="badge" id="ver-badge">Carregando versão…</span>
+        <span class="meta" id="ver-meta"></span>
+      </div>
+      <a class="btn primary" id="apk-btn" href="https://github.com/NuncaMorto/UFOP-App/releases/tag/v1.9.7" rel="noopener">
+        <svg class="ico"><use href="#i-down"/></svg><span>Baixar para Android (.apk)</span>
+      </a>
+      <p class="status" id="dl-status">Buscando a última versão no GitHub…</p>
+      <div class="hash" id="hash-row">
+        <span class="hash-label">SHA-256</span>
+        <code id="hash-val">—</code>
+        <button type="button" class="icon-btn small" id="hash-copy" aria-label="Copiar SHA-256" hidden><svg class="ico"><use href="#i-copy"/></svg></button>
+      </div>
+      <div class="ios" role="note"><svg class="ico"><use href="#i-apple"/></svg><span>iOS (Apple Liquid Glass) · <b>Em breve na App Store</b></span></div>
+    </div>
+  </div>
+
+  <div class="phone-wrap" aria-hidden="true">
+    <svg class="phone" viewBox="0 0 280 560" role="img" aria-label="Prévia do aplicativo">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B1E3F"/><stop offset="1" stop-color="#5a1228"/></linearGradient>
+      </defs>
+      <rect x="4" y="4" width="272" height="552" rx="40" fill="#0d0b0a" stroke="#4a4340" stroke-width="3"/>
+      <rect x="14" y="14" width="252" height="532" rx="32" fill="#211d1b"/>
+      <rect x="105" y="22" width="70" height="16" rx="8" fill="#0d0b0a"/>
+      <text x="30" y="70" fill="#a8a29e" font-size="11" font-family="Inter,sans-serif">Olá, estudante</text>
+      <text x="30" y="92" fill="#fff" font-size="18" font-weight="700" font-family="Plus Jakarta Sans,sans-serif">Hoje na UFOP</text>
+      <rect x="28" y="108" width="224" height="96" rx="20" fill="url(#g1)"/>
+      <text x="44" y="136" fill="#f5d0da" font-size="10" font-family="Inter,sans-serif">PRÓXIMA AULA · 14:00</text>
+      <text x="44" y="162" fill="#fff" font-size="17" font-weight="700" font-family="Plus Jakarta Sans,sans-serif">Cálculo II</text>
+      <text x="44" y="184" fill="#f5d0da" font-size="11" font-family="Inter,sans-serif">Sala 204 · ICEB</text>
+      <rect x="28" y="218" width="106" height="74" rx="16" fill="#2c2724"/>
+      <rect x="146" y="218" width="106" height="74" rx="16" fill="#2c2724"/>
+      <circle cx="46" cy="240" r="8" fill="#2E7D32"/>
+      <text x="42" y="244" fill="#fff" font-size="10" font-weight="700">✓</text>
+      <text x="40" y="268" fill="#fff" font-size="11" font-weight="600" font-family="Inter,sans-serif">CRE 7,82</text>
+      <text x="40" y="282" fill="#a8a29e" font-size="9" font-family="Inter,sans-serif">Simulador</text>
+      <text x="158" y="268" fill="#fff" font-size="11" font-weight="600" font-family="Inter,sans-serif">Atestado</text>
+      <text x="158" y="282" fill="#a8a29e" font-size="9" font-family="Inter,sans-serif">PDF oficial</text>
+      <circle cx="164" cy="240" r="8" fill="#8B1E3F"/>
+      <rect x="28" y="306" width="224" height="52" rx="14" fill="#2c2724"/>
+      <rect x="40" y="320" width="24" height="24" rx="7" fill="#2E7D32"/>
+      <text x="76" y="328" fill="#fff" font-size="11" font-weight="600" font-family="Inter,sans-serif">Calendário 2026.2</text>
+      <text x="76" y="343" fill="#a8a29e" font-size="9" font-family="Inter,sans-serif">Início das aulas em breve</text>
+      <rect x="28" y="370" width="224" height="52" rx="14" fill="#2c2724"/>
+      <rect x="40" y="384" width="24" height="24" rx="7" fill="#8B1E3F"/>
+      <text x="76" y="392" fill="#fff" font-size="11" font-weight="600" font-family="Inter,sans-serif">Matriz · 54 cursos</text>
+      <text x="76" y="407" fill="#a8a29e" font-size="9" font-family="Inter,sans-serif">Disponível offline</text>
+      <rect x="28" y="490" width="224" height="40" rx="20" fill="#2c2724"/>
+      <circle cx="70" cy="510" r="6" fill="#8B1E3F"/><circle cx="140" cy="510" r="6" fill="#57534e"/><circle cx="210" cy="510" r="6" fill="#57534e"/>
+    </svg>
+  </div>
+</section>
+
+<section class="wrap section" id="recursos">
+  <h2>Feito para o dia a dia do estudante</h2>
+  <div class="grid">
+    <article class="card glass feat"><svg class="ico"><use href="#i-lock"/></svg><h3>Offline-first e seguro</h3><p>Seus dados ficam no aparelho, protegidos com criptografia AES-256-GCM.</p></article>
+    <article class="card glass feat"><svg class="ico"><use href="#i-doc"/></svg><h3>Atestado, salas e EAD</h3><p>Atestado em PDF, salas oficiais 2026.2 e disciplinas EAD em um só lugar.</p></article>
+    <article class="card glass feat"><svg class="ico"><use href="#i-grid"/></svg><h3>54 matrizes e simulador de CRE</h3><p>Consulte as matrizes curriculares da UFOP e simule seu CRE.</p></article>
+    <article class="card glass feat"><svg class="ico"><use href="#i-cal"/></svg><h3>Calendários acadêmicos</h3><p>Calendários 2026.2, 2027.1 e 2027.2 sempre à mão.</p></article>
+    <article class="card glass feat"><svg class="ico"><use href="#i-refresh"/></svg><h3>Atualização dentro do app</h3><p>Verificada por SHA-256 e sem apagar seus dados.</p></article>
+    <article class="card glass feat"><svg class="ico"><use href="#i-access"/></svg><h3>Acessibilidade WCAG</h3><p>Contraste, alvos de toque grandes e leitura por leitores de tela.</p></article>
+  </div>
+</section>
+
+<section class="wrap section" id="instalar">
+  <h2>Instale em 3 passos</h2>
+  <ol class="steps">
+    <li class="card glass"><span class="num">1</span><div><h3>Baixe o .apk</h3><p>Toque em “Baixar para Android (.apk)” e abra o arquivo baixado.</p></div></li>
+    <li class="card glass"><span class="num">2</span><div><h3>Permita a fonte uma vez</h3><p>Se o Android pedir, autorize a instalação a partir do navegador. É só na primeira vez.</p></div></li>
+    <li class="card glass"><span class="num">3</span><div><h3>Atualize pelo app</h3><p>Nas próximas versões, atualize direto no app, sem perder seus dados.</p></div></li>
+  </ol>
+</section>
+
+<section class="wrap section" id="novidades">
+  <h2>Novidades</h2>
+  <div class="card glass notes">
+    <div class="notes-head"><h3 id="notes-title">Última versão</h3></div>
+    <div id="notes" class="notes-body"><p class="muted">Carregando notas…</p></div>
+  </div>
+  <details class="card glass history" id="history" hidden>
+    <summary>Versões anteriores</summary>
+    <div id="history-list"></div>
+  </details>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p>Projeto independente e de código aberto para estudantes da UFOP</p>
+    <div class="links">
+      <a class="badge lic" href="https://github.com/NuncaMorto/UFOP-App/blob/develop/LICENSE" rel="noopener">GNU GPLv3</a>
+      <a class="btn ghost" href="https://github.com/NuncaMorto/UFOP-App" rel="noopener"><svg class="ico"><use href="#i-github"/></svg><span>Repositório no GitHub</span></a>
+    </div>
+    <p class="muted small">Não é um aplicativo oficial da UFOP.</p>
+  </div>
+</footer>
+<script src="app.js" defer></script>
+</body>
+</html>

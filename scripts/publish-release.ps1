@@ -9,12 +9,15 @@
     Publica a release como rascunho.
 .PARAMETER Prerelease
     Marca a release como pre-release.
+.PARAMETER AndroidOnly
+    Ignora pacotes .ipa e publica apenas o APK Android.
 #>
 param(
     [string]$Tag,
     [string]$NotesFile,
     [switch]$Draft,
-    [switch]$Prerelease
+    [switch]$Prerelease,
+    [switch]$AndroidOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +47,14 @@ if (-not $Tag) {
 
 $VersionBare = $Tag.Substring(1)
 
+$VersionCode = $null
+if (Test-Path $BuildGradleKts) {
+    $GradleMeta = Get-Content -Path $BuildGradleKts -Raw -Encoding UTF8
+    if ($GradleMeta -match 'versionCode\s*=\s*(\d+)') {
+        $VersionCode = $Matches[1]
+    }
+}
+
 $ReleaseApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag.apk"
 $DebugApkPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-debug.apk"
 $ApkPath = if (Test-Path $ReleaseApkPath) { $ReleaseApkPath } else { $DebugApkPath }
@@ -51,7 +62,7 @@ $IpaPath = Join-Path $DistDir "Vida-Academica-UFOP-$Tag-unsigned.ipa"
 
 $Assets = New-Object System.Collections.Generic.List[string]
 if (Test-Path $ApkPath) { $Assets.Add($ApkPath) }
-if (Test-Path $IpaPath) { $Assets.Add($IpaPath) }
+if (-not $AndroidOnly -and (Test-Path $IpaPath)) { $Assets.Add($IpaPath) }
 
 if ($Assets.Count -eq 0) {
     throw "Nenhum pacote encontrado em '$DistDir' para a versão '$Tag' (esperado '$ApkPath' ou '$IpaPath')."
@@ -101,6 +112,9 @@ try {
         }
         if (-not $ExtractedNotes) {
             $ExtractedNotes = "## Vida Acadêmica UFOP $Tag`n`nRelease publicada a partir de \`dist/\`."
+        }
+        if ($VersionCode -and $ExtractedNotes -notmatch '<!--\s*versionCode\s*:') {
+            $ExtractedNotes = $ExtractedNotes.TrimEnd() + "`n`n<!-- versionCode: $VersionCode -->`n"
         }
         $ResolvedNotesPath = Join-Path $TempDir "release-notes.md"
         [IO.File]::WriteAllText($ResolvedNotesPath, $ExtractedNotes, [Text.UTF8Encoding]::new($false))
