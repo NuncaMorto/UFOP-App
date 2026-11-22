@@ -5,9 +5,11 @@ public struct ClassCheckInSheetView: View {
     public let onSave: (AttendanceStatus, DepartmentColorKey) -> Void
     public let onCancel: () -> Void
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var selectedStatus: AttendanceStatus
     @State private var selectedColorKey: DepartmentColorKey
-    @Environment(\.colorScheme) private var colorScheme
 
     public init(
         detail: ClassCheckInDetail,
@@ -21,41 +23,55 @@ public struct ClassCheckInSheetView: View {
         self._selectedColorKey = State(initialValue: detail.selectedColorKey)
     }
 
+    private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
+    private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
+    private var accentColorObj: CampusAccentColor { appearance?.accentColor ?? .green }
+
     public var body: some View {
         ZStack {
-            CampusTheme.cardBackground(for: colorScheme)
-                .ignoresSafeArea()
+            LiquidGlassBackdrop(accent: accentColorObj, highContrast: hc)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
-                    sheetTopBar
+            VStack(spacing: 0) {
+                topBar
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 10)
 
-                    headerSection
-
-                    metadataCard
-
-                    colorPickerSection
-
-                    verticalStatusPillsSection
-
-                    footnoteBanner
-
-                    saveButton
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        headerSection
+                        metadataCard
+                        colorPickerSection
+                        verticalStatusPillsSection
+                        footnoteBanner
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 28)
+
+                VStack(spacing: 0) {
+                    saveButton
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
+                }
+                .background(.ultraThinMaterial.opacity(0.6))
             }
         }
+        .preferredColorScheme(appearance?.resolvedColorScheme)
     }
 
     // MARK: - Top Bar
 
-    private var sheetTopBar: some View {
-        HStack {
+    private var topBar: some View {
+        let deptColor = CampusTheme.departmentColor(for: selectedColorKey)
+        let accessibleDeptColor = CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme)
+
+        return HStack {
             Text(detail.department)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.departmentColor(for: selectedColorKey))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(accessibleDeptColor)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
@@ -69,41 +85,42 @@ public struct ClassCheckInSheetView: View {
                 onCancel()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(CampusTheme.secondarySurface(for: colorScheme))
-                    )
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    .frame(width: 40, height: 40)
+                    .liquidGlassCapsule(selected: false, accent: accentColorObj.primary(for: colorScheme), highContrast: hc)
             }
             .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
             .accessibilityLabel("Fechar")
         }
     }
 
-    // MARK: - Header ("Cálculo II", "Terça-feira, 17 de novembro")
+    // MARK: - Header
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(detail.disciplineName)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                .font(.system(size: 27, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
             Text(detail.fullDateLabel)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
         }
     }
 
-    // MARK: - Metadata Card ("08:00–09:40" + "22 °C · Ensolarado", "Prédio A · Sala 204", "Prof.ª Ana Martins")
+    // MARK: - Metadata Card
 
     private var metadataCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let deptColor = CampusTheme.departmentColor(for: selectedColorKey)
+        let cleanProfessor = detail.professor.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Label(detail.timeRange, systemImage: "clock.fill")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Spacer()
 
@@ -123,52 +140,47 @@ public struct ClassCheckInSheetView: View {
             }
 
             Divider()
-                .overlay(CampusTheme.cardBorder(for: colorScheme))
+                .overlay(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
 
             HStack(spacing: 10) {
-                Image(systemName: "building.2.fill")
+                Image(systemName: detail.location.localizedCaseInsensitiveContains("EAD") ? "laptopcomputer" : "building.2.fill")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CampusTheme.departmentColor(for: selectedColorKey))
+                    .foregroundStyle(deptColor)
                     .frame(width: 20)
 
-                Text(detail.location)
+                Text(detail.location.isEmpty ? "Local não informado" : detail.location)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Spacer()
             }
 
-            HStack(spacing: 10) {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CampusTheme.departmentColor(for: selectedColorKey))
-                    .frame(width: 20)
+            if !cleanProfessor.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(deptColor)
+                        .frame(width: 20)
 
-                Text(detail.professor)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                    Text(cleanProfessor)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
-                Spacer()
+                    Spacer()
+                }
             }
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(CampusTheme.appBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
+        .liquidGlassCard(cornerRadius: 18, tint: deptColor, highContrast: hc)
     }
 
-    // MARK: - 4 Department Color Swatches
+    // MARK: - Department Color Swatches
 
     private var colorPickerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Cor da disciplina")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
             HStack(spacing: 14) {
                 ForEach(DepartmentColorKey.allCases) { key in
@@ -195,16 +207,14 @@ public struct ClassCheckInSheetView: View {
                                     .foregroundStyle(.white)
                             }
                         }
-                        .padding(3)
+                        .padding(4)
                         .overlay(
                             Circle()
-                                .strokeBorder(
-                                    isSelected ? swatchColor : Color.clear,
-                                    lineWidth: 2
-                                )
+                                .strokeBorder(isSelected ? swatchColor : Color.clear, lineWidth: 2)
                         )
                     }
                     .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
                     .accessibilityLabel(key.accessibilityLabel)
                 }
 
@@ -213,13 +223,13 @@ public struct ClassCheckInSheetView: View {
         }
     }
 
-    // MARK: - 3 Vertically Stacked Wide Pill Buttons ("Vou à aula", "Vou faltar", "Aula cancelada")
+    // MARK: - 3 Vertically Stacked Wide Pill Buttons
 
     private var verticalStatusPillsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Como será sua presença hoje?")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
             VStack(spacing: 10) {
                 ForEach(AttendanceStatus.allCases) { status in
@@ -232,26 +242,15 @@ public struct ClassCheckInSheetView: View {
     private func statusPillButton(for status: AttendanceStatus) -> some View {
         let isSelected = selectedStatus == status
 
-        let fillColor: Color = {
-            guard isSelected else {
-                return CampusTheme.secondarySurface(for: colorScheme)
-            }
+        let activeColor: Color = {
             switch status {
             case .attending:
-                // Azul sólido quando selecionado (conforme especificação do PDF)
-                return CampusTheme.mathBlue
+                return accentColorObj.primary(for: colorScheme)
             case .absent:
                 return Color(hex: 0xDC2626)
             case .cancelled:
-                return colorScheme == .dark ? Color(hex: 0x334155) : Color(hex: 0x1E293B)
+                return colorScheme == .dark ? Color(hex: 0x475569) : Color(hex: 0x1E293B)
             }
-        }()
-
-        let foregroundColor: Color = {
-            if isSelected {
-                return .white
-            }
-            return CampusTheme.primaryText(for: colorScheme)
         }()
 
         return Button {
@@ -273,93 +272,66 @@ public struct ClassCheckInSheetView: View {
                         .font(.system(size: 14, weight: .bold))
                 }
             }
-            .foregroundStyle(foregroundColor)
+            .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
             .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(fillColor)
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(
-                        isSelected ? Color.clear : CampusTheme.cardBorder(for: colorScheme),
-                        lineWidth: 1
-                    )
-            )
+            .frame(maxWidth: .infinity, minHeight: max(52, minTouch))
+            .liquidGlassCapsule(selected: isSelected, accent: activeColor, interactive: true, highContrast: hc)
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Footnote ("Aula cancelada não conta como falta. Salve para atualizar o relatório em Disciplinas.")
+    // MARK: - Footnote
 
     private var footnoteBanner: some View {
-        HStack(alignment: .top, spacing: 10) {
+        let primary = accentColorObj.primary(for: colorScheme)
+
+        return HStack(alignment: .top, spacing: 10) {
             Image(systemName: "info.circle.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(CampusTheme.mathBlue)
+                .foregroundStyle(primary)
                 .padding(.top, 1)
 
             Text(detail.footnoteText)
                 .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(CampusTheme.selectedPillBackground(for: colorScheme).opacity(0.55))
-        )
+        .liquidGlassCard(cornerRadius: 16, tint: primary, highContrast: hc)
     }
 
-    // MARK: - Primary "Salvar" Button
+    // MARK: - Save Button
 
     private var saveButton: some View {
-        Button {
+        let primary = accentColorObj.primary(for: colorScheme)
+        let onPrimary = accentColorObj.onPrimary(for: colorScheme)
+
+        return LiquidGlassPrimaryButton(
+            tint: primary,
+            foreground: onPrimary,
+            minHeight: max(52, minTouch)
+        ) {
             onSave(selectedStatus, selectedColorKey)
         } label: {
             Text("Salvar")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.mathBlue)
-                )
-                .shadow(
-                    color: CampusTheme.mathBlue.opacity(0.28),
-                    radius: 10,
-                    x: 0,
-                    y: 4
-                )
         }
-        .buttonStyle(.plain)
     }
 }
 
 #Preview("ClassCheckInSheetView - Light") {
     let store = CampusStore()
     if let detail = store.getClassCheckInDetail(agendaItemId: "ter-17-calc-ii") {
-        ClassCheckInSheetView(
-            detail: detail,
-            onSave: { _, _ in },
-            onCancel: {}
-        )
-        .preferredColorScheme(.light)
+        ClassCheckInSheetView(detail: detail, onSave: { _, _ in }, onCancel: {})
+            .preferredColorScheme(.light)
     }
 }
 
 #Preview("ClassCheckInSheetView - Dark") {
     let store = CampusStore()
     if let detail = store.getClassCheckInDetail(agendaItemId: "ter-17-calc-ii") {
-        ClassCheckInSheetView(
-            detail: detail,
-            onSave: { _, _ in },
-            onCancel: {}
-        )
-        .preferredColorScheme(.dark)
+        ClassCheckInSheetView(detail: detail, onSave: { _, _ in }, onCancel: {})
+            .preferredColorScheme(.dark)
     }
 }

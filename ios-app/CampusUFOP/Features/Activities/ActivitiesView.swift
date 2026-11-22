@@ -2,52 +2,78 @@ import SwiftUI
 
 public struct ActivitiesView: View {
     @Environment(CampusStore.self) private var store
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
-    @State private var selectedFilter: String = "Pendentes"
-    @State private var selectedKindFilter: String = "Todos"
-    @State private var isAddAssessmentSheetPresented: Bool = false
 
-    private let filterOptions = ["Pendentes", "Concluídas", "Todas"]
-    private let kindFilterOptions = ["Todos", "Trabalho", "Seminário", "Prova"]
+    @State private var selectedTypes: Set<String> = []
+    @State private var onlyCompleted: Bool = false
+    @State private var selectedDisciplineFilter: String = "Todas as disciplinas"
+    @State private var isAddAssessmentSheetPresented: Bool = false
+    @State private var activeAssessmentDetail: AcademicActivityItem?
+    @State private var assessmentPendingDelete: AcademicActivityItem?
+
+    private let activityTypes = ["Prova", "Trabalho", "Seminário"]
 
     public init() {}
 
+    private var accent: Color {
+        (appearance?.accentColor ?? .green).primary(for: colorScheme)
+    }
+
+    private var hc: Bool {
+        appearance?.accessibility.highContrastMode ?? false
+    }
+
+    private var minTouch: CGFloat {
+        appearance?.accessibility.minTouchHeight ?? 48
+    }
+
+    private var availableDisciplineNames: [String] {
+        let names = Array(Set(store.academicActivities.map(\.disciplineName))).sorted()
+        return ["Todas as disciplinas"] + names
+    }
+
+    private var typeFilterButtonLabel: String {
+        var parts: [String] = activityTypes.filter { selectedTypes.contains($0) }.map {
+            switch $0 {
+            case "Prova": return "Provas"
+            case "Trabalho": return "Trabalhos"
+            default: return "Seminários"
+            }
+        }
+        if onlyCompleted {
+            parts.append("Concluídas")
+        }
+        if parts.isEmpty { return "Todos os tipos" }
+        if parts.count == 1 { return parts[0] }
+        return "\(parts.count) filtros"
+    }
+
     private var filteredActivities: [AcademicActivityItem] {
         store.academicActivities.filter { item in
-            let matchesStatus: Bool
-            switch selectedFilter {
-            case "Pendentes":
-                matchesStatus = !item.isCompleted
-            case "Concluídas":
-                matchesStatus = item.isCompleted
-            default:
-                matchesStatus = true
-            }
-
-            let matchesKind = selectedKindFilter == "Todos"
-                || item.kind.localizedCaseInsensitiveCompare(selectedKindFilter) == .orderedSame
-
-            return matchesStatus && matchesKind
+            let matchesStatus = onlyCompleted ? item.isCompleted : !item.isCompleted
+            let matchesType = selectedTypes.isEmpty
+                || selectedTypes.contains(where: { $0.caseInsensitiveCompare(item.kind) == .orderedSame })
+            let matchesCourse = selectedDisciplineFilter == "Todas as disciplinas"
+                || item.disciplineName == selectedDisciplineFilter
+            return matchesStatus && matchesType && matchesCourse
         }
     }
 
     public var body: some View {
         NavigationStack {
             ZStack {
-                CampusTheme.appBackground(for: colorScheme)
-                    .ignoresSafeArea()
+                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 18) {
                         headerSection
 
-                        filterPills
-
-                        kindFilterPills
+                        singleRowFilterBar
 
                         activitiesListSection
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 18)
                     .padding(.top, 12)
                     .padding(.bottom, 32)
                 }
@@ -74,22 +100,62 @@ public struct ActivitiesView: View {
                         isAddAssessmentSheetPresented = false
                     }
                 )
-                .presentationDetents([.large, .fraction(0.84)])
+                .presentationDetents([.large, .fraction(0.86)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+            }
+            .sheet(item: $activeAssessmentDetail) { item in
+                AssessmentDetailSheetView(
+                    activity: item,
+                    store: store,
+                    onRequestDelete: { target in
+                        activeAssessmentDetail = nil
+                        assessmentPendingDelete = target
+                    },
+                    onClose: {
+                        activeAssessmentDetail = nil
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+            }
+            .confirmationDialog(
+                "Excluir avaliação?",
+                isPresented: Binding(
+                    get: { assessmentPendingDelete != nil },
+                    set: { if !$0 { assessmentPendingDelete = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: assessmentPendingDelete
+            ) { item in
+                Button("Excluir avaliação", role: .destructive) {
+                    withAnimation(.snappy) {
+                        store.deleteAssessment(assessmentId: item.id)
+                    }
+                    assessmentPendingDelete = nil
+                }
+                Button("Cancelar", role: .cancel) {
+                    assessmentPendingDelete = nil
+                }
+            } message: { item in
+                Text("Deseja remover '\(item.title)' de \(item.disciplineName)?")
             }
         }
     }
 
-    // MARK: - Header
+    // MARK: Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let pendingCount = store.pendingAssessmentsCount
+        let completedCount = store.completedAssessmentsCount
+
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center) {
-                Text("SEMESTRE 2026.2")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                Text("SEMESTRE \(store.selectedSemesterFilter)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                     .tracking(1.5)
-                    .foregroundStyle(CampusTheme.mathBlue)
+                    .foregroundStyle(accent)
 
                 Spacer()
 
@@ -99,120 +165,123 @@ public struct ActivitiesView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Nova avaliação")
+                        Text("Novo prazo")
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(CampusTheme.selectedPillText(for: colorScheme))
+                    .foregroundStyle(accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(
-                                CampusTheme.selectedPillText(for: colorScheme).opacity(0.25),
-                                lineWidth: 1
-                            )
-                    )
+                    .liquidGlassCapsule(selected: true, accent: accent, highContrast: hc)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Adicionar avaliação")
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Adicionar avaliação ou prazo")
             }
 
             Text("Atividades")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                .accessibilityAddTraits(.isHeader)
 
-            Text("Prazos, listas e avaliações sincronizados com suas disciplinas")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+            Text("\(pendingCount) pendentes · \(completedCount) concluídas")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
         }
     }
 
-    // MARK: - Filter Pills (Pendentes / Concluídas / Todas)
+    // MARK: Compact Single-Row Filter Bar ("Todos os tipos ▾" + "Todas as disciplinas ▾" — Sprint 15)
 
-    private var filterPills: some View {
-        HStack(spacing: 8) {
-            ForEach(filterOptions, id: \.self) { option in
-                let isSelected = selectedFilter == option
-                Button {
-                    withAnimation(.snappy) {
-                        selectedFilter = option
+    private var singleRowFilterBar: some View {
+        let hasActiveTypeFilter = !selectedTypes.isEmpty || onlyCompleted
+        let hasActiveCourseFilter = selectedDisciplineFilter != "Todas as disciplinas"
+
+        return LiquidGlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                Menu {
+                    Section("Tipos (selecione um ou mais)") {
+                        ForEach(activityTypes, id: \.self) { type in
+                            Button {
+                                if selectedTypes.contains(type) {
+                                    selectedTypes.remove(type)
+                                } else {
+                                    selectedTypes.insert(type)
+                                }
+                            } label: {
+                                Label(
+                                    type == "Prova" ? "Provas" : (type == "Trabalho" ? "Trabalhos" : "Seminários"),
+                                    systemImage: selectedTypes.contains(type) ? "checkmark.square.fill" : "square"
+                                )
+                            }
+                        }
+                    }
+
+                    Section("Estado") {
+                        Button {
+                            onlyCompleted.toggle()
+                        } label: {
+                            Label("Concluídas", systemImage: onlyCompleted ? "checkmark.square.fill" : "square")
+                        }
+                    }
+
+                    if hasActiveTypeFilter {
+                        Button(role: .destructive) {
+                            selectedTypes.removeAll()
+                            onlyCompleted = false
+                        } label: {
+                            Label("Mostrar todos os tipos", systemImage: "arrow.counterclockwise")
+                        }
                     }
                 } label: {
-                    Text(option)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(
-                            isSelected
-                                ? CampusTheme.selectedPillText(for: colorScheme)
-                                : CampusTheme.secondaryText(for: colorScheme)
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(
-                                    isSelected
-                                        ? CampusTheme.selectedPillBackground(for: colorScheme)
-                                        : CampusTheme.cardBackground(for: colorScheme)
-                                )
-                        )
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .strokeBorder(
-                                    isSelected
-                                        ? CampusTheme.selectedPillText(for: colorScheme).opacity(0.28)
-                                        : CampusTheme.cardBorder(for: colorScheme),
-                                    lineWidth: 1
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Kind Filter Pills (Todos / Trabalho / Seminário / Prova)
-
-    private var kindFilterPills: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(kindFilterOptions, id: \.self) { kind in
-                    let isSelected = selectedKindFilter == kind
-                    Button {
-                        withAnimation(.snappy) {
-                            selectedKindFilter = kind
-                        }
-                    } label: {
-                        Text(kind == "Todos" ? "Todos os tipos" : kind)
+                    HStack(spacing: 6) {
+                        Text(typeFilterButtonLabel)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(
-                                isSelected
-                                    ? .white
-                                    : CampusTheme.secondaryText(for: colorScheme)
-                            )
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(
-                                        isSelected
-                                            ? CampusTheme.mathBlue
-                                            : CampusTheme.secondarySurface(for: colorScheme)
-                                    )
-                            )
+                            .foregroundStyle(hasActiveTypeFilter ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(hasActiveTypeFilter ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .liquidGlassCapsule(selected: hasActiveTypeFilter, accent: accent, highContrast: hc)
                 }
+                .minimumTouchTarget(minTouch)
+
+                Menu {
+                    ForEach(availableDisciplineNames, id: \.self) { name in
+                        Button {
+                            selectedDisciplineFilter = name
+                        } label: {
+                            HStack {
+                                Text(name)
+                                if selectedDisciplineFilter == name {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(selectedDisciplineFilter)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(hasActiveCourseFilter ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(hasActiveCourseFilter ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .liquidGlassCapsule(selected: hasActiveCourseFilter, accent: accent, highContrast: hc)
+                }
+                .minimumTouchTarget(minTouch)
+
+                Spacer(minLength: 0)
             }
         }
     }
 
-    // MARK: - Activities List
+    // MARK: Activities List
 
     @ViewBuilder
     private var activitiesListSection: some View {
@@ -220,36 +289,30 @@ public struct ActivitiesView: View {
             VStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 28))
-                    .foregroundStyle(CampusTheme.mathBlue)
+                    .foregroundStyle(accent)
 
                 Text("Tudo em dia")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                Text("Nenhuma atividade encontrada neste filtro.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                Text("Nenhuma atividade encontrada nos filtros selecionados.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                 Button {
                     isAddAssessmentSheetPresented = true
                 } label: {
                     Label("Cadastrar Trabalho, Seminário ou Prova", systemImage: "plus.circle.fill")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(CampusTheme.mathBlue)
-                        .padding(.top, 2)
+                        .foregroundStyle(accent)
                 }
                 .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 36)
-            .background(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .fill(CampusTheme.cardBackground(for: colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-            )
+            .padding(.vertical, 34)
+            .padding(.horizontal, 18)
+            .liquidGlassCard(highContrast: hc)
         } else {
             VStack(spacing: 12) {
                 ForEach(filteredActivities) { item in
@@ -260,104 +323,310 @@ public struct ActivitiesView: View {
     }
 
     private func activityRow(item: AcademicActivityItem) -> some View {
-        let accent = CampusTheme.departmentColor(for: item.colorKey)
+        let itemColor = CampusTheme.departmentColor(for: item.colorKey)
 
-        return AccentBarCardContainer(accentColor: accent) {
-            HStack(spacing: 14) {
-                VStack(spacing: 1) {
-                    Text(item.dueDay)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(accent)
+        return Button {
+            activeAssessmentDetail = item
+        } label: {
+            AccentBarCardContainer(accentColor: itemColor, highContrast: hc) {
+                HStack(spacing: 12) {
+                    VStack(spacing: 1) {
+                        Text(item.dueDay)
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundStyle(itemColor)
+                        Text(item.dueMonth)
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(itemColor)
+                    }
+                    .frame(width: 46, height: 46)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(CampusTheme.departmentSoftTint(for: item.colorKey, scheme: colorScheme))
+                    )
 
-                    Text(item.dueMonth)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(accent)
-                }
-                .frame(width: 46, height: 46)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(CampusTheme.departmentSoftTint(for: item.colorKey, scheme: colorScheme))
-                )
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(item.disciplineName)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(itemColor, scheme: colorScheme))
+                                .lineLimit(1)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(item.disciplineName)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(accent)
+                            Text("•")
+                                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
-                        Text("•")
-                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+                            Text(item.kind)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        }
 
-                        Text(item.kind)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                        Text(item.title)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .strikethrough(item.isCompleted)
+                            .multilineTextAlignment(.leading)
+
+                        Text(item.categoryLabel)
+                            .font(.system(size: 12))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
 
-                    Text(item.title)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                        .strikethrough(item.isCompleted, color: CampusTheme.mutedText(for: colorScheme))
+                    Spacer()
 
-                    Text(item.categoryLabel)
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                }
-
-                Spacer()
-
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                        _ = store.toggleAssessmentCompleted(assessmentId: item.id)
+                    Button {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            _ = store.toggleAssessmentCompleted(assessmentId: item.id)
+                        }
+                    } label: {
+                        Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(item.isCompleted ? accent : CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                     }
-                } label: {
-                    Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(
-                            item.isCompleted
-                                ? CampusTheme.mathBlue
-                                : CampusTheme.mutedText(for: colorScheme)
-                        )
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+                    .accessibilityLabel(item.isCompleted ? "Marcar como pendente" : "Marcar como concluída")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.isCompleted ? "Marcar como pendente" : "Marcar como concluída")
             }
         }
-        .contextMenu {
-            Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                    _ = store.toggleAssessmentCompleted(assessmentId: item.id)
-                }
-            } label: {
-                Label(
-                    item.isCompleted ? "Marcar como pendente" : "Marcar como concluída",
-                    systemImage: item.isCompleted ? "arrow.uturn.backward.circle" : "checkmark.circle"
-                )
-            }
-
-            Button(role: .destructive) {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                    store.deleteAssessment(assessmentId: item.id)
-                }
-            } label: {
-                Label("Excluir avaliação", systemImage: "trash")
-            }
-        }
+        .buttonStyle(.plain)
     }
 }
 
-// MARK: - Add Assessment Modal Sheet (Sprint 2)
+// MARK: - Assessment Detail & Edit Sheet (Vertically Aligned Chips + Native Picker + Confirmation)
+
+public struct AssessmentDetailSheetView: View {
+    public let activity: AcademicActivityItem
+    @Bindable public var store: CampusStore
+    public let onRequestDelete: (AcademicActivityItem) -> Void
+    public let onClose: () -> Void
+
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
+    @State private var isEditing: Bool = false
+    @State private var editTitle: String = ""
+    @State private var editKind: String = "Prova"
+    @State private var editDate: Date = Date()
+
+    private let kinds = ["Prova", "Trabalho", "Seminário"]
+
+    public init(
+        activity: AcademicActivityItem,
+        store: CampusStore,
+        onRequestDelete: @escaping (AcademicActivityItem) -> Void,
+        onClose: @escaping () -> Void
+    ) {
+        self.activity = activity
+        self.store = store
+        self.onRequestDelete = onRequestDelete
+        self.onClose = onClose
+    }
+
+    private var liveActivity: AcademicActivityItem {
+        store.academicActivities.first(where: { $0.id == activity.id }) ?? activity
+    }
+
+    public var body: some View {
+        let current = liveActivity
+        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        let hc = appearance?.accessibility.highContrastMode ?? false
+        let courseColor = CampusTheme.departmentColor(for: current.colorKey)
+
+        ZStack {
+            LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Circle().fill(courseColor).frame(width: 8, height: 8)
+                                Text(current.disciplineName)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.accessibleTextColor(courseColor, scheme: colorScheme))
+                            }
+                            Text(current.title)
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        }
+
+                        Spacer()
+
+                        Button(action: onClose) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 34, height: 34)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Card com data e chips perfeitamente alinhados na mesma altura vertical (v1.9.6 fix)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 12) {
+                            VStack(spacing: 1) {
+                                Text(current.dueDay)
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(courseColor)
+                                Text(current.dueMonth)
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(courseColor)
+                            }
+                            .frame(width: 48, height: 48)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(courseColor.opacity(0.16)))
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Label("Data: \(formattedDisplayDate(current.dueDate))", systemImage: "calendar")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                Label("Horário: \(current.dueTime)", systemImage: "clock")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            }
+                        }
+
+                        Divider()
+
+                        HStack(alignment: .center, spacing: 8) {
+                            Text(current.kind)
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(courseColor)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(courseColor.opacity(0.16)))
+
+                            HStack(spacing: 5) {
+                                Image(systemName: current.isCompleted ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(current.isCompleted ? "Concluída" : "Pendente")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundStyle(current.isCompleted ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .liquidGlassCapsule(selected: current.isCompleted, accent: accent, interactive: false, highContrast: hc)
+                        }
+                    }
+                    .padding(16)
+                    .liquidGlassCard(cornerRadius: 18, tint: courseColor, highContrast: hc)
+
+                    if isEditing {
+                        VStack(alignment: .leading, spacing: 12) {
+                            TextField("Título", text: $editTitle)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .liquidGlassCard(cornerRadius: 12, highContrast: hc)
+
+                            Picker("Tipo", selection: $editKind) {
+                                ForEach(kinds, id: \.self) { Text($0).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+
+                            DatePicker("Data e horário", selection: $editDate)
+                                .tint(accent)
+
+                            LiquidGlassPrimaryButton(
+                                tint: accent,
+                                foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                                minHeight: appearance?.accessibility.minTouchHeight ?? 48
+                            ) {
+                                let df = DateFormatter()
+                                df.locale = Locale(identifier: "en_US_POSIX")
+                                df.dateFormat = "yyyy-MM-dd"
+                                let tf = DateFormatter()
+                                tf.locale = Locale(identifier: "en_US_POSIX")
+                                tf.dateFormat = "HH:mm"
+                                store.updateAssessment(
+                                    id: current.id,
+                                    title: editTitle,
+                                    kind: editKind,
+                                    dueDate: df.string(from: editDate),
+                                    dueTime: tf.string(from: editDate)
+                                )
+                                isEditing = false
+                            } label: {
+                                Text("Salvar alterações")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                            }
+                        }
+                        .padding(14)
+                        .liquidGlassCard(cornerRadius: 16, highContrast: hc)
+                    }
+
+                    Button(role: .destructive) {
+                        onRequestDelete(current)
+                    } label: {
+                        Label("Excluir avaliação", systemImage: "trash")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color(hex: 0xEF4444))
+                            .frame(maxWidth: .infinity, minHeight: appearance?.accessibility.minTouchHeight ?? 48)
+                            .liquidGlassCapsule(selected: false, accent: Color(hex: 0xEF4444), highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+
+                    HStack(spacing: 10) {
+                        Button {
+                            if !isEditing {
+                                editTitle = current.title
+                                editKind = current.kind
+                                editDate = parsedDate(iso: current.dueDate, hhmm: current.dueTime)
+                            }
+                            isEditing.toggle()
+                        } label: {
+                            Label(isEditing ? "Cancelar edição" : "Editar", systemImage: "pencil")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .frame(maxWidth: .infinity, minHeight: appearance?.accessibility.minTouchHeight ?? 48)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+
+                        LiquidGlassPrimaryButton(
+                            tint: accent,
+                            foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                            minHeight: appearance?.accessibility.minTouchHeight ?? 48
+                        ) {
+                            _ = store.toggleAssessmentCompleted(assessmentId: current.id)
+                            onClose()
+                        } label: {
+                            Text(current.isCompleted ? "Reabrir" : "Concluído")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                        }
+                    }
+                }
+                .padding(20)
+            }
+        }
+    }
+
+    private func formattedDisplayDate(_ iso: String) -> String {
+        let p = iso.split(separator: "-")
+        guard p.count == 3 else { return iso }
+        return "\(p[2])/\(p[1])/\(p[0])"
+    }
+
+    private func parsedDate(iso: String, hhmm: String) -> Date {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return df.date(from: "\(iso) \(hhmm)") ?? Date()
+    }
+}
+
+// MARK: - Add Assessment Sheet (Native DatePicker + Liquid Glass)
 
 public struct AddAssessmentSheetView: View {
     public let disciplines: [DisciplineSummaryCard]
     public let onSave: (String, String, String, String, String) -> Void
     public let onCancel: () -> Void
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var selectedCourseId: String
     @State private var selectedKind: String = "Trabalho"
     @State private var title: String = ""
-    @State private var dueDate: String = "29 NOV"
-    @State private var dueTime: String = "18:00"
-    @Environment(\.colorScheme) private var colorScheme
+    @State private var dueDateTime: Date = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date()) ?? Date()
 
     private let kinds = ["Trabalho", "Seminário", "Prova"]
 
@@ -373,175 +642,91 @@ public struct AddAssessmentSheetView: View {
     }
 
     public var body: some View {
+        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        let hc = appearance?.accessibility.highContrastMode ?? false
+
         ZStack {
-            CampusTheme.cardBackground(for: colorScheme)
-                .ignoresSafeArea()
+            LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 18) {
                     HStack {
-                        Text("NOVA AVALIAÇÃO · 2026.2")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                        Text("NOVA AVALIAÇÃO")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
                             .tracking(1.4)
-                            .foregroundStyle(CampusTheme.mathBlue)
-
+                            .foregroundStyle(accent)
                         Spacer()
-
                         Button(action: onCancel) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    Circle()
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                )
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 34, height: 34)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                         }
                         .buttonStyle(.plain)
                     }
 
                     Text("Cadastrar prazo acadêmico")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                    // Seleção de disciplina
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Disciplina")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(disciplines) { disc in
-                                    let isSelected = selectedCourseId == disc.id
-                                    let accent = CampusTheme.departmentColor(for: disc.colorKey)
-                                    Button {
-                                        selectedCourseId = disc.id
-                                    } label: {
-                                        Text(disc.name)
-                                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme))
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 9)
-                                            .background(
-                                                Capsule(style: .continuous)
-                                                    .fill(isSelected ? accent : CampusTheme.secondarySurface(for: colorScheme))
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-
-                    // Seleção de tipo: Trabalho / Seminário / Prova
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Categoria da avaliação")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
+                    ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(kinds, id: \.self) { kind in
-                                let isSelected = selectedKind == kind
+                            ForEach(disciplines) { disc in
+                                let isSelected = selectedCourseId == disc.id
+                                let dColor = CampusTheme.departmentColor(for: disc.colorKey)
                                 Button {
-                                    selectedKind = kind
+                                    selectedCourseId = disc.id
                                 } label: {
-                                    Text(kind)
-                                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                                        .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(isSelected ? CampusTheme.mathBlue : CampusTheme.secondarySurface(for: colorScheme))
-                                        )
+                                    Text(disc.name)
+                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .liquidGlassCapsule(selected: isSelected, accent: dColor, highContrast: hc)
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        inputGroup(label: "Título", text: $title, placeholder: "Ex.: Trabalho Prático · Grafos")
-
-                        HStack(spacing: 12) {
-                            inputGroup(label: "Data (DD MMM)", text: $dueDate, placeholder: "29 NOV")
-                            inputGroup(label: "Horário", text: $dueTime, placeholder: "18:00")
-                        }
+                    Picker("Categoria", selection: $selectedKind) {
+                        ForEach(kinds, id: \.self) { Text($0).tag($0) }
                     }
+                    .pickerStyle(.segmented)
 
-                    HStack(spacing: 12) {
-                        Button(action: onCancel) {
-                            Text("Cancelar")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                )
-                        }
-                        .buttonStyle(.plain)
+                    TextField("Título (ex.: Prova 1, Trabalho Prático)", text: $title)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .liquidGlassCard(cornerRadius: 12, highContrast: hc)
 
-                        Button {
-                            let finalTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? "\(selectedKind) avaliativo"
-                                : title
-                            onSave(selectedCourseId, finalTitle, selectedKind, dueDate, dueTime)
-                        } label: {
-                            Text("Salvar avaliação")
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(CampusTheme.mathBlue)
-                                )
-                        }
-                        .buttonStyle(.plain)
+                    DatePicker("Data e hora de entrega", selection: $dueDateTime)
+                        .tint(accent)
+                        .padding(12)
+                        .liquidGlassCard(cornerRadius: 14, highContrast: hc)
+
+                    LiquidGlassPrimaryButton(
+                        tint: accent,
+                        foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                        minHeight: appearance?.accessibility.minTouchHeight ?? 48
+                    ) {
+                        let df = DateFormatter()
+                        df.locale = Locale(identifier: "en_US_POSIX")
+                        df.dateFormat = "yyyy-MM-dd"
+                        let tf = DateFormatter()
+                        tf.locale = Locale(identifier: "en_US_POSIX")
+                        tf.dateFormat = "HH:mm"
+                        let finalTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? "\(selectedKind) avaliativo"
+                            : title
+                        onSave(selectedCourseId, finalTitle, selectedKind, df.string(from: dueDateTime), tf.string(from: dueDateTime))
+                    } label: {
+                        Text("Salvar avaliação")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
                     }
-                    .padding(.top, 4)
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 30)
+                .padding(20)
             }
         }
     }
-
-    private func inputGroup(label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
-            TextField(placeholder, text: text)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(CampusTheme.appBackground(for: colorScheme))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                )
-        }
-    }
-}
-
-#Preview("ActivitiesView - Light") {
-    ActivitiesView()
-        .environment(CampusStore())
-        .preferredColorScheme(.light)
-}
-
-#Preview("ActivitiesView - Dark") {
-    ActivitiesView()
-        .environment(CampusStore())
-        .preferredColorScheme(.dark)
 }

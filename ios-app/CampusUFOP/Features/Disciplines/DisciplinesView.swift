@@ -2,586 +2,647 @@ import SwiftUI
 
 public struct DisciplinesView: View {
     @Bindable public var viewModel: DisciplinesViewModel
+
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
-    @State private var searchText: String = ""
+
+    @State private var searchQuery: String = ""
+    @State private var isMatrixPresented: Bool = false
 
     private let gridColumns: [GridItem] = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(minimum: 140), spacing: 12),
+        GridItem(.flexible(minimum: 140), spacing: 12)
     ]
 
     public init(viewModel: DisciplinesViewModel) {
         self.viewModel = viewModel
     }
 
-    private var trimmedSearchQuery: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
+    private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
+    private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
+    private var isBarsMode: Bool { viewModel.store.disciplinesLayoutMode == "bars" }
 
     private var displayedDisciplines: [DisciplineSummaryCard] {
+        let needle = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let base = viewModel.disciplines
-        guard !trimmedSearchQuery.isEmpty else { return base }
-        let needle = Self.normalizedSearchToken(trimmedSearchQuery)
+        guard !needle.isEmpty else { return base }
         return base.filter { card in
-            Self.normalizedSearchToken(card.name).contains(needle)
-                || Self.normalizedSearchToken(card.professor).contains(needle)
-                || Self.normalizedSearchToken(card.code).contains(needle)
-                || Self.normalizedSearchToken(card.department).contains(needle)
+            card.name.lowercased().contains(needle)
+                || card.code.lowercased().contains(needle)
+                || card.professor.lowercased().contains(needle)
+                || card.department.lowercased().contains(needle)
         }
-    }
-
-    private static func normalizedSearchToken(_ text: String) -> String {
-        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
     }
 
     public var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
-                CampusTheme.appBackground(for: colorScheme)
-                    .ignoresSafeArea()
+        ZStack {
+            LiquidGlassBackdrop(accent: resolvedAccent, highContrast: hc)
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        headerSection
-
-                        searchBar
-
-                        filtersBar
-
-                        disciplinesGrid
-
-                        footerInfoCard
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 96)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    headerSection
+                    quickActionsRow
+                    filtersAndLayoutRow
+                    searchBarSection
+                    disciplinesCollectionSection
+                    footerLegendSection
                 }
-
-                floatingTimetableButton
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 22)
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 108)
             }
-            #if os(iOS)
-            .navigationBarHidden(true)
-            #endif
-            .sheet(
-                isPresented: Binding(
-                    get: { viewModel.activeDisciplineDetail != nil },
-                    set: { isPresented in
-                        if !isPresented {
-                            viewModel.dismissDisciplineDetail()
-                        }
-                    }
-                )
-            ) {
-                if let detail = viewModel.activeDisciplineDetail {
-                    DisciplineDetailSheetView(
-                        detail: detail,
-                        store: viewModel.store,
-                        onUpdateNotes: { newNotes in
-                            viewModel.saveDisciplineNotes(
-                                disciplineId: detail.summary.id,
-                                notes: newNotes
-                            )
-                        },
-                        onDeleteCourse: {
-                            viewModel.deleteCourse(courseId: detail.summary.id)
-                        },
-                        onClose: {
-                            viewModel.dismissDisciplineDetail()
-                        }
+        }
+        .sheet(item: selectedDisciplineBinding) { detail in
+            DisciplineDetailSheetView(
+                detail: detail,
+                store: viewModel.store,
+                onUpdateNotes: { updatedNotes in
+                    viewModel.saveDisciplineNotes(disciplineId: detail.summary.id, notes: updatedNotes)
+                },
+                onDeleteCourse: {
+                    viewModel.deleteCourse(courseId: detail.summary.id)
+                },
+                onClose: {
+                    viewModel.dismissDisciplineDetail()
+                }
+            )
+        }
+        .sheet(isPresented: $viewModel.isTimetablePresented) {
+            TimetableGridView(
+                store: viewModel.store,
+                onClose: {
+                    viewModel.dismissTimetable()
+                }
+            )
+        }
+        .sheet(isPresented: $isMatrixPresented) {
+            CurriculumMatrixView(
+                store: viewModel.store,
+                onClose: {
+                    isMatrixPresented = false
+                }
+            )
+        }
+        .sheet(isPresented: $viewModel.isAddCoursePresented) {
+            AddCourseSheetView(
+                store: viewModel.store,
+                defaultSemester: viewModel.semesterFilter,
+                defaultDepartmentId: viewModel.departmentFilter == "Todos os departamentos" ? "MAT" : viewModel.departmentFilter,
+                onCreate: { semester, departmentId, name, professor, workloadHours, colorHex, isEad, initialSlot in
+                    try viewModel.createCourse(
+                        semester: semester,
+                        departmentId: departmentId,
+                        name: name,
+                        professor: professor,
+                        workloadHours: workloadHours,
+                        colorOverrideHex: colorHex,
+                        isEad: isEad,
+                        initialSlot: initialSlot
                     )
-                    .presentationDetents([.large, .fraction(0.88)])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
+                },
+                onCancel: {
+                    viewModel.dismissAddCourseSheet()
                 }
-            }
-            .sheet(isPresented: $viewModel.isTimetablePresented) {
-                TimetableGridView(
-                    store: viewModel.store,
-                    onClose: {
-                        viewModel.dismissTimetable()
-                    }
-                )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
-            }
-            .sheet(isPresented: $viewModel.isAddCoursePresented) {
-                AddCourseSheetView(
-                    semester: viewModel.semesterFilter,
-                    onSave: { departmentId, name, professor, workloadHours, colorOverrideHex, initialSlot in
-                        _ = try viewModel.createCourse(
-                            semester: viewModel.semesterFilter,
-                            departmentId: departmentId,
-                            name: name,
-                            professor: professor,
-                            workloadHours: workloadHours,
-                            colorOverrideHex: colorOverrideHex,
-                            initialSlot: initialSlot
-                        )
-                    },
-                    onCancel: {
-                        viewModel.dismissAddCourseSheet()
-                    }
-                )
-                .presentationDetents([.large, .fraction(0.92)])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
-            }
+            )
         }
     }
 
-    // MARK: - Header ("SEMESTRE 2026.2", "Disciplinas", "Seu acompanhamento de faltas" + "+ Disciplina")
+    private var selectedDisciplineBinding: Binding<DisciplineDetail?> {
+        Binding(
+            get: { viewModel.activeDisciplineDetail },
+            set: { newValue in
+                if newValue == nil {
+                    viewModel.dismissDisciplineDetail()
+                }
+            }
+        )
+    }
+
+    // MARK: - Header
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center) {
+        let primary = resolvedAccent.primary(for: colorScheme)
+        let onPrimary = resolvedAccent.onPrimary(for: colorScheme)
+
+        return HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("SEMESTRE \(viewModel.semesterFilter)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .tracking(1.5)
-                    .foregroundStyle(CampusTheme.mathBlue)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.0)
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
-                Spacer()
+                Text("Disciplinas")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                Button {
-                    viewModel.openAddCourseSheet()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("Disciplina")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(CampusTheme.selectedPillText(for: colorScheme))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(
-                                CampusTheme.selectedPillText(for: colorScheme).opacity(0.25),
-                                lineWidth: 1
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Adicionar disciplina")
+                Text("Seu acompanhamento de faltas")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
             }
 
-            Text("Disciplinas")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+            Spacer(minLength: 8)
 
-            Text("Seu acompanhamento de faltas")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+            Button {
+                viewModel.openAddCourseSheet()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("Disciplina")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(onPrimary)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 42)
+                .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+            .padding(.top, 10)
+            .accessibilityLabel("Adicionar nova disciplina")
         }
     }
 
-    // MARK: - Quick Search Bar ("Buscar disciplina ou professor")
+    // MARK: - Quick Actions ("Matriz" + "Grade")
 
-    private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+    private var quickActionsRow: some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
 
-            TextField("Buscar disciplina ou professor", text: $searchText)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                .autocorrectionDisabled(true)
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                #endif
-                .accessibilityLabel("Buscar disciplina ou professor")
-
-            if !searchText.isEmpty {
+        return LiquidGlassGroup(spacing: 10) {
+            HStack(spacing: 10) {
                 Button {
-                    withAnimation(.snappy) {
-                        searchText = ""
-                    }
+                    isMatrixPresented = true
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+                    HStack(spacing: 6) {
+                        Image(systemName: "book.pages.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Matriz")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 40)
+                    .liquidGlassCapsule(selected: false, accent: CampusTheme.mathBlue, interactive: true, highContrast: hc)
                 }
                 .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Abrir matriz curricular e cálculo de CRE")
+
+                Button {
+                    viewModel.openTimetable()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "tablecells.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Grade")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(resolvedAccent.onPrimary(for: colorScheme))
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 40)
+                    .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Abrir grade horária semanal")
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    // MARK: - Filter Pills + Layout Switcher
+
+    private var filtersAndLayoutRow: some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
+
+        return LiquidGlassGroup(spacing: 8) {
+            HStack(spacing: 8) {
+                Menu {
+                    ForEach(viewModel.availableDepartments, id: \.self) { department in
+                        Button {
+                            withAnimation(.snappy) {
+                                viewModel.departmentFilter = department
+                            }
+                        } label: {
+                            if viewModel.departmentFilter == department {
+                                Label(department, systemImage: "checkmark")
+                            } else {
+                                Text(department)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(viewModel.departmentFilter)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(
+                        viewModel.departmentFilter == "Todos os departamentos"
+                            ? CampusTheme.primaryText(for: colorScheme, highContrast: hc)
+                            : CampusTheme.accessibleTextColor(primary, scheme: colorScheme)
+                    )
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 38)
+                    .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                }
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Filtrar departamento: \(viewModel.departmentFilter)")
+
+                Menu {
+                    ForEach(viewModel.availableSemesters, id: \.self) { semester in
+                        Button {
+                            withAnimation(.snappy) {
+                                viewModel.semesterFilter = semester
+                            }
+                        } label: {
+                            if viewModel.semesterFilter == semester {
+                                Label(semester, systemImage: "checkmark")
+                            } else {
+                                Text(semester)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(viewModel.semesterFilter)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 38)
+                    .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                }
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Filtrar semestre: \(viewModel.semesterFilter)")
+
+                Spacer(minLength: 4)
+
+                // Segmented Layout Toggle: Bloco (grid) vs Barras (bars)
+                HStack(spacing: 4) {
+                    layoutToggleButton(mode: "grid", systemImage: "square.grid.2x2.fill", label: "Visualização em blocos")
+                    layoutToggleButton(mode: "bars", systemImage: "list.bullet", label: "Visualização em barras")
+                }
+                .padding(3)
+                .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
+            }
+        }
+    }
+
+    private func layoutToggleButton(mode: String, systemImage: String, label: String) -> some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
+        let isSelected = viewModel.store.disciplinesLayoutMode == mode
+
+        return Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.store.disciplinesLayoutMode = mode
+            }
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(isSelected ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .frame(width: 34, height: 32)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isSelected ? primary : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .frame(minWidth: 40, minHeight: 36)
+        .contentShape(Rectangle())
+        .accessibilityLabel(label)
+    }
+
+    // MARK: - Search Bar
+
+    private var searchBarSection: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+
+            TextField("Buscar disciplina ou professor...", text: $searchQuery)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                }
+                .buttonStyle(.plain)
+                .frame(minWidth: 32, minHeight: 32)
                 .accessibilityLabel("Limpar busca")
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
+        .frame(minHeight: 46)
+        .liquidGlassCapsule(selected: false, accent: resolvedAccent.primary(for: colorScheme), interactive: false, highContrast: hc)
     }
 
-    // MARK: - Filters ("Todos os departamentos" + "2026.2")
-
-    private var filtersBar: some View {
-        HStack(spacing: 10) {
-            Menu {
-                ForEach(viewModel.availableDepartments, id: \.self) { dept in
-                    Button {
-                        withAnimation(.snappy) {
-                            viewModel.departmentFilter = dept
-                        }
-                    } label: {
-                        HStack {
-                            Text(dept)
-                            if viewModel.departmentFilter == dept {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(viewModel.departmentFilter)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                        .lineLimit(1)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.cardBackground(for: colorScheme))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                )
-            }
-
-            Menu {
-                ForEach(viewModel.availableSemesters, id: \.self) { sem in
-                    Button {
-                        withAnimation(.snappy) {
-                            viewModel.semesterFilter = sem
-                        }
-                    } label: {
-                        HStack {
-                            Text(sem)
-                            if viewModel.semesterFilter == sem {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(viewModel.semesterFilter)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.cardBackground(for: colorScheme))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                )
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
-
-    // MARK: - 2x2 LazyVGrid
+    // MARK: - Disciplines Collection (Grid vs Bars with distinct keys)
 
     @ViewBuilder
-    private var disciplinesGrid: some View {
-        let cards = displayedDisciplines
-
-        if viewModel.disciplines.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "books.vertical.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(CampusTheme.mathBlue)
-
-                Text("Nenhuma disciplina neste filtro")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                Text("Cadastre uma disciplina em \(viewModel.semesterFilter) ou aplique um template oficial da UFOP na Grade de horários.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .multilineTextAlignment(.center)
-
-                HStack(spacing: 10) {
-                    Button {
-                        viewModel.openAddCourseSheet()
-                    } label: {
-                        Label("Nova disciplina", systemImage: "plus.circle.fill")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(CampusTheme.mathBlue)
-                            )
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        viewModel.openTimetable()
-                    } label: {
-                        Label("Templates UFOP", systemImage: "square.grid.3x2.fill")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(CampusTheme.selectedPillText(for: colorScheme))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 4)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 32)
-            .padding(.horizontal, 20)
-            .background(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .fill(CampusTheme.cardBackground(for: colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-            )
-        } else if cards.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(CampusTheme.mathBlue)
+    private var disciplinesCollectionSection: some View {
+        let items = displayedDisciplines
+        if items.isEmpty {
+            VStack(spacing: 8) {
+                Image(systemName: "books.vertical")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                 Text("Nenhuma disciplina encontrada")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                Text("Não encontramos resultados para \"\(trimmedSearchQuery)\" no filtro atual.")
+                Text("Ajuste os filtros ou toque em + Disciplina.")
                     .font(.system(size: 13))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .multilineTextAlignment(.center)
-
-                Button {
-                    withAnimation(.snappy) {
-                        searchText = ""
-                    }
-                } label: {
-                    Label("Limpar busca", systemImage: "xmark.circle.fill")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.selectedPillText(for: colorScheme))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                        )
-                }
-                .buttonStyle(.plain)
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 28)
-            .padding(.horizontal, 20)
-            .background(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .fill(CampusTheme.cardBackground(for: colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-            )
+            .padding(28)
+            .liquidGlassCard(cornerRadius: 20, highContrast: hc)
+        } else if isBarsMode {
+            LazyVStack(spacing: 12) {
+                ForEach(items) { card in
+                    Button {
+                        viewModel.openDisciplineDetail(card)
+                    } label: {
+                        disciplineBarCard(card)
+                    }
+                    .buttonStyle(.plain)
+                    .id("bars-\(card.id)")
+                }
+            }
         } else {
-            LazyVGrid(columns: gridColumns, spacing: 14) {
-                ForEach(cards) { card in
-                    disciplineGridCard(card: card)
+            LazyVGrid(columns: gridColumns, spacing: 12) {
+                ForEach(items) { card in
+                    Button {
+                        viewModel.openDisciplineDetail(card)
+                    } label: {
+                        disciplineGridCard(card)
+                    }
+                    .buttonStyle(.plain)
+                    .id("grid-\(card.id)")
                 }
             }
         }
     }
 
-    private func disciplineGridCard(card: DisciplineSummaryCard) -> some View {
-        let accent = CampusTheme.departmentColor(for: card.colorKey)
+    // MARK: - Grid Card (2 columns, compact, no "f..." clipping or "Controlada" clutter)
 
-        return Button {
-            viewModel.openDisciplineDetail(card)
-        } label: {
-            HStack(spacing: 0) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(accent)
-                    .frame(width: CampusTheme.leftAccentBarWidth)
-                    .padding(.vertical, 12)
-                    .padding(.leading, 10)
+    private func disciplineGridCard(_ card: DisciplineSummaryCard) -> some View {
+        let deptColor = CampusTheme.departmentColor(for: card.colorKey)
+        let riskLevel = CampusTheme.semanticAbsenceRiskLevel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences)
+        let riskColor = CampusTheme.semanticAbsenceRiskColor(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences, scheme: colorScheme)
+        let barColor = riskLevel > 0 ? riskColor : deptColor
+        let progress = card.maxAbsences > 0 ? min(1.0, max(0.0, Double(card.currentAbsences) / Double(card.maxAbsences))) : 0
+        let isEad = viewModel.store.isCourseEad(card.id)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .center) {
-                        Text(card.department)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(accent)
-                            .lineLimit(1)
+        return HStack(spacing: 0) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(deptColor)
+                .frame(width: 4)
+                .padding(.vertical, 10)
+                .padding(.leading, 4)
 
-                        Spacer(minLength: 4)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 5) {
+                    Text(card.code)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(CampusTheme.departmentSoftTint(for: card.colorKey, scheme: colorScheme))
+                        )
 
-                        Text(card.shortWorkloadLabel)
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+                    if isEad {
+                        Text("EAD")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.mathBlue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(CampusTheme.mathBlue.opacity(colorScheme == .dark ? 0.22 : 0.14))
+                            )
                     }
 
-                    Text(card.name)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, minHeight: 38, alignment: .topLeading)
+                    Spacer(minLength: 0)
+                }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(card.compactRatioText)
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                Text(card.name)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .minimumScaleFactor(0.9)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .topLeading)
 
-                            Text("faltas")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("\(card.currentAbsences)")
+                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                        Text("/\(card.maxAbsences) faltas")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        Spacer(minLength: 2)
+                    }
+
+                    if riskLevel > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: CampusTheme.semanticAbsenceRiskIcon(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
+                                .font(.system(size: 10, weight: .bold))
+                            Text(CampusTheme.semanticAbsenceRiskLabel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
                         }
+                        .foregroundStyle(riskColor)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(riskColor.opacity(colorScheme == .dark ? 0.22 : 0.14))
+                        )
+                    }
 
-                        GeometryReader { proxy in
-                            ZStack(alignment: .leading) {
-                                Capsule(style: .continuous)
-                                    .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                    .frame(height: 6)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule(style: .continuous)
+                                .fill(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
+                                .frame(height: 5)
 
+                            if progress > 0 {
                                 Capsule(style: .continuous)
-                                    .fill(accent)
-                                    .frame(
-                                        width: max(6, proxy.size.width * card.absenceProgress),
-                                        height: 6
+                                    .fill(barColor)
+                                    .frame(width: max(8, proxy.size.width * progress), height: 5)
+                            }
+                        }
+                    }
+                    .frame(height: 5)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
+        }
+        .frame(maxWidth: .infinity, minHeight: 162, alignment: .topLeading)
+        .liquidGlassCard(cornerRadius: 20, tint: deptColor, interactive: true, highContrast: hc)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(card.name), código \(card.code), \(card.currentAbsences) de \(card.maxAbsences) faltas")
+    }
+
+    // MARK: - Bar Card (Full width)
+
+    private func disciplineBarCard(_ card: DisciplineSummaryCard) -> some View {
+        let deptColor = CampusTheme.departmentColor(for: card.colorKey)
+        let riskLevel = CampusTheme.semanticAbsenceRiskLevel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences)
+        let riskColor = CampusTheme.semanticAbsenceRiskColor(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences, scheme: colorScheme)
+        let barColor = riskLevel > 0 ? riskColor : deptColor
+        let progress = card.maxAbsences > 0 ? min(1.0, max(0.0, Double(card.currentAbsences) / Double(card.maxAbsences))) : 0
+        let isEad = viewModel.store.isCourseEad(card.id)
+        let cleanProf = card.professor.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return HStack(spacing: 0) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(deptColor)
+                .frame(width: 4)
+                .padding(.vertical, 10)
+                .padding(.leading, 4)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 6) {
+                            Text(card.code)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(CampusTheme.departmentSoftTint(for: card.colorKey, scheme: colorScheme))
+                                )
+
+                            if isEad {
+                                Text("A distância (EAD)")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(CampusTheme.mathBlue)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(CampusTheme.mathBlue.opacity(colorScheme == .dark ? 0.22 : 0.14))
                                     )
                             }
                         }
-                        .frame(height: 6)
 
-                        Text(
-                            card.cancelledClasses > 0
-                                ? "\(card.cancelledClasses) cancelada(s) · restam \(card.remainingAbsences)"
-                                : "Restam \(card.remainingAbsences) faltas · \(card.shortWorkloadLabel)"
-                        )
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
-                        .lineLimit(1)
+                        Text(card.name)
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+
+                        if !card.location.isEmpty || !cleanProf.isEmpty {
+                            HStack(spacing: 6) {
+                                Image(systemName: isEad ? "laptopcomputer" : "clock")
+                                    .font(.system(size: 11))
+                                Text(cleanProf.isEmpty ? card.location : "\(card.location) · \(cleanProf)")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        }
+                    }
+
+                    Spacer(minLength: 6)
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 1) {
+                            Text("\(card.currentAbsences)")
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            Text("/\(card.maxAbsences)")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        }
+                        Text("faltas")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+
+                        if riskLevel > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: CampusTheme.semanticAbsenceRiskIcon(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(CampusTheme.semanticAbsenceRiskLabel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                            }
+                            .foregroundStyle(riskColor)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(riskColor.opacity(colorScheme == .dark ? 0.22 : 0.14))
+                            )
+                        }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 14)
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule(style: .continuous)
+                            .fill(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
+                            .frame(height: 5)
+
+                        if progress > 0 {
+                            Capsule(style: .continuous)
+                                .fill(barColor)
+                                .frame(width: max(8, proxy.size.width * progress), height: 5)
+                        }
+                    }
+                }
+                .frame(height: 5)
             }
-            .background(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .fill(CampusTheme.cardBackground(for: colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-            )
-            .shadow(
-                color: CampusTheme.cardShadow(for: colorScheme),
-                radius: 8,
-                x: 0,
-                y: 4
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Informative Footer
-
-    private var footerInfoCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(CampusTheme.mathBlue)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Limite de 25% da carga horária · UFOP")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                Text("Toque em uma disciplina para consultar prazos, avaliações e anotações. Aulas canceladas não somam no contador de faltas.")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Dark Floating Action Button (Bottom-Right -> Opens TimetableGridView)
-
-    private var floatingTimetableButton: some View {
-        Button {
-            viewModel.openTimetable()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "calendar.day.timeline.left")
-                    .font(.system(size: 15, weight: .semibold))
-
-                Text("Grade de horários")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 14)
             .padding(.vertical, 14)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(CampusTheme.floatingButtonBackground(for: colorScheme))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-            )
-            .shadow(
-                color: Color.black.opacity(0.28),
-                radius: 12,
-                x: 0,
-                y: 6
-            )
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Abrir Grade de horários")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .liquidGlassCard(cornerRadius: 20, tint: deptColor, interactive: true, highContrast: hc)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(card.name), \(card.currentAbsences) de \(card.maxAbsences) faltas")
+    }
+
+    // MARK: - Footer
+
+    private var footerLegendSection: some View {
+        let totalCancelled = viewModel.disciplines.reduce(0) { $0 + $1.cancelledClasses }
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Aulas canceladas (\(totalCancelled)) não somam faltas. As marcações salvas na Agenda atualizam estes relatórios.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+            Text("Cores por departamento UFOP · semáforo acessível de faltas.")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+        }
+        .padding(.top, 4)
     }
 }
 

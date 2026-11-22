@@ -1,603 +1,1037 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+private enum ProfileSubtab: String, CaseIterable, Identifiable {
+    case summary = "Resumo"
+    case calendar = "Calendário"
+    case settings = "Ajustes"
+    case faq = "FAQ"
+
+    var id: String { rawValue }
+}
+
+private struct FaqEntry: Identifiable {
+    let id: String
+    let question: String
+    let answer: String
+}
 
 public struct ProfileView: View {
-    @Environment(CampusStore.self) private var store
+    @Environment(CampusStore.self) private var environmentStore: CampusStore?
+    @Environment(CampusAppearanceController.self) private var environmentAppearance: CampusAppearanceController?
+    @Environment(AppLockManager.self) private var environmentLockManager: AppLockManager?
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("campus.ufop.appearanceMode") private var appearanceModeRaw: String = "system"
-    @State private var isScheduleShareSheetPresented: Bool = false
+
+    @State private var fallbackStore = CampusStore()
+    @State private var fallbackAppearance = CampusAppearanceController()
+    @State private var fallbackLockManager = AppLockManager()
+
+    @State private var selectedSubtab: ProfileSubtab = .summary
+    @State private var selectedCalendarSemester: String = "2026.2"
+    @State private var selectedCalendarCategory: String = "Todos"
+
+    // Sheets & Importers
+    @State private var isMatrixPresented: Bool = false
+    @State private var isSharePresented: Bool = false
+    @State private var isReleaseNotesPresented: Bool = false
+    @State private var showTranscriptPicker: Bool = false
+    @State private var transcriptMessage: String?
+    @State private var transcriptError: String?
+
+    // Segurança & Backup (.ufopbackup)
+    @State private var newPinPassword: String = ""
+    @State private var disablePinPassword: String = ""
+    @State private var lockFeedback: String?
+    @State private var backupPassword: String = ""
+    @State private var backupDocument: UfopTextDocument?
+    @State private var showBackupExporter: Bool = false
+    @State private var showBackupImporter: Bool = false
+    @State private var backupFeedback: String?
+    @State private var backupError: String?
+
+    // Manutenção & Logout
+    @State private var showResetSeedConfirmation: Bool = false
+    @State private var showSignOutFirstAlert: Bool = false
+    @State private var showSignOutSecondAlert: Bool = false
+    @State private var expandedFaqIds: Set<String> = []
 
     public init() {}
 
+    private var activeStore: CampusStore { environmentStore ?? fallbackStore }
+    private var activeAppearance: CampusAppearanceController { environmentAppearance ?? fallbackAppearance }
+    private var activeLock: AppLockManager { environmentLockManager ?? fallbackLockManager }
+
+    private var hc: Bool { activeAppearance.accessibility.highContrastMode }
+    private var minTouch: CGFloat { activeAppearance.accessibility.minTouchHeight }
+    private var primaryAccent: Color { activeAppearance.accentColor.primary(for: colorScheme) }
+    private var onPrimaryAccent: Color { activeAppearance.accentColor.onPrimary(for: colorScheme) }
+
     public var body: some View {
-        let profile = store.academicProfileSummary
+        ZStack {
+            LiquidGlassBackdrop(accent: activeAppearance.accentColor, highContrast: hc)
 
-        NavigationStack {
-            ZStack {
-                CampusTheme.appBackground(for: colorScheme)
-                    .ignoresSafeArea()
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    headerSection
+                    subtabPickerSection
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        headerSection
-
-                        studentIdentityCard(activeCampus: profile.activeCampus)
-
-                        campusPickerCard(profile: profile)
-
-                        semesterMetricsCard(profile: profile)
-
-                        academicCalendarSection(events: profile.calendarEvents)
-
-                        scheduleShareImportCard
-
-                        appearancePreferenceCard
-
-                        resetDemoDataButton
+                    switch selectedSubtab {
+                    case .summary:
+                        summarySubtabContent
+                    case .calendar:
+                        calendarSubtabContent
+                    case .settings:
+                        settingsSubtabContent
+                    case .faq:
+                        faqSubtabContent
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 32)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 108)
+            }
+        }
+        .sheet(isPresented: $isMatrixPresented) {
+            CurriculumMatrixView(store: activeStore) {
+                isMatrixPresented = false
+            }
+        }
+        .sheet(isPresented: $isSharePresented) {
+            ScheduleShareImportSheetView(store: activeStore) {
+                isSharePresented = false
+            }
+        }
+        .sheet(isPresented: $isReleaseNotesPresented) {
+            ReleaseNotesSheetView {
+                isReleaseNotesPresented = false
+            }
+        }
+        .fileImporter(
+            isPresented: $showTranscriptPicker,
+            allowedContentTypes: [.pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            handleTranscriptImport(result)
+        }
+        .fileExporter(
+            isPresented: $showBackupExporter,
+            document: backupDocument,
+            contentType: .plainText,
+            defaultFilename: "ufop-backup-\(CampusStore.todayIsoDateString()).ufopbackup"
+        ) { result in
+            switch result {
+            case .success:
+                backupFeedback = "Backup criptografado (.ufopbackup) salvo com sucesso."
+                backupError = nil
+            case .failure(let err):
+                backupError = err.localizedDescription
+            }
+        }
+        .fileImporter(
+            isPresented: $showBackupImporter,
+            allowedContentTypes: [.data, .plainText, .json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleBackupRestore(result)
+        }
+        .confirmationDialog(
+            "Restaurar grade padrão 2026.2?",
+            isPresented: $showResetSeedConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Restaurar disciplinas padrão", role: .destructive) {
+                _ = activeStore.resetSemesterToDefaultSeed(semester: activeStore.selectedSemesterFilter)
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Substitui as disciplinas atuais do semestre pelo conjunto padrão de demonstração UFOP 2026.2.")
+        }
+        .alert("Deseja baixar backup antes de sair?", isPresented: $showSignOutFirstAlert) {
+            Button("Fazer backup antes") {
+                withAnimation(.snappy) {
+                    selectedSubtab = .settings
+                    backupFeedback = "Defina uma senha na seção Backup (.ufopbackup) e toque em Exportar antes de sair."
                 }
             }
-            #if os(iOS)
-            .navigationBarHidden(true)
-            #endif
-            .sheet(isPresented: $isScheduleShareSheetPresented) {
-                ScheduleShareImportSheetView(
-                    store: store,
-                    onClose: {
-                        isScheduleShareSheetPresented = false
-                    }
-                )
-                .presentationDetents([.large, .fraction(0.88)])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
+            Button("Sair sem backup", role: .destructive) {
+                showSignOutSecondAlert = true
             }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Todos os dados salvos localmente neste aparelho serão removidos após a confirmação.")
+        }
+        .alert("Confirmar saída da conta?", isPresented: $showSignOutSecondAlert) {
+            Button("Apagar dados locais e sair", role: .destructive) {
+                activeStore.signOutAndResetAllData(lockManager: activeLock, appearance: activeAppearance)
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("O aplicativo voltará para a tela de boas-vindas e os arquivos locais criptografados serão apagados.")
         }
     }
 
-    // MARK: - Header
+    // MARK: - Header & Segmented Subtabs
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("CAMPUS · UFOP")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .tracking(1.5)
-                .foregroundStyle(CampusTheme.mathBlue)
+            Text("MEU PERFIL")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .tracking(1.0)
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
-            Text("Perfil acadêmico")
+            Text("Perfil Acadêmico")
                 .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-            Text("Universidade Federal de Ouro Preto · 2026.2")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
         }
     }
 
-    // MARK: - Student Card
+    private var subtabPickerSection: some View {
+        LiquidGlassGroup(spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ProfileSubtab.allCases) { tab in
+                        let isSelected = selectedSubtab == tab
+                        Button {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                                selectedSubtab = tab
+                            }
+                        } label: {
+                            Text(tab.rawValue)
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 40)
+                                .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                    }
+                }
+            }
+        }
+    }
 
-    private func studentIdentityCard(activeCampus: UfopCampusInfo) -> some View {
-        HStack(spacing: 16) {
+    // MARK: - 1. Resumo
+
+    @ViewBuilder
+    private var summarySubtabContent: some View {
+        let summary = activeStore.academicProfileSummary
+        let profile = activeStore.studentProfile
+        let creReport = activeStore.getAcademicCreReport()
+
+        studentIdentityCard(profile: profile, summary: summary)
+        campusSelectorCard(summary: summary)
+        metricsGrid(summary: summary)
+        creAndTranscriptCard(creReport: creReport)
+        shareScheduleCard
+    }
+
+    private func studentIdentityCard(profile: StudentProfile, summary: AcademicProfileSummary) -> some View {
+        let displayName = profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Estudante UFOP"
+            : profile.fullName
+        let initials = displayName
+            .split(separator: " ")
+            .prefix(2)
+            .compactMap(\.first)
+            .map { String($0).uppercased() }
+            .joined()
+
+        return HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                    .frame(width: 58, height: 58)
-
-                Text("UF")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.selectedPillText(for: colorScheme))
+                    .fill(primaryAccent)
+                    .frame(width: 54, height: 54)
+                Text(initials.isEmpty ? "UF" : initials)
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundStyle(onPrimaryAccent)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text("Estudante UFOP")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                Text(displayName)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                    Spacer()
-
-                    WeatherPillBadge(label: activeCampus.weatherBadgeLabel)
+                if !profile.courseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(profile.courseName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                 }
 
-                Text(activeCampus.fullLabel)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
-                Text("Matrícula ativa · Semestre 2026.2 · \(activeCampus.weatherCondition)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(CampusTheme.mathBlue)
+                HStack(spacing: 8) {
+                    if !profile.registrationNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Mat. \(profile.registrationNumber)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    }
+                    Text("• \(summary.semester)")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                }
             }
+
+            Spacer(minLength: 0)
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 22, tint: primaryAccent, highContrast: hc)
     }
 
-    // MARK: - Campus da UFOP Picker (Ouro Preto · Morro do Cruzeiro, Mariana · ICHS/ICSA, João Monlevade · ICEA)
+    private func campusSelectorCard(summary: AcademicProfileSummary) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Campus UFOP")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                Spacer()
+                WeatherPillBadge(label: summary.activeCampus.weatherBadgeLabel)
+            }
 
-    private func campusPickerCard(profile: AcademicProfileSummary) -> some View {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(summary.campuses) { campus in
+                        let isSelected = campus.id == summary.activeCampus.id
+                        Button {
+                            withAnimation(.snappy) {
+                                _ = activeStore.setActiveCampus(campusId: campus.id)
+                            }
+                        } label: {
+                            Text(campus.city)
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 38)
+                                .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                    }
+                }
+            }
+
+            Text(summary.activeCampus.fullLabel)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+    }
+
+    private func metricsGrid(summary: AcademicProfileSummary) -> some View {
+        let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+        return LazyVGrid(columns: columns, spacing: 10) {
+            metricTile(title: "Disciplinas", value: "\(summary.totalCourses)", subtitle: "Em \(summary.semester)", tint: primaryAccent)
+            metricTile(title: "Faltas acumuladas", value: "\(summary.totalAbsences)/\(summary.totalMaxAbsences)", subtitle: "\(summary.coursesAtRisk) em risco", tint: CampusTheme.mathBlue)
+            metricTile(title: "Canceladas", value: "\(summary.totalCancelledClasses)", subtitle: "Não somam falta", tint: CampusTheme.compPurple)
+            metricTile(title: "Avaliações", value: "\(summary.pendingAssessments)", subtitle: "\(summary.completedAssessments) concluídas", tint: CampusTheme.engineeringGreen)
+        }
+    }
+
+    private func metricTile(title: String, value: String, subtitle: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            Text(value)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .liquidGlassCard(cornerRadius: 18, tint: tint, highContrast: hc)
+    }
+
+    private func creAndTranscriptCard(creReport: AcademicCreReport) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Campus da UFOP")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                    Text("Altera o clima e a referência de localização na Agenda")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Coeficiente de Rendimento (CRE)")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    Text("Integralizado: \(creReport.completedHours)h / \(creReport.totalRequiredHours)h · Aprovadas: \(creReport.totalApproved)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 }
-
                 Spacer()
+                Text(String(format: "%.2f", creReport.overallCre))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
             }
 
-            VStack(spacing: 8) {
-                ForEach(profile.campuses) { campus in
-                    let isSelected = campus.id == profile.activeCampus.id
-                    Button {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
-                            _ = store.setActiveCampus(campusId: campus.id)
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(
-                                    isSelected
-                                        ? CampusTheme.mathBlue
-                                        : CampusTheme.mutedText(for: colorScheme)
-                                )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(campus.fullLabel)
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                                Text("\(campus.weatherCondition) · \(campus.weatherTempC) °C")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                            }
-
-                            Spacer()
-
-                            WeatherPillBadge(label: campus.weatherBadgeLabel)
-                        }
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(
-                                    isSelected
-                                        ? CampusTheme.selectedPillBackground(for: colorScheme)
-                                        : CampusTheme.appBackground(for: colorScheme)
-                                )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(
-                                    isSelected
-                                        ? CampusTheme.selectedPillText(for: colorScheme).opacity(0.32)
-                                        : CampusTheme.cardBorder(for: colorScheme),
-                                    lineWidth: 1
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Selecionar \(campus.fullLabel)")
-                }
+            if let transcriptMessage {
+                Text(transcriptMessage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
             }
-        }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Semester Metrics Card
-
-    private func semesterMetricsCard(profile: AcademicProfileSummary) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Resumo em tempo real · 2026.2")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                Spacer()
-
-                Text("\(profile.pendingAssessments) pendentes")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(CampusTheme.mathBlue)
+            if let transcriptError {
+                Text(transcriptError)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0xDC2626))
             }
 
             HStack(spacing: 10) {
-                metricBox(
-                    value: "\(profile.totalCourses)",
-                    label: "Disciplinas",
-                    tint: CampusTheme.mathBlue
-                )
-
-                metricBox(
-                    value: "\(profile.totalAbsences)/\(profile.totalMaxAbsences)",
-                    label: "Faltas totais",
-                    tint: CampusTheme.compPurple
-                )
-
-                metricBox(
-                    value: "\(profile.totalCancelledClasses)",
-                    label: "Canceladas",
-                    tint: CampusTheme.algebraGreen
-                )
-            }
-
-            HStack(spacing: 6) {
-                Image(systemName: profile.coursesAtRisk > 0 ? "exclamationmark.triangle.fill" : "checkmark.shield.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(profile.coursesAtRisk > 0 ? Color(hex: 0xDC2626) : CampusTheme.algebraGreen)
-
-                Text(
-                    profile.coursesAtRisk > 0
-                        ? "Atenção: \(profile.coursesAtRisk) disciplina(s) acima de 75% do limite de faltas."
-                        : "\(profile.totalCancelledClasses) canceladas · não somam faltas no limite de 25% da UFOP."
-                )
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-            }
-        }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
-    }
-
-    private func metricBox(value: String, label: String, tint: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(tint)
-
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(CampusTheme.appBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Calendário Acadêmico UFOP 2026.2 (18 NOV, 02 DEZ, 12 DEZ, 15 DEZ)
-
-    private func academicCalendarSection(events: [AcademicCalendarEvent]) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Calendário Acadêmico UFOP 2026.2")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                    Text("Datas oficiais PROGRAD · 2º semestre letivo")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                Button {
+                    transcriptError = nil
+                    showTranscriptPicker = true
+                } label: {
+                    Label("Histórico PDF", systemImage: "doc.badge.plus")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
                 }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
 
-                Spacer()
-            }
-
-            VStack(spacing: 10) {
-                ForEach(events) { event in
-                    HStack(spacing: 12) {
-                        VStack(spacing: 1) {
-                            Text(event.dayNumber)
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(CampusTheme.mathBlue)
-
-                            Text(event.monthShort)
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(CampusTheme.mathBlue)
-                        }
-                        .frame(width: 46, height: 44)
-                        .background(
-                            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                        )
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.title)
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                            Text(event.category)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                        }
-
-                        Spacer()
-                    }
-                    .padding(11)
-                    .background(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(CampusTheme.appBackground(for: colorScheme))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                    )
+                Button {
+                    isMatrixPresented = true
+                } label: {
+                    Label("Matriz & Simulador", systemImage: "slider.horizontal.3")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(onPrimaryAccent)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: hc)
                 }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
             }
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
     }
 
-    // MARK: - Compartilhar / Importar Grade (JSON)
-
-    private var scheduleShareImportCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var shareScheduleCard: some View {
+        Button {
+            isSharePresented = true
+        } label: {
             HStack(spacing: 12) {
                 Image(systemName: "square.and.arrow.up.on.square.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(CampusTheme.mathBlue)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Compartilhar / Importar Grade (JSON)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                    Text("Exporte sua grade 2026.2 ou importe horários de colegas da UFOP")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                    Text("Compartilhar ou importar grade (.ufopgrade)")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    Text("Exporte para JSON/arquivo e envie para colegas da turma.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 }
 
                 Spacer()
-            }
 
-            Button {
-                isScheduleShareSheetPresented = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "curlybraces")
-                        .font(.system(size: 13, weight: .bold))
-
-                    Text("Abrir exportação e importação JSON")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .fill(CampusTheme.mathBlue)
-                )
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
             }
-            .buttonStyle(.plain)
+            .padding(16)
+            .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, interactive: true, highContrast: hc)
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
+        .minimumTouchTarget(minTouch)
     }
 
-    // MARK: - Appearance Card (Light / Dark / System)
+    // MARK: - 2. Calendário Oficial (2026.2, 2027.1, 2027.2)
 
-    private var appearancePreferenceCard: some View {
+    @ViewBuilder
+    private var calendarSubtabContent: some View {
+        let semesters = ["2026.2", "2027.1", "2027.2"]
+        let semEvents = activeStore.calendarEvents.filter { $0.semester == selectedCalendarSemester }
+        let categories = ["Todos"] + Array(Set(semEvents.map(\.category))).sorted()
+        let filtered = semEvents.filter {
+            selectedCalendarCategory == "Todos" || $0.category == selectedCalendarCategory
+        }
+
         VStack(alignment: .leading, spacing: 12) {
-            Text("Aparência do aplicativo")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+            Text("Calendários Acadêmicos Oficiais UFOP")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-            Picker("Aparência", selection: $appearanceModeRaw) {
-                Text("Sistema").tag("system")
-                Text("Claro").tag("light")
-                Text("Escuro").tag("dark")
+            HStack(spacing: 8) {
+                ForEach(semesters, id: \.self) { sem in
+                    let isSelected = selectedCalendarSemester == sem
+                    Button {
+                        withAnimation(.snappy) {
+                            selectedCalendarSemester = sem
+                            selectedCalendarCategory = "Todos"
+                        }
+                    } label: {
+                        Text(sem)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                            .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+                }
             }
-            .pickerStyle(.segmented)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(categories, id: \.self) { cat in
+                        let isSelected = selectedCalendarCategory == cat
+                        Button {
+                            selectedCalendarCategory = cat
+                        } label: {
+                            Text(cat)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 34)
+                                .liquidGlassCapsule(selected: isSelected, accent: CampusTheme.mathBlue, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Text("\(filtered.count) evento(s) em \(selectedCalendarSemester)")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+
+            VStack(spacing: 10) {
+                ForEach(filtered) { ev in
+                    HStack(spacing: 12) {
+                        VStack(spacing: 1) {
+                            Text(ev.dayNumber)
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                            Text(ev.monthShort)
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        }
+                        .frame(width: 44, height: 42)
+                        .background(RoundedRectangle(cornerRadius: 11).fill(activeAppearance.accentColor.softTint(for: colorScheme)))
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ev.title)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            Text(ev.category)
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .liquidGlassCard(cornerRadius: 16, highContrast: hc)
+                }
+            }
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
     }
 
-    // MARK: - Reset Seed Data Button
+    // MARK: - 3. Ajustes (Personalização, Segurança, Acessibilidade, Manutenção)
 
-    private var resetDemoDataButton: some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
-                store.seedUFOP2026_2Data()
-            }
-        } label: {
+    @ViewBuilder
+    private var settingsSubtabContent: some View {
+        appearanceCustomizationCard
+        securityAndLockCard
+        encryptedBackupCard
+        AccessibilityControlsSection(appearance: activeAppearance)
+        maintenanceCard
+    }
+
+    private var appearanceCustomizationCard: some View {
+        let modes: [(key: String, label: String)] = [("system", "Sistema"), ("light", "Claro"), ("dark", "Escuro")]
+
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Personalização & Tema")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
             HStack(spacing: 8) {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 14, weight: .semibold))
-
-                Text("Restaurar dados iniciais de 2026.2")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                ForEach(modes, id: \.key) { mode in
+                    let isSelected = activeAppearance.appearanceModeRaw == mode.key
+                    Button {
+                        withAnimation(.snappy) {
+                            activeAppearance.appearanceModeRaw = mode.key
+                        }
+                    } label: {
+                        Text(mode.label)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(maxWidth: .infinity, minHeight: 38)
+                            .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+                }
             }
-            .foregroundStyle(CampusTheme.mathBlue)
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(CampusTheme.selectedPillBackground(for: colorScheme))
+
+            Text("Cor de destaque")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(CampusAccentColor.allCases) { accentOption in
+                        let isSelected = activeAppearance.accentColor == accentOption
+                        let swatch = accentOption.primary(for: colorScheme)
+                        Button {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                activeAppearance.accentColor = accentOption
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(swatch)
+                                    .frame(width: 18, height: 18)
+                                Text(accentOption.displayName)
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .liquidGlassCapsule(selected: isSelected, accent: swatch, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+    }
+
+    private var securityAndLockCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                Text("Segurança & Privacidade")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+            }
+
+            Text("AES-256-GCM ativo para dados locais · PDFs processados em memória sem retenção de arquivos temporários.")
+                .font(.system(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+            if activeLock.isLockEnabled {
+                Label("Bloqueio do aplicativo ativado", systemImage: "checkmark.seal.fill")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+
+                if activeLock.biometricAvailable {
+                    Toggle(
+                        "Usar \(activeLock.biometricLabel)",
+                        isOn: Binding(
+                            get: { activeLock.isBiometricEnabled },
+                            set: { newVal in
+                                lockFeedback = activeLock.setBiometricEnabled(newVal)
+                            }
+                        )
+                    )
+                    .tint(primaryAccent)
+                }
+
+                HStack(spacing: 8) {
+                    SecureField("Senha atual para desativar", text: $disablePinPassword)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Desativar") {
+                        if let err = activeLock.disableLock(currentPassword: disablePinPassword) {
+                            lockFeedback = err
+                        } else {
+                            disablePinPassword = ""
+                            lockFeedback = "Bloqueio desativado."
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(hex: 0xDC2626))
+                }
+            } else {
+                HStack(spacing: 8) {
+                    SecureField("Definir senha (mín. 4 dígitos)", text: $newPinPassword)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Ativar") {
+                        if let err = activeLock.enableLock(password: newPinPassword, allowBiometric: activeLock.biometricAvailable) {
+                            lockFeedback = err
+                        } else {
+                            newPinPassword = ""
+                            lockFeedback = "Bloqueio ativado com sucesso."
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(primaryAccent)
+                }
+            }
+
+            if let lockFeedback {
+                Text(lockFeedback)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+            }
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+    }
+
+    private var encryptedBackupCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Backup Portátil (.ufopbackup)")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+            Text("Exporte ou restaure disciplinas, horários, faltas, notas e avaliações usando criptografia PBKDF2 + AES-GCM.")
+                .font(.system(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+            SecureField("Senha do backup", text: $backupPassword)
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 10) {
+                Button {
+                    do {
+                        let content = try activeStore.exportEncryptedBackup(password: backupPassword)
+                        backupDocument = UfopTextDocument(text: content)
+                        showBackupExporter = true
+                    } catch {
+                        backupError = error.localizedDescription
+                        backupFeedback = nil
+                    }
+                } label: {
+                    Label("Exportar", systemImage: "square.and.arrow.up")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(onPrimaryAccent)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    backupError = nil
+                    showBackupImporter = true
+                } label: {
+                    Label("Restaurar", systemImage: "arrow.down.doc")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let backupFeedback {
+                Text(backupFeedback)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+            }
+            if let backupError {
+                Text(backupError)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0xDC2626))
+            }
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+    }
+
+    private var maintenanceCard: some View {
+        Button {
+            showResetSeedConfirmation = true
+        } label: {
+            Label("Restaurar grade de demonstração UFOP 2026.2", systemImage: "arrow.counterclockwise")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget(minTouch)
+    }
+
+    // MARK: - 4. FAQ, Release Notes, Guided Tour & Sign Out
+
+    private var faqEntries: [FaqEntry] {
+        [
+            FaqEntry(
+                id: "offline",
+                question: "Meus dados ficam salvos apenas no celular?",
+                answer: "Sim. Tudo funciona offline-first com criptografia AES-256-GCM usando chave protegida no Keychain do iOS."
+            ),
+            FaqEntry(
+                id: "pdfs",
+                question: "O aplicativo guarda os PDFs que eu importo?",
+                answer: "Não. O texto do Atestado de Matrícula, Plano de Ensino e Histórico Escolar é extraído em memória e qualquer cópia temporária é removida imediatamente."
+            ),
+            FaqEntry(
+                id: "absences",
+                question: "Como funciona o cálculo de faltas e aulas canceladas?",
+                answer: "O limite oficial da UFOP corresponde a 25% da carga horária (ex.: 60h = 18 faltas). Marcar uma aula como cancelada na Agenda nunca adiciona falta."
+            ),
+            FaqEntry(
+                id: "cre",
+                question: "Como calcular meu CRE e verificar a matriz?",
+                answer: "Na aba Disciplinas (botão Matriz) ou no Resumo do Perfil, importe seu Histórico Escolar em PDF e simule notas futuras."
+            ),
+            FaqEntry(
+                id: "backup",
+                question: "Como transferir meus dados para outro aparelho?",
+                answer: "Vá em Perfil → Ajustes → Backup Portátil (.ufopbackup), defina uma senha forte e exporte o arquivo criptografado."
             )
+        ]
+    }
+
+    @ViewBuilder
+    private var faqSubtabContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Novidades & Tour Guiado")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+            HStack(spacing: 10) {
+                Button {
+                    isReleaseNotesPresented = true
+                } label: {
+                    Label("Notas v\(CampusReleaseNotesData.currentVersionString)", systemImage: "sparkles")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(onPrimaryAccent)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    activeStore.guidedTourCompleted = false
+                } label: {
+                    Label("Rever Tour", systemImage: "map.fill")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+
+        VStack(spacing: 10) {
+            ForEach(faqEntries) { entry in
+                DisclosureGroup(
+                    isExpanded: Binding(
+                        get: { expandedFaqIds.contains(entry.id) },
+                        set: { expanded in
+                            if expanded { expandedFaqIds.insert(entry.id) }
+                            else { expandedFaqIds.remove(entry.id) }
+                        }
+                    )
+                ) {
+                    Text(entry.answer)
+                        .font(.system(size: 13))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 6)
+                } label: {
+                    Text(entry.question)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .multilineTextAlignment(.leading)
+                }
+                .tint(primaryAccent)
+                .padding(14)
+                .liquidGlassCard(cornerRadius: 16, highContrast: hc)
+            }
+        }
+
+        Button(role: .destructive) {
+            showSignOutFirstAlert = true
+        } label: {
+            Label("Sair da conta e apagar dados locais", systemImage: "rectangle.portrait.and.arrow.right")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(hex: 0xDC2626))
+                .frame(maxWidth: .infinity, minHeight: max(48, minTouch))
+                .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0xDC2626).opacity(colorScheme == .dark ? 0.18 : 0.10)))
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(hex: 0xDC2626).opacity(0.32), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: - Helpers
+
+    private func handleTranscriptImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let err):
+            transcriptError = err.localizedDescription
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            do {
+                let text = try SecurePdfProcessor.extractTextAndDeleteTemp(from: url)
+                let parsed = try UfopPdfParsers.parseTranscript(text: text)
+                let report = activeStore.applyTranscriptImport(parsed)
+                transcriptMessage = "Histórico processado! CRE: \(String(format: "%.2f", report.overallCre)) · \(report.totalApproved) aprovadas."
+                transcriptError = nil
+            } catch {
+                transcriptError = error.localizedDescription
+            }
+        }
+    }
+
+    private func handleBackupRestore(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let err):
+            backupError = err.localizedDescription
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let text = try String(contentsOf: url, encoding: .utf8)
+                _ = try activeStore.importEncryptedBackup(text, password: backupPassword)
+                backupFeedback = "Backup restaurado com sucesso!"
+                backupError = nil
+            } catch {
+                backupError = error.localizedDescription
+                backupFeedback = nil
+            }
+        }
+    }
 }
 
-// MARK: - Schedule Share / Import JSON Sheet (Sprint 2)
+// MARK: - Schedule Share & Import Sheet (.ufopgrade)
 
 public struct ScheduleShareImportSheetView: View {
-    public let store: CampusStore
+    @Bindable public var store: CampusStore
     public let onClose: () -> Void
 
-    @State private var jsonPayloadText: String = ""
-    @State private var statusFeedback: String?
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+
+    @State private var exportedJson: String = ""
+    @State private var importJson: String = ""
+    @State private var statusBanner: String?
+    @State private var showFileImporter: Bool = false
+    @State private var showFileExporter: Bool = false
 
     public init(store: CampusStore, onClose: @escaping () -> Void) {
         self.store = store
         self.onClose = onClose
-        self._jsonPayloadText = State(initialValue: store.exportSchedulePayload(semester: "2026.2"))
     }
 
     public var body: some View {
+        let accent = appearance?.accentColor ?? .green
+        let hc = appearance?.accessibility.highContrastMode ?? false
+        let primary = accent.primary(for: colorScheme)
+
         ZStack {
-            CampusTheme.cardBackground(for: colorScheme)
-                .ignoresSafeArea()
+            LiquidGlassBackdrop(accent: accent, highContrast: hc)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack {
-                        Text("GRADE HORÁRIA · JSON")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .tracking(1.4)
-                            .foregroundStyle(CampusTheme.mathBlue)
-
-                        Spacer()
-
-                        Button(action: onClose) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    Circle()
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                )
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Compartilhar Grade")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                    Spacer()
+                    Button {
+                        onClose()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(width: 38, height: 38)
+                            .liquidGlassCapsule(selected: false, accent: primary, highContrast: hc)
                     }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Compartilhar ou Importar Grade")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                        Text("Copie o JSON da sua grade 2026.2 ou cole um payload válido para sincronizar disciplinas e horários.")
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    }
-
-                    if let statusFeedback {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(CampusTheme.algebraGreen)
-                            Text(statusFeedback)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(CampusTheme.secondarySurface(for: colorScheme))
-                        )
-                    }
-
-                    TextEditor(text: $jsonPayloadText)
-                        .font(.system(size: 12, weight: .regular, design: .monospaced))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 240)
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(CampusTheme.appBackground(for: colorScheme))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                        )
-
-                    HStack(spacing: 12) {
-                        Button {
-                            jsonPayloadText = store.exportSchedulePayload(semester: "2026.2")
-                            statusFeedback = "Payload JSON de 2026.2 atualizado com sucesso."
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 13, weight: .bold))
-                                Text("Regerar JSON")
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            }
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(CampusTheme.secondarySurface(for: colorScheme))
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            let importedCount = store.importSchedulePayload(json: jsonPayloadText)
-                            if importedCount > 0 {
-                                statusFeedback = "\(importedCount) disciplina(s) importada(s) para 2026.2."
-                            } else {
-                                statusFeedback = "JSON inválido ou sem disciplinas compatíveis."
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 13, weight: .bold))
-                                Text("Importar JSON")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                            }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(CampusTheme.mathBlue)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 30)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if let statusBanner {
+                            Text(statusBanner)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .liquidGlassCard(cornerRadius: 12, tint: primary, highContrast: hc)
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Exportar grade (\(store.selectedSemesterFilter))")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                            HStack(spacing: 8) {
+                                Button("Gerar & Copiar JSON") {
+                                    exportedJson = store.exportSchedulePayload(semester: store.selectedSemesterFilter)
+                                    UIPasteboard.general.string = exportedJson
+                                    statusBanner = "Grade copiada para a área de transferência!"
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(primary)
+
+                                Button("Salvar .ufopgrade") {
+                                    exportedJson = store.exportSchedulePayload(semester: store.selectedSemesterFilter)
+                                    showFileExporter = true
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(14)
+                        .liquidGlassCard(cornerRadius: 18, tint: primary, highContrast: hc)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Importar grade de colega")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                            TextEditor(text: $importJson)
+                                .font(.system(size: 12, design: .monospaced))
+                                .scrollContentBackground(.hidden)
+                                .frame(minHeight: 110)
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc)))
+
+                            HStack(spacing: 8) {
+                                Button("Importar JSON") {
+                                    let count = store.importSchedulePayload(json: importJson)
+                                    statusBanner = count > 0
+                                        ? "\(count) disciplina(s) importada(s)!"
+                                        : "Conteúdo inválido ou vazio."
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(primary)
+
+                                Button("Abrir arquivo") {
+                                    showFileImporter = true
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(14)
+                        .liquidGlassCard(cornerRadius: 18, tint: primary, highContrast: hc)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
+                }
+            }
+        }
+        .fileExporter(
+            isPresented: $showFileExporter,
+            document: UfopTextDocument(text: exportedJson),
+            contentType: .plainText,
+            defaultFilename: "grade-ufop-\(store.selectedSemesterFilter).ufopgrade"
+        ) { result in
+            if case .success = result {
+                statusBanner = "Arquivo .ufopgrade exportado!"
+            }
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.data, .plainText, .json],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                if let txt = try? String(contentsOf: url, encoding: .utf8) {
+                    importJson = txt
+                    let count = store.importSchedulePayload(json: txt)
+                    statusBanner = count > 0 ? "\(count) disciplina(s) importada(s) do arquivo!" : "Arquivo inválido."
+                }
             }
         }
     }
@@ -605,12 +1039,10 @@ public struct ScheduleShareImportSheetView: View {
 
 #Preview("ProfileView - Light") {
     ProfileView()
-        .environment(CampusStore())
         .preferredColorScheme(.light)
 }
 
 #Preview("ProfileView - Dark") {
     ProfileView()
-        .environment(CampusStore())
         .preferredColorScheme(.dark)
 }

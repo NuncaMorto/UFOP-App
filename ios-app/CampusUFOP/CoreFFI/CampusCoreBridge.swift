@@ -893,7 +893,40 @@ private struct RustCrossPlatformSchedulePayload: Codable {
     let courses: [RustCrossPlatformCoursePayload]?
 }
 
-// MARK: - Reactive CampusStore (@Observable UniFFI Bridge + UFOP 2026.2 Engine)
+// MARK: - Student Onboarding Profile Model (v1.8.0+)
+
+public struct StudentProfile: Equatable, Codable, Sendable {
+    public var fullName: String
+    public var registrationNumber: String
+    public var courseName: String
+    public var campusName: String
+    public var activeSemester: String
+    public var semesterStartDate: String
+    public var semesterEndDate: String
+    public var onboardingCompleted: Bool
+
+    public init(
+        fullName: String = "",
+        registrationNumber: String = "",
+        courseName: String = "",
+        campusName: String = "Ouro Preto",
+        activeSemester: String = "2026.2",
+        semesterStartDate: String = "2026-08-24",
+        semesterEndDate: String = "2026-12-23",
+        onboardingCompleted: Bool = false
+    ) {
+        self.fullName = fullName
+        self.registrationNumber = registrationNumber
+        self.courseName = courseName
+        self.campusName = campusName
+        self.activeSemester = activeSemester
+        self.semesterStartDate = semesterStartDate
+        self.semesterEndDate = semesterEndDate
+        self.onboardingCompleted = onboardingCompleted
+    }
+}
+
+// MARK: - Reactive CampusStore (@Observable UniFFI Bridge + UFOP 2026.2+ Engine)
 
 @Observable
 public final class CampusStore {
@@ -903,26 +936,60 @@ public final class CampusStore {
     public var selectedSemesterFilter: String = "2026.2"
     public var selectedTimetableFilter: String = "Minha grade"
 
-    public private(set) var disciplines: [DisciplineSummaryCard] = []
-    public private(set) var assessmentsByDiscipline: [String: [AssessmentItem]] = [:]
-    public private(set) var notesByDiscipline: [String: String] = [:]
-    public private(set) var agendaItemsByDate: [String: [AgendaTimelineItem]] = [:]
-    public private(set) var timetableSlots: [TimetableSlotCell] = []
-    public private(set) var courseScheduleSlots: [CourseScheduleSlotItem] = []
-    public private(set) var activeTemplateId: String? = nil
-    public private(set) var academicActivities: [AcademicActivityItem] = []
-    public private(set) var campuses: [UfopCampusInfo] = []
-    public private(set) var calendarEvents: [AcademicCalendarEvent] = []
+    public var studentProfile: StudentProfile = StudentProfile()
+    public var transcriptEntries: [TranscriptCourseEntry] = []
+    public var isEadByCourseId: [String: Bool] = [:]
+    public var turmaByCourseId: [String: String] = [:]
+
+    public var disciplinesLayoutMode: String {
+        didSet { UserDefaults.standard.set(disciplinesLayoutMode, forKey: "campus.ufop.disciplinesLayoutMode") }
+    }
+
+    public var timetableOrientation: String {
+        didSet { UserDefaults.standard.set(timetableOrientation, forKey: "campus.ufop.timetableOrientation") }
+    }
+
+    public var guidedTourCompleted: Bool {
+        didSet { UserDefaults.standard.set(guidedTourCompleted, forKey: "campus.ufop.guidedTourCompleted") }
+    }
+
+    public var lastSeenReleaseVersion: String {
+        didSet { UserDefaults.standard.set(lastSeenReleaseVersion, forKey: "campus.ufop.lastSeenReleaseVersion") }
+    }
+
+    public internal(set) var disciplines: [DisciplineSummaryCard] = []
+    public internal(set) var assessmentsByDiscipline: [String: [AssessmentItem]] = [:]
+    public internal(set) var notesByDiscipline: [String: String] = [:]
+    public internal(set) var agendaItemsByDate: [String: [AgendaTimelineItem]] = [:]
+    public internal(set) var timetableSlots: [TimetableSlotCell] = []
+    public internal(set) var courseScheduleSlots: [CourseScheduleSlotItem] = []
+    public internal(set) var activeTemplateId: String? = nil
+    public internal(set) var academicActivities: [AcademicActivityItem] = []
+    public internal(set) var campuses: [UfopCampusInfo] = []
+    public internal(set) var calendarEvents: [AcademicCalendarEvent] = []
 
     /// Rastreia o status anteriormente salvo por item de agenda para garantir idempotência
     /// na transição entre `.attending`, `.absent` e `.cancelled`.
-    private var recordedStatusByAgendaItem: [String: AttendanceStatus] = [:]
+    internal var recordedStatusByAgendaItem: [String: AttendanceStatus] = [:]
 
     /// Sprint 4: Histórico de marcações (`.absent` / `.cancelled`) por sessão (`agendaItemId`).
-    public private(set) var absenceHistoryBySession: [String: AbsenceHistoryEntry] = [:]
+    public internal(set) var absenceHistoryBySession: [String: AbsenceHistoryEntry] = [:]
+
+    internal var hasCompletedInit: Bool = false
 
     public init() {
+        let defaults = UserDefaults.standard
+        self.disciplinesLayoutMode = defaults.string(forKey: "campus.ufop.disciplinesLayoutMode") ?? "grid"
+        self.timetableOrientation = defaults.string(forKey: "campus.ufop.timetableOrientation") ?? "vertical"
+        self.guidedTourCompleted = defaults.bool(forKey: "campus.ufop.guidedTourCompleted")
+        self.lastSeenReleaseVersion = defaults.string(forKey: "campus.ufop.lastSeenReleaseVersion") ?? ""
+
         seedUFOP2026_2Data()
+        loadPersistedEncryptedStateIfAvailable()
+        ensureOfficialCalendarEventsLoaded()
+        _ = applyRoomAllocationCatalog()
+        self.selectedDateIso = Self.todayIsoDateString()
+        self.hasCompletedInit = true
     }
 
     // MARK: - UFOP 2026.2 Deterministic Seeds (PDF Spec + Sprint 2 Scale)
@@ -960,44 +1027,7 @@ public final class CampusStore {
             )
         ]
 
-        self.calendarEvents = [
-            AcademicCalendarEvent(
-                id: "cal-2026-2-trancamento",
-                semester: "2026.2",
-                eventDate: "2026-11-18",
-                dayNumber: "18",
-                monthShort: "NOV",
-                title: "Período de Trancamento",
-                category: "PROGRAD · Matrícula"
-            ),
-            AcademicCalendarEvent(
-                id: "cal-2026-2-estudos-autonomos",
-                semester: "2026.2",
-                eventDate: "2026-12-02",
-                dayNumber: "02",
-                monthShort: "DEZ",
-                title: "Semana de Estudos Autônomos",
-                category: "Ensino · Revisão"
-            ),
-            AcademicCalendarEvent(
-                id: "cal-2026-2-encerramento",
-                semester: "2026.2",
-                eventDate: "2026-12-12",
-                dayNumber: "12",
-                monthShort: "DEZ",
-                title: "Encerramento das Aulas 2026.2",
-                category: "Calendário Oficial UFOP"
-            ),
-            AcademicCalendarEvent(
-                id: "cal-2026-2-exames-especiais",
-                semester: "2026.2",
-                eventDate: "2026-12-15",
-                dayNumber: "15",
-                monthShort: "DEZ",
-                title: "Exames Especiais",
-                category: "Avaliação Final"
-            )
-        ]
+        self.calendarEvents = Self.officialCalendarEventsSeed()
 
         self.disciplines = []
         self.assessmentsByDiscipline = [:]
@@ -1699,7 +1729,7 @@ public final class CampusStore {
 
     // MARK: - Reactive Sync Between Assessments & Activities
 
-    private func rebuildAcademicActivitiesFromAssessments() {
+    internal func rebuildAcademicActivitiesFromAssessments() {
         var combined: [AcademicActivityItem] = []
 
         for discipline in disciplines {
@@ -1745,24 +1775,32 @@ public final class CampusStore {
     }
 
     public func selectAgendaDate(_ dateIso: String) {
-        guard agendaItemsByDate.keys.contains(dateIso) else { return }
-        selectedDateIso = dateIso
+        let trimmed = dateIso.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        selectedDateIso = trimmed
     }
 
     public func getAgendaOverview(for dateIso: String) -> AgendaDayOverview {
-        let chips: [AgendaDayChip] = Self.weekMetadata.map { meta in
-            let items = agendaItemsByDate[meta.iso] ?? []
+        let parsedSelected = Self.parseIsoDate(dateIso) ?? Date()
+        let selectedIsoNormalized = Self.isoString(from: parsedSelected)
+        let weekDates = Self.mondayToSundayDates(containing: parsedSelected)
+
+        let chips: [AgendaDayChip] = weekDates.enumerated().map { index, date in
+            let iso = Self.isoString(from: date)
+            let weekdayNum = index + 1
+            let hasEvents = !timelineItems(for: iso, weekdayIndex: weekdayNum).isEmpty
             return AgendaDayChip(
-                dateIso: meta.iso,
-                weekdayShort: meta.short,
-                dayNumber: meta.num,
-                isSelected: meta.iso == dateIso,
-                hasEvents: !items.isEmpty
+                dateIso: iso,
+                weekdayShort: Self.weekdayMetadata(for: weekdayNum).shortLabel,
+                dayNumber: Self.dayNumberString(from: date),
+                isSelected: iso == selectedIsoNormalized,
+                hasEvents: hasEvents
             )
         }
 
-        let items = (agendaItemsByDate[dateIso] ?? []).sorted { $0.startTime < $1.startTime }
-        let fullHeader = Self.fullPortugueseDateLabel(for: dateIso)
+        let selectedWeekday = Self.isoWeekdayIndex(from: parsedSelected)
+        let items = timelineItems(for: selectedIsoNormalized, weekdayIndex: selectedWeekday)
+        let fullHeader = Self.fullPortugueseDateLabel(for: selectedIsoNormalized)
 
         let lectureCount = items.filter { $0.kind == .lecture }.count
         let commitmentCount = items.filter { $0.kind == .commitment }.count
@@ -1781,16 +1819,62 @@ public final class CampusStore {
             summarySubtitle = parts.joined(separator: " • ")
         }
 
+        let monthLabel = Self.portugueseMonthYearLabel(from: parsedSelected)
+        let weekNumber = Calendar(identifier: .iso8601).component(.weekOfYear, from: parsedSelected)
+
         return AgendaDayOverview(
-            semesterTag: "2026.2",
-            monthLabel: "Novembro 2026",
-            weekLabel: "SEMANA 47",
-            selectedDateIso: dateIso,
+            semesterTag: selectedSemesterFilter,
+            monthLabel: monthLabel,
+            weekLabel: "SEMANA \(weekNumber)",
+            selectedDateIso: selectedIsoNormalized,
             fullDateHeader: fullHeader,
             summarySubtitle: summarySubtitle,
             weekDays: chips,
             timelineItems: items
         )
+    }
+
+    public func getClassCheckInDetail(agendaItemId: String) -> ClassCheckInDetail? {
+        // Procura primeiro na timeline dinâmica da data selecionada (funciona em qualquer semana do ano)
+        if let liveItem = getAgendaOverview(for: selectedDateIso).timelineItems.first(where: { $0.id == agendaItemId }) {
+            let disciplineId = liveItem.disciplineId ?? "calc-ii"
+            let overview = getAgendaOverview(for: selectedDateIso)
+            return ClassCheckInDetail(
+                agendaItemId: liveItem.id,
+                disciplineId: disciplineId,
+                department: liveItem.department,
+                disciplineName: liveItem.title,
+                fullDateLabel: overview.fullDateHeader,
+                timeRange: liveItem.timeRangeLabel,
+                weatherLabel: liveItem.weatherDetailLabel,
+                location: liveItem.location,
+                professor: liveItem.professor,
+                selectedColorKey: liveItem.colorKey,
+                selectedStatus: liveItem.attendanceStatus,
+                footnoteText: "Aula cancelada não conta como falta. Salve para atualizar o relatório em Disciplinas."
+            )
+        }
+        for (dateIso, items) in agendaItemsByDate {
+            if let item = items.first(where: { $0.id == agendaItemId }) {
+                let disciplineId = item.disciplineId ?? "calc-ii"
+                let overview = getAgendaOverview(for: dateIso)
+                return ClassCheckInDetail(
+                    agendaItemId: item.id,
+                    disciplineId: disciplineId,
+                    department: item.department,
+                    disciplineName: item.title,
+                    fullDateLabel: overview.fullDateHeader,
+                    timeRange: item.timeRangeLabel,
+                    weatherLabel: item.weatherDetailLabel,
+                    location: item.location,
+                    professor: item.professor,
+                    selectedColorKey: item.colorKey,
+                    selectedStatus: item.attendanceStatus,
+                    footnoteText: "Aula cancelada não conta como falta. Salve para atualizar o relatório em Disciplinas."
+                )
+            }
+        }
+        return nil
     }
 
     /// Cria um novo compromisso acadêmico (grupo de estudos, monitoria, laboratório) no dia selecionado.
@@ -1834,6 +1918,7 @@ public final class CampusStore {
         dayItems.sort { $0.startTime < $1.startTime }
         agendaItemsByDate[targetDate] = dayItems
         recordedStatusByAgendaItem[newItem.id] = .attending
+        persistEncryptedState()
 
         return newItem
     }
@@ -1848,30 +1933,7 @@ public final class CampusStore {
                 break
             }
         }
-    }
-
-    public func getClassCheckInDetail(agendaItemId: String) -> ClassCheckInDetail? {
-        for (dateIso, items) in agendaItemsByDate {
-            if let item = items.first(where: { $0.id == agendaItemId }) {
-                let disciplineId = item.disciplineId ?? "calc-ii"
-                let overview = getAgendaOverview(for: dateIso)
-                return ClassCheckInDetail(
-                    agendaItemId: item.id,
-                    disciplineId: disciplineId,
-                    department: item.department,
-                    disciplineName: item.title,
-                    fullDateLabel: overview.fullDateHeader,
-                    timeRange: item.timeRangeLabel,
-                    weatherLabel: item.weatherDetailLabel,
-                    location: item.location,
-                    professor: item.professor,
-                    selectedColorKey: item.colorKey,
-                    selectedStatus: item.attendanceStatus,
-                    footnoteText: "Aula cancelada não conta como falta. Salve para atualizar o relatório em Disciplinas."
-                )
-            }
-        }
-        return nil
+        persistEncryptedState()
     }
 
     /// Salva o check-in da aula aplicando a regra crítica:
@@ -1895,6 +1957,17 @@ public final class CampusStore {
                 targetSession = (dateIso, items[index].startTime, items[index].endTime)
                 agendaItemsByDate[dateIso] = items
                 break
+            }
+        }
+
+        if targetDisciplineId == nil, agendaItemId.hasPrefix("lecture-") {
+            let withoutPrefix = String(agendaItemId.dropFirst("lecture-".count))
+            let parts = withoutPrefix.components(separatedBy: "@")
+            let slotId = parts.first ?? withoutPrefix
+            let sessionDate = parts.count > 1 ? parts[1] : selectedDateIso
+            if let slot = courseScheduleSlots.first(where: { $0.slotId == slotId }) {
+                targetDisciplineId = slot.courseId
+                targetSession = (sessionDate, slot.startTime, slot.endTime)
             }
         }
 
@@ -1942,6 +2015,7 @@ public final class CampusStore {
             // Propaga a cor selecionada para a disciplina, itens de agenda e grade horária
             updateDisciplineColor(disciplineId: disciplineId, colorKey: colorKey)
         }
+        persistEncryptedState()
     }
 
     /// Sprint 4: Lista o histórico de check-ins marcados como falta (`.absent`) ou aula cancelada (`.cancelled`)
@@ -2067,6 +2141,7 @@ public final class CampusStore {
         assessmentsByDiscipline[targetCourseId] = list
 
         rebuildAcademicActivitiesFromAssessments()
+        persistEncryptedState()
         return newItem
     }
 
@@ -2079,6 +2154,7 @@ public final class CampusStore {
                 let updated = items[idx]
                 assessmentsByDiscipline[courseId] = items
                 rebuildAcademicActivitiesFromAssessments()
+                persistEncryptedState()
                 return updated
             }
         }
@@ -2092,6 +2168,7 @@ public final class CampusStore {
                 items.remove(at: idx)
                 assessmentsByDiscipline[courseId] = items
                 rebuildAcademicActivitiesFromAssessments()
+                persistEncryptedState()
                 return
             }
         }
@@ -2224,6 +2301,7 @@ public final class CampusStore {
 
     public func updateDisciplineNotes(disciplineId: String, notes: String) {
         notesByDiscipline[disciplineId] = notes
+        persistEncryptedState()
     }
 
     public func updateDisciplineColor(disciplineId: String, colorKey: DepartmentColorKey) {
@@ -2291,7 +2369,7 @@ public final class CampusStore {
             maxAbsences: maxAbsences,
             cancelledClasses: 0,
             colorKey: resolvedColorKey,
-            professor: cleanProfessor.isEmpty ? "Docente UFOP" : cleanProfessor,
+            professor: cleanProfessor,
             location: "Campus UFOP"
         )
 
@@ -2325,6 +2403,7 @@ public final class CampusStore {
         notesByDiscipline.removeValue(forKey: courseId)
         activeTemplateId = nil
         rebuildAcademicActivitiesFromAssessments()
+        persistEncryptedState()
     }
 
     /// Adiciona um horário semanal para a disciplina, detectando conflitos no mesmo `dayOfWeek` e `startTime` (ou sobreposição) no semestre ativo.
@@ -2386,9 +2465,7 @@ public final class CampusStore {
         let cleanBuilding = building.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "Campus UFOP"
             : building.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanRoom = room.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Sala 101"
-            : room.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanRoom = room.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedShort = shortLocation.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedShort = trimmedShort.isEmpty
             ? Self.buildShortLocation(building: cleanBuilding, room: cleanRoom)
@@ -2409,8 +2486,9 @@ public final class CampusStore {
 
         courseScheduleSlots.append(slot)
 
+        let fullSlotLocation = cleanRoom.isEmpty ? cleanBuilding : "\(cleanBuilding) · \(cleanRoom)"
         if course.location == "Campus UFOP" || course.location.isEmpty {
-            disciplines[courseIndex].location = "\(cleanBuilding) · \(cleanRoom)"
+            disciplines[courseIndex].location = fullSlotLocation
         }
 
         timetableSlots.append(
@@ -2426,7 +2504,6 @@ public final class CampusStore {
         )
 
         if course.semester == selectedSemesterFilter || course.semester == "2026.2" {
-            let fullLocation = "\(cleanBuilding) · \(cleanRoom)"
             let lectureItem = AgendaTimelineItem(
                 id: "lecture-\(slotId)",
                 disciplineId: course.id,
@@ -2434,8 +2511,8 @@ public final class CampusStore {
                 startTime: normalizedStart,
                 endTime: normalizedEnd,
                 title: course.name,
-                subtitle: fullLocation,
-                location: fullLocation,
+                subtitle: fullSlotLocation,
+                location: fullSlotLocation,
                 professor: course.professor,
                 department: course.department,
                 colorKey: course.colorKey,
@@ -2450,6 +2527,7 @@ public final class CampusStore {
             recordedStatusByAgendaItem[lectureItem.id] = .attending
         }
 
+        persistEncryptedState()
         return slot
     }
 
@@ -2479,6 +2557,7 @@ public final class CampusStore {
                 }
             }
         }
+        persistEncryptedState()
     }
 
     /// Lista os horários semanais cadastrados para uma disciplina em ordem cronológica.
@@ -2578,6 +2657,7 @@ public final class CampusStore {
 
         activeTemplateId = blueprint.id
         rebuildAcademicActivitiesFromAssessments()
+        persistEncryptedState()
         return appliedCount
     }
 
@@ -2701,6 +2781,7 @@ public final class CampusStore {
             campuses[idx].isActive = (idx == matchedIndex)
         }
 
+        persistEncryptedState()
         return activeCampus
     }
 
@@ -2784,6 +2865,7 @@ public final class CampusStore {
             }
             _ = setActiveCampus(campusId: payload.activeCampusId)
             rebuildAcademicActivitiesFromAssessments()
+            persistEncryptedState()
             return payload.disciplines.count
         }
 
@@ -3146,13 +3228,25 @@ public final class CampusStore {
     }
 
     private static func buildShortLocation(building: String, room: String) -> String {
-        let cleanRoom = room.replacingOccurrences(of: "Sala ", with: "")
+        if isEadText(building) {
+            return "EAD"
+        }
+        let cleanRoom = room.replacingOccurrences(of: "Sala ", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanBuilding = building
             .replacingOccurrences(of: "Prédio ", with: "")
             .replacingOccurrences(of: "Escola de Minas", with: "EM")
-        if cleanBuilding.count <= 6 {
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanRoom.isEmpty {
+            return cleanBuilding
+        }
+        if cleanBuilding.count <= 8 {
             return "\(cleanBuilding) · \(cleanRoom)"
         }
         return cleanRoom
+    }
+
+    private static func isEadText(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return lower.contains("ead") || lower.contains("distância") || lower.contains("distancia") || lower.contains("remoto")
     }
 }

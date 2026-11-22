@@ -8,11 +8,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
-## v1.9.6 — Filtro Multi-Tipo em Atividades, Disciplinas & Alinhamento
+## v1.9.6 — Paridade iOS Liquid Glass, Filtro Multi-Tipo & Disciplinas
 
-- Correção na aba **Disciplinas** ao alternar entre **Grade** e **Barras** (sem ocultar matérias ou fechar ao abrir detalhes) e leitura limpa de `12/18 · Atenção`.
-- Novo seletor multi-tipo em **Atividades** (`Todos os tipos ▾`) para filtrar um ou mais tipos (Provas, Trabalhos, Seminários e Concluídas) na mesma linha.
-- Alinhamento corrigido do chip **Pendente / Concluída** na ficha da avaliação.
+- **iOS (`Vida Academica UFOP` · Apple Liquid Glass):** paridade completa das atualizações **v1.5 → v1.9.6** adotando design **Apple Liquid Glass** (Xcode 26 / iOS 26 SDK com fallback `.ultraThinMaterial` para iOS 17–18):
+  - Cadastro inicial em 4 etapas (Atestado de Matrícula PDF com detecção automática de EAD e salas oficiais 2026.2, Planos de Ensino, 7 cores de destaque e acessibilidade).
+  - Criptografia local **AES-256-GCM** no Keychain, bloqueio por PIN e **Face ID / Touch ID**, remoção imediata de PDFs temporários da memória, backup portátil `.ufopbackup` e saída segura de conta.
+  - Catálogo com **54 matrizes curriculares da UFOP**, histórico escolar PDF com cálculo e simulador de CRE e alerta de matriz legada (`< 2026/1`).
+  - **Calendários Oficiais UFOP 2026.2, 2027.1 e 2027.2** integrados na Agenda dinâmica (7 dias + navegação entre semanas + check-in em qualquer data).
+  - **Disciplinas** em **Blocos** ou **Barras** (sem selo redundante e sem truncamento), **Grade Horária** Vertical/Horizontal com check-in rápido, **Atividades** com seletor multi-tipo `Todos os tipos ▾`, Tour Guiado animado, Notas de Atualização e Widget Liquid Glass.
+- **Android (`1.9.6`):**
+  - Correção na aba **Disciplinas** ao alternar entre **Grade** e **Barras** (sem ocultar matérias ou fechar ao abrir detalhes) e leitura limpa de `12/18 · Atenção`.
+  - Novo seletor multi-tipo em **Atividades** (`Todos os tipos ▾`) para filtrar um ou mais tipos (Provas, Trabalhos, Seminários e Concluídas) na mesma linha.
+  - Alinhamento corrigido do chip **Pendente / Concluída** na ficha da avaliação.
 
 ---
 

@@ -2,32 +2,55 @@ import SwiftUI
 
 public struct AgendaView: View {
     @Bindable public var viewModel: AgendaViewModel
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+
+    @State private var commitmentToDelete: AgendaTimelineItem?
 
     public init(viewModel: AgendaViewModel) {
         self.viewModel = viewModel
     }
 
+    private var accent: Color {
+        (appearance?.accentColor ?? .green).primary(for: colorScheme)
+    }
+
+    private var hc: Bool {
+        appearance?.accessibility.highContrastMode ?? false
+    }
+
+    private var minTouch: CGFloat {
+        appearance?.accessibility.minTouchHeight ?? 48
+    }
+
     public var body: some View {
         let overview = viewModel.overview
         let activeCampus = viewModel.activeCampus
+        let spotlight = viewModel.store.currentOrNextClassInfo()
+        let termBanner = viewModel.store.academicTermBanner(for: overview.selectedDateIso)
 
         NavigationStack {
             ZStack {
-                CampusTheme.appBackground(for: colorScheme)
-                    .ignoresSafeArea()
+                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        headerSection(activeCampus: activeCampus)
+                    VStack(alignment: .leading, spacing: 18) {
+                        headerSection(activeCampus: activeCampus, overview: overview)
 
                         weekStripCard(overview: overview)
 
+                        academicTermCard(banner: termBanner)
+
+                        // Só exibe o anúncio separado se a próxima aula NÃO estiver no dia já visível abaixo (IHC Sprint 14)
+                        if let spotlight, spotlight.dateIso != overview.selectedDateIso {
+                            nextClassRedirectBanner(spotlight: spotlight)
+                        }
+
                         dayHeaderSection(overview: overview)
 
-                        timelineSection(items: overview.timelineItems)
+                        timelineSection(items: overview.timelineItems, spotlight: spotlight, selectedDateIso: overview.selectedDateIso)
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 18)
                     .padding(.top, 12)
                     .padding(.bottom, 32)
                 }
@@ -73,22 +96,43 @@ public struct AgendaView: View {
                         viewModel.dismissAddCommitmentSheet()
                     }
                 )
-                .presentationDetents([.large, .fraction(0.82)])
+                .presentationDetents([.large, .fraction(0.86)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+            }
+            .confirmationDialog(
+                "Excluir compromisso?",
+                isPresented: Binding(
+                    get: { commitmentToDelete != nil },
+                    set: { if !$0 { commitmentToDelete = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: commitmentToDelete
+            ) { item in
+                Button("Excluir compromisso", role: .destructive) {
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.82)) {
+                        viewModel.deleteCommitment(id: item.id)
+                    }
+                    commitmentToDelete = nil
+                }
+                Button("Cancelar", role: .cancel) {
+                    commitmentToDelete = nil
+                }
+            } message: { item in
+                Text("Deseja remover '\(item.title)' da sua agenda?")
             }
         }
     }
 
-    // MARK: - Header ("CAMPUS", "Seu dia no campus", "Um dia de cada vez. Tudo por aqui." + Active UFOP Campus Badge)
+    // MARK: Header
 
-    private func headerSection(activeCampus: UfopCampusInfo) -> some View {
+    private func headerSection(activeCampus: UfopCampusInfo, overview: AgendaDayOverview) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 8) {
-                Text("CAMPUS")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .tracking(1.6)
-                    .foregroundStyle(CampusTheme.mathBlue)
+                Text("AGENDA · \(overview.semesterTag)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.5)
+                    .foregroundStyle(accent)
 
                 Spacer()
 
@@ -111,87 +155,100 @@ public struct AgendaView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(CampusTheme.mathBlue)
+                            .foregroundStyle(accent)
 
-                        Text(activeCampus.agendaHeaderBadgeText)
+                        Text("\(activeCampus.city) · \(activeCampus.weatherTempC)°C")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                    )
+                    .padding(.vertical, 6)
+                    .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                 }
                 .accessibilityLabel("Campus ativo: \(activeCampus.fullLabel)")
-
-                Text("UFOP · 2026.2")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.secondarySurface(for: colorScheme))
-                    )
             }
 
             Text("Seu dia no campus")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                .accessibilityAddTraits(.isHeader)
 
-            Text("Um dia de cada vez. Tudo por aqui.")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+            if !viewModel.store.studentProfile.fullName.isEmpty {
+                Text("\(viewModel.store.studentProfile.fullName) · \(viewModel.store.studentProfile.courseName)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    .lineLimit(1)
+            } else {
+                Text("Um dia de cada vez. Tudo por aqui.")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            }
         }
     }
 
-    // MARK: - Week Strip ("Novembro 2026" / "SEMANA 47" + SEG 16 .. DOM 22)
+    // MARK: 7-Day Full-Width Week Strip (SEG..DOM without clipping)
 
     private func weekStripCard(overview: AgendaDayOverview) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(overview.monthLabel)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Spacer()
 
-                Text(overview.weekLabel)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .tracking(1.0)
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.secondarySurface(for: colorScheme))
-                    )
+                Button {
+                    withAnimation(.snappy) {
+                        viewModel.store.jumpAgendaToToday()
+                    }
+                } label: {
+                    Text("Hoje")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+
+                LiquidGlassGroup(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Button {
+                            withAnimation(.snappy) { viewModel.store.shiftAgendaWeek(by: -1) }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 28, height: 28)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Semana anterior")
+
+                        Button {
+                            withAnimation(.snappy) { viewModel.store.shiftAgendaWeek(by: 1) }
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 28, height: 28)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Próxima semana")
+                    }
+                }
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 ForEach(overview.weekDays) { chip in
                     dayChipButton(chip: chip)
                 }
             }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-        )
-        .shadow(
-            color: CampusTheme.cardShadow(for: colorScheme),
-            radius: 10,
-            x: 0,
-            y: 4
-        )
+        .padding(14)
+        .liquidGlassCard(cornerRadius: 22, tint: accent, highContrast: hc)
     }
 
     private func dayChipButton(chip: AgendaDayChip) -> some View {
@@ -200,67 +257,121 @@ public struct AgendaView: View {
                 viewModel.selectDay(chip)
             }
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Text(chip.weekdayShort)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(
-                        chip.isSelected
-                            ? CampusTheme.selectedPillText(for: colorScheme)
-                            : CampusTheme.secondaryText(for: colorScheme)
-                    )
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(chip.isSelected ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
                 Text(chip.dayNumber)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        chip.isSelected
-                            ? CampusTheme.selectedPillText(for: colorScheme)
-                            : CampusTheme.primaryText(for: colorScheme)
-                    )
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(chip.isSelected ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Circle()
                     .fill(
                         chip.isSelected
-                            ? CampusTheme.selectedPillText(for: colorScheme)
-                            : (chip.hasEvents ? CampusTheme.mutedText(for: colorScheme).opacity(0.45) : Color.clear)
+                            ? accent
+                            : (chip.hasEvents ? CampusTheme.mutedText(for: colorScheme).opacity(0.55) : .clear)
                     )
                     .frame(width: 5, height: 5)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: CampusTheme.pillCornerRadius, style: .continuous)
-                    .fill(
-                        chip.isSelected
-                            ? CampusTheme.selectedPillBackground(for: colorScheme)
-                            : Color.clear
-                    )
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(chip.isSelected ? accent.opacity(colorScheme == .dark ? 0.22 : 0.14) : Color.clear)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: CampusTheme.pillCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        chip.isSelected
-                            ? CampusTheme.selectedPillText(for: colorScheme).opacity(0.28)
-                            : Color.clear,
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(chip.isSelected ? accent.opacity(0.45) : .clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(chip.weekdayShort) \(chip.dayNumber)")
+        .minimumTouchTarget(minTouch)
+        .accessibilityLabel("\(chip.weekdayShort) \(chip.dayNumber)\(chip.isSelected ? ", selecionado" : "")")
     }
 
-    // MARK: - Day Summary ("Terça-feira, 17 de novembro", "2 aulas • 1 compromisso" + "+ Compromisso")
+    // MARK: Term Banner & Off-Day Next Class Pill
+
+    private func academicTermCard(banner: AcademicTermBannerInfo) -> some View {
+        let bannerColor = banner.isRecessOrBreak ? Color(hex: 0xF59E0B) : accent
+        return HStack(spacing: 10) {
+            Image(systemName: banner.isRecessOrBreak ? "calendar.badge.exclamationmark" : "graduationcap.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(bannerColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(banner.title)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                Text(banner.detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            }
+
+            Spacer()
+
+            Text(banner.badge)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(bannerColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(bannerColor.opacity(0.14)))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .liquidGlassCard(cornerRadius: 16, tint: bannerColor, highContrast: hc)
+    }
+
+    private func nextClassRedirectBanner(spotlight: AgendaClassSpotlight) -> some View {
+        Button {
+            withAnimation(.snappy) {
+                viewModel.store.selectAgendaDate(spotlight.dateIso)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: spotlight.isOngoing ? "bolt.fill" : "clock.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(accent)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(spotlight.isOngoing ? "Agora" : "Próxima aula · \(spotlight.dayLabel)"): \(spotlight.item.title)")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .lineLimit(1)
+                    Text("\(spotlight.item.startTime)–\(spotlight.item.endTime) · \(spotlight.item.location)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(accent)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .liquidGlassCard(cornerRadius: 16, tint: accent, interactive: true, highContrast: hc)
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget(minTouch)
+    }
+
+    // MARK: Day Summary Header
 
     private func dayHeaderSection(overview: AgendaDayOverview) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(overview.fullDateHeader)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Text(overview.summarySubtitle)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
             }
 
             Spacer()
@@ -270,49 +381,38 @@ public struct AgendaView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-
+                        .font(.system(size: 11, weight: .bold))
                     Text("Compromisso")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(CampusTheme.selectedPillText(for: colorScheme))
+                .foregroundStyle(accent)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.selectedPillBackground(for: colorScheme))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(
-                            CampusTheme.selectedPillText(for: colorScheme).opacity(0.25),
-                            lineWidth: 1
-                        )
-                )
+                .liquidGlassCapsule(selected: true, accent: accent, highContrast: hc)
             }
             .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
             .accessibilityLabel("Adicionar compromisso")
         }
-        .padding(.top, 2)
     }
 
-    // MARK: - Timeline Items
+    // MARK: Timeline Items
 
     @ViewBuilder
-    private func timelineSection(items: [AgendaTimelineItem]) -> some View {
+    private func timelineSection(items: [AgendaTimelineItem], spotlight: AgendaClassSpotlight?, selectedDateIso: String) -> some View {
         if items.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "sun.max.fill")
                     .font(.system(size: 28))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                 Text("Dia livre no campus")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Text("Nenhuma aula ou compromisso agendado para este dia.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                    .font(.system(size: 13))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     .multilineTextAlignment(.center)
 
                 Button {
@@ -320,65 +420,87 @@ public struct AgendaView: View {
                 } label: {
                     Label("Agendar grupo de estudos ou monitoria", systemImage: "plus.circle.fill")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(CampusTheme.mathBlue)
-                        .padding(.top, 4)
+                        .foregroundStyle(accent)
                 }
                 .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 36)
-            .padding(.horizontal, 20)
-            .background(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .fill(CampusTheme.cardBackground(for: colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
-                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-            )
+            .padding(.vertical, 32)
+            .padding(.horizontal, 18)
+            .liquidGlassCard(highContrast: hc)
         } else {
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
                 ForEach(items) { item in
-                    timelineRow(item: item)
+                    let isHighlightedNow = spotlight != nil
+                        && spotlight!.dateIso == selectedDateIso
+                        && spotlight!.item.disciplineId == item.disciplineId
+                        && spotlight!.item.startTime == item.startTime
+                    let highlightLabel: String? = isHighlightedNow ? (spotlight!.isOngoing ? "Agora" : "Próxima aula") : nil
+
+                    timelineRow(item: item, inlineSpotlightBadge: highlightLabel)
                 }
             }
         }
     }
 
-    private func timelineRow(item: AgendaTimelineItem) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Coluna de horário à esquerda (08:00 / 09:40)
+    private func timelineRow(item: AgendaTimelineItem, inlineSpotlightBadge: String?) -> some View {
+        let deptColor = CampusTheme.accessibleTextColor(
+            CampusTheme.departmentColor(for: item.colorKey),
+            scheme: colorScheme
+        )
+        let isEad = (item.disciplineId.map { viewModel.store.isCourseEad($0) } ?? false)
+            || item.location.lowercased().contains("ead")
+            || item.location.lowercased().contains("distância")
+
+        return HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .trailing, spacing: 3) {
                 Text(item.startTime)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                 Text(item.endTime)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
             }
-            .frame(width: 46, alignment: .trailing)
-            .padding(.top, 12)
+            .frame(width: 44, alignment: .trailing)
+            .padding(.top, 14)
 
-            // Card da aula/compromisso com barra lateral colorida e badge amarelo ☀️ XX °C
             Button {
                 if item.isClassCheckInEnabled {
                     viewModel.openCheckInSheet(for: item)
                 }
             } label: {
-                AccentBarCardContainer(
-                    accentColor: CampusTheme.departmentColor(for: item.colorKey)
-                ) {
-                    VStack(alignment: .leading, spacing: 10) {
+                AccentBarCardContainer(accentColor: CampusTheme.departmentColor(for: item.colorKey), highContrast: hc) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top, spacing: 8) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(item.department)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(CampusTheme.departmentColor(for: item.colorKey))
+                                HStack(spacing: 6) {
+                                    Text(item.department)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(deptColor)
+
+                                    if let inlineSpotlightBadge {
+                                        Text(inlineSpotlightBadge.uppercased())
+                                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 2)
+                                            .background(Capsule().fill(accent))
+                                    }
+
+                                    if isEad {
+                                        Text("EAD")
+                                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                                            .foregroundStyle(CampusTheme.mathBlue)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 2)
+                                            .background(Capsule().fill(CampusTheme.selectedPillBackground(for: colorScheme)))
+                                    }
+                                }
 
                                 Text(item.title)
-                                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                                     .multilineTextAlignment(.leading)
                             }
 
@@ -387,30 +509,33 @@ public struct AgendaView: View {
                             WeatherPillBadge(label: item.weatherBadgeLabel)
                         }
 
-                        HStack(spacing: 10) {
-                            Label(item.location, systemImage: "mappin.and.ellipse")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                        HStack(spacing: 8) {
+                            Label(
+                                isEad ? "A distância (EAD)" : (item.location.isEmpty ? "Local não definido" : item.location),
+                                systemImage: isEad ? "laptopcomputer" : "mappin.and.ellipse"
+                            )
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                             Spacer()
 
                             Text(item.timeRangeLabel)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+                                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                         }
 
                         HStack(spacing: 8) {
-                            Text(item.professor)
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+                            if !item.professor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text(item.professor)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                            }
 
                             Spacer()
 
                             if item.isCustomCommitment {
                                 Button(role: .destructive) {
-                                    withAnimation(.spring(response: 0.26, dampingFraction: 0.82)) {
-                                        viewModel.deleteCommitment(id: item.id)
-                                    }
+                                    commitmentToDelete = item
                                 } label: {
                                     HStack(spacing: 4) {
                                         Image(systemName: "trash")
@@ -418,13 +543,10 @@ public struct AgendaView: View {
                                         Text("Excluir")
                                             .font(.system(size: 11, weight: .semibold))
                                     }
-                                    .foregroundStyle(Color(hex: 0xDC2626))
+                                    .foregroundStyle(Color(hex: 0xEF4444))
                                     .padding(.horizontal, 9)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        Capsule(style: .continuous)
-                                            .fill(Color(hex: 0xDC2626).opacity(colorScheme == .dark ? 0.18 : 0.10))
-                                    )
+                                    .padding(.vertical, 5)
+                                    .background(Capsule().fill(Color(hex: 0xEF4444).opacity(0.12)))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Excluir compromisso \(item.title)")
@@ -436,35 +558,15 @@ public struct AgendaView: View {
                 }
             }
             .buttonStyle(.plain)
-            .contextMenu {
-                if item.isCustomCommitment {
-                    Button(role: .destructive) {
-                        withAnimation(.spring(response: 0.26, dampingFraction: 0.82)) {
-                            viewModel.deleteCommitment(id: item.id)
-                        }
-                    } label: {
-                        Label("Excluir compromisso", systemImage: "trash")
-                    }
-                } else if item.isClassCheckInEnabled {
-                    Button {
-                        viewModel.openCheckInSheet(for: item)
-                    } label: {
-                        Label("Registrar presença na aula", systemImage: "checkmark.circle")
-                    }
-                }
-            }
         }
     }
 
     private func statusBadge(for status: AttendanceStatus) -> some View {
         let color: Color = {
             switch status {
-            case .attending:
-                return CampusTheme.mathBlue
-            case .absent:
-                return Color(hex: 0xDC2626)
-            case .cancelled:
-                return CampusTheme.secondaryText(for: colorScheme)
+            case .attending: return accent
+            case .absent: return Color(hex: 0xEF4444)
+            case .cancelled: return CampusTheme.secondaryText(for: colorScheme, highContrast: hc)
             }
         }()
 
@@ -477,14 +579,11 @@ public struct AgendaView: View {
         .foregroundStyle(color)
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
-        .background(
-            Capsule(style: .continuous)
-                .fill(color.opacity(colorScheme == .dark ? 0.18 : 0.10))
-        )
+        .background(Capsule().fill(color.opacity(colorScheme == .dark ? 0.20 : 0.12)))
     }
 }
 
-// MARK: - Add Commitment Modal Sheet (Sprint 2)
+// MARK: - Add Commitment Sheet (Native Date/Time Pickers + Liquid Glass)
 
 public struct AddCommitmentSheetView: View {
     public let selectedDateLabel: String
@@ -492,12 +591,14 @@ public struct AddCommitmentSheetView: View {
     public let onSave: (String, String, String, String, String) -> Void
     public let onCancel: () -> Void
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var title: String = "Grupo de estudos · Cálculo II"
     @State private var descriptionText: String = "Monitoria / Estudo em grupo"
-    @State private var startTime: String = "16:00"
-    @State private var endTime: String = "17:30"
+    @State private var startDate: Date = Calendar.current.date(bySettingHour: 16, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var endDate: Date = Calendar.current.date(bySettingHour: 17, minute: 30, second: 0, of: Date()) ?? Date()
     @State private var location: String = "Biblioteca Central · Sala 03"
-    @Environment(\.colorScheme) private var colorScheme
 
     private let quickPresets: [(label: String, title: String, location: String, desc: String)] = [
         ("Grupo de estudos", "Grupo de estudos · Cálculo II", "Biblioteca Central · Sala 03", "Estudo colaborativo"),
@@ -519,162 +620,121 @@ public struct AddCommitmentSheetView: View {
     }
 
     public var body: some View {
+        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        let hc = appearance?.accessibility.highContrastMode ?? false
+
         ZStack {
-            CampusTheme.cardBackground(for: colorScheme)
-                .ignoresSafeArea()
+            LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 18) {
                     HStack {
                         Text("NOVO COMPROMISSO")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
                             .tracking(1.4)
-                            .foregroundStyle(CampusTheme.algebraGreen)
+                            .foregroundStyle(accent)
 
                         Spacer()
 
                         Button(action: onCancel) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    Circle()
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                )
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 34, height: 34)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                         }
                         .buttonStyle(.plain)
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Agendar no campus")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                        HStack(spacing: 8) {
-                            Text(selectedDateLabel)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
-                            Text("•")
-                                .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
-
-                            WeatherPillBadge(label: activeCampus.weatherBadgeLabel)
-                        }
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        Text("\(selectedDateLabel) · \(activeCampus.city)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
 
-                    // Modelos rápidos
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Sugestões rápidas")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(quickPresets, id: \.label) { preset in
-                                    Button {
-                                        title = preset.title
-                                        location = preset.location
-                                        descriptionText = preset.desc
-                                    } label: {
-                                        Text(preset.label)
-                                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 8)
-                                            .background(
-                                                Capsule(style: .continuous)
-                                                    .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(quickPresets, id: \.label) { preset in
+                                Button {
+                                    title = preset.title
+                                    location = preset.location
+                                    descriptionText = preset.desc
+                                } label: {
+                                    Text(preset.label)
+                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        fieldGroup(label: "Título do compromisso", text: $title, placeholder: "Ex.: Grupo de estudos · Cálculo II")
+                    VStack(alignment: .leading, spacing: 12) {
+                        fieldGroup(label: "Título do compromisso", text: $title, placeholder: "Ex.: Grupo de estudos", highContrast: hc)
 
                         HStack(spacing: 12) {
-                            fieldGroup(label: "Início", text: $startTime, placeholder: "14:00")
-                            fieldGroup(label: "Término", text: $endTime, placeholder: "15:00")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Início")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                DatePicker("", selection: $startDate, displayedComponents: .hourAndMinute)
+                                    .labelsHidden()
+                                    .tint(accent)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .liquidGlassCard(cornerRadius: 12, highContrast: hc)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Término")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                DatePicker("", selection: $endDate, displayedComponents: .hourAndMinute)
+                                    .labelsHidden()
+                                    .tint(accent)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .liquidGlassCard(cornerRadius: 12, highContrast: hc)
                         }
 
-                        fieldGroup(label: "Local no campus (\(activeCampus.city))", text: $location, placeholder: "Ex.: Biblioteca Central · Sala 03")
-
-                        fieldGroup(label: "Categoria / Observação", text: $descriptionText, placeholder: "Ex.: Monitoria acadêmica")
+                        fieldGroup(label: "Local no campus", text: $location, placeholder: "Ex.: Biblioteca Central", highContrast: hc)
+                        fieldGroup(label: "Observação", text: $descriptionText, placeholder: "Ex.: Monitoria", highContrast: hc)
                     }
 
-                    HStack(spacing: 12) {
-                        Button(action: onCancel) {
-                            Text("Cancelar")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme))
-                                )
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            onSave(title, descriptionText, startTime, endTime, location)
-                        } label: {
-                            Text("Salvar compromisso")
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(CampusTheme.mathBlue)
-                                )
-                        }
-                        .buttonStyle(.plain)
+                    LiquidGlassPrimaryButton(
+                        tint: accent,
+                        foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                        minHeight: appearance?.accessibility.minTouchHeight ?? 48
+                    ) {
+                        let fmt = DateFormatter()
+                        fmt.dateFormat = "HH:mm"
+                        onSave(title, descriptionText, fmt.string(from: startDate), fmt.string(from: endDate), location)
+                    } label: {
+                        Text("Salvar compromisso")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
                     }
-                    .padding(.top, 6)
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 18)
-                .padding(.bottom, 30)
+                .padding(20)
             }
         }
     }
 
-    private func fieldGroup(label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private func fieldGroup(label: String, text: Binding<String>, placeholder: String, highContrast: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
             TextField(placeholder, text: text)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(CampusTheme.appBackground(for: colorScheme))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                )
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .liquidGlassCard(cornerRadius: 12, highContrast: highContrast)
         }
     }
-}
-
-#Preview("AgendaView - Light") {
-    let store = CampusStore()
-    AgendaView(viewModel: AgendaViewModel(store: store))
-        .preferredColorScheme(.light)
-}
-
-#Preview("AgendaView - Dark") {
-    let store = CampusStore()
-    AgendaView(viewModel: AgendaViewModel(store: store))
-        .preferredColorScheme(.dark)
 }

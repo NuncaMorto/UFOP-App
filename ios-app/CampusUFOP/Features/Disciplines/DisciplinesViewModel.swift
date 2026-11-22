@@ -92,6 +92,7 @@ public final class DisciplinesViewModel {
         professor: String,
         workloadHours: Int,
         colorOverrideHex: String? = nil,
+        isEad: Bool = false,
         initialSlot: InitialScheduleSlotInput? = nil
     ) throws -> DisciplineSummaryCard {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -99,10 +100,8 @@ public final class DisciplinesViewModel {
             throw CampusScheduleError.emptyField("Nome da disciplina")
         }
 
+        // Regra do usuário: o nome do professor pode ficar vazio se cadastrado manualmente.
         let trimmedProfessor = professor.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedProfessor.isEmpty else {
-            throw CampusScheduleError.emptyField("Docente")
-        }
 
         let targetSemester = semester ?? store.selectedSemesterFilter
         let created = store.createCourse(
@@ -113,6 +112,9 @@ public final class DisciplinesViewModel {
             workloadHours: workloadHours,
             colorOverrideHex: colorOverrideHex
         )
+        if isEad {
+            store.setCourseEad(created.id, isEad: true)
+        }
 
         if let initialSlot {
             do {
@@ -121,9 +123,9 @@ public final class DisciplinesViewModel {
                     dayOfWeek: initialSlot.dayOfWeek,
                     startTime: initialSlot.startTime,
                     endTime: initialSlot.endTime,
-                    building: initialSlot.building,
-                    room: initialSlot.room,
-                    shortLocation: initialSlot.shortLocation
+                    building: isEad ? "A distância (EAD)" : initialSlot.building,
+                    room: isEad ? "" : initialSlot.room,
+                    shortLocation: isEad ? "EAD" : initialSlot.shortLocation
                 )
             } catch {
                 // Garante atomicidade caso o horário inicial entre em conflito
@@ -137,6 +139,7 @@ public final class DisciplinesViewModel {
             store.selectedDepartmentFilter = "Todos os departamentos"
         }
 
+        store.persistEncryptedState()
         isAddCoursePresented = false
         return created
     }

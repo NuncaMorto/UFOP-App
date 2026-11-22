@@ -8,56 +8,64 @@ public enum CampusTab: Hashable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .agenda:
-            return "Agenda"
-        case .disciplines:
-            return "Disciplinas"
-        case .activities:
-            return "Atividades"
-        case .profile:
-            return "Perfil"
+        case .agenda: return "Agenda"
+        case .disciplines: return "Disciplinas"
+        case .activities: return "Atividades"
+        case .profile: return "Perfil"
         }
     }
 
     public var systemImage: String {
         switch self {
-        case .agenda:
-            return "calendar"
-        case .disciplines:
-            return "book.closed.fill"
-        case .activities:
-            return "checklist"
-        case .profile:
-            return "person.crop.circle"
+        case .agenda: return "calendar"
+        case .disciplines: return "book.closed.fill"
+        case .activities: return "checklist"
+        case .profile: return "person.crop.circle"
         }
     }
 }
 
 public struct MainTabView: View {
     @Environment(CampusStore.self) private var store
-    @State private var selectedTab: CampusTab = .agenda
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
+    @Binding private var externalSelectedTab: CampusTab
+    @State private var fallbackSelectedTab: CampusTab = .agenda
+    private let usesExternalBinding: Bool
+
     @State private var agendaViewModel: AgendaViewModel?
     @State private var disciplinesViewModel: DisciplinesViewModel?
 
-    public init() {}
+    public init() {
+        self._externalSelectedTab = .constant(.agenda)
+        self.usesExternalBinding = false
+    }
+
+    public init(selectedTab: Binding<CampusTab>) {
+        self._externalSelectedTab = selectedTab
+        self.usesExternalBinding = true
+    }
+
+    private var activeTabBinding: Binding<CampusTab> {
+        usesExternalBinding ? $externalSelectedTab : $fallbackSelectedTab
+    }
 
     public var body: some View {
-        TabView(selection: $selectedTab) {
-            AgendaView(
-                viewModel: resolvedAgendaViewModel
-            )
-            .tabItem {
-                Label(CampusTab.agenda.title, systemImage: CampusTab.agenda.systemImage)
-            }
-            .tag(CampusTab.agenda)
+        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
 
-            DisciplinesView(
-                viewModel: resolvedDisciplinesViewModel
-            )
-            .tabItem {
-                Label(CampusTab.disciplines.title, systemImage: CampusTab.disciplines.systemImage)
-            }
-            .tag(CampusTab.disciplines)
+        TabView(selection: activeTabBinding) {
+            AgendaView(viewModel: resolvedAgendaViewModel)
+                .tabItem {
+                    Label(CampusTab.agenda.title, systemImage: CampusTab.agenda.systemImage)
+                }
+                .tag(CampusTab.agenda)
+
+            DisciplinesView(viewModel: resolvedDisciplinesViewModel)
+                .tabItem {
+                    Label(CampusTab.disciplines.title, systemImage: CampusTab.disciplines.systemImage)
+                }
+                .tag(CampusTab.disciplines)
 
             ActivitiesView()
                 .tabItem {
@@ -71,13 +79,11 @@ public struct MainTabView: View {
                 }
                 .tag(CampusTab.profile)
         }
-        .tint(CampusTheme.mathBlue)
+        .tint(accent)
     }
 
     private var resolvedAgendaViewModel: AgendaViewModel {
-        if let agendaViewModel {
-            return agendaViewModel
-        }
+        if let agendaViewModel { return agendaViewModel }
         let vm = AgendaViewModel(store: store)
         DispatchQueue.main.async {
             self.agendaViewModel = vm
@@ -86,9 +92,7 @@ public struct MainTabView: View {
     }
 
     private var resolvedDisciplinesViewModel: DisciplinesViewModel {
-        if let disciplinesViewModel {
-            return disciplinesViewModel
-        }
+        if let disciplinesViewModel { return disciplinesViewModel }
         let vm = DisciplinesViewModel(store: store)
         DispatchQueue.main.async {
             self.disciplinesViewModel = vm
@@ -97,14 +101,9 @@ public struct MainTabView: View {
     }
 }
 
-#Preview("MainTabView - Light") {
+#Preview("MainTabView") {
     MainTabView()
         .environment(CampusStore())
-        .preferredColorScheme(.light)
-}
-
-#Preview("MainTabView - Dark") {
-    MainTabView()
-        .environment(CampusStore())
-        .preferredColorScheme(.dark)
+        .environment(CampusAppearanceController())
+        .environment(AppLockManager())
 }

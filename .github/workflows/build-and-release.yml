@@ -34,9 +34,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Inspect Xcode and Swift toolchain
+      - name: Select Xcode 26 SDK (Liquid Glass)
         run: |
-          ls -d /Applications/Xcode*.app || true
+          for candidate in \
+            "/Applications/Xcode_26.3.app/Contents/Developer" \
+            "/Applications/Xcode_26.2.app/Contents/Developer" \
+            "/Applications/Xcode_26.1.1.app/Contents/Developer" \
+            "/Applications/Xcode_26.app/Contents/Developer"
+          do
+            if [[ -d "${candidate}" ]]; then
+              sudo xcode-select -s "${candidate}"
+              break
+            fi
+          done
           xcode-select -p
           xcodebuild -version
           swift --version

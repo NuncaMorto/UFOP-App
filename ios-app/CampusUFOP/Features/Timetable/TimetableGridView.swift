@@ -3,123 +3,187 @@ import SwiftUI
 public struct TimetableGridView: View {
     @Bindable public var store: CampusStore
     public let onClose: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var appliedTemplateFeedback: String?
-    @State private var pendingTemplate: UfopCurriculumTemplate?
-    @State private var isResetConfirmationPresented: Bool = false
 
-    private let timeColumnWidth: CGFloat = 86
-    private let dayColumnWidth: CGFloat = 108
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
+    @State private var selectedFilter: String = "Todas"
+    @State private var hideEmptyHours: Bool = true
+    @State private var pendingTemplateConfirm: UfopCurriculumTemplate?
+    @State private var selectedCell: TimetableSlotCell?
+    @State private var activeCheckInDetail: ClassCheckInDetail?
+    @State private var openedDisciplineDetail: DisciplineDetail?
 
     public init(store: CampusStore, onClose: @escaping () -> Void) {
         self.store = store
         self.onClose = onClose
     }
 
-    private var availableTemplates: [UfopCurriculumTemplate] {
-        store.listUfopTemplates()
-    }
+    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
+    private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
+    private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
+    private var isHorizontalOrientation: Bool { store.timetableOrientation == "horizontal" }
 
-    private var activeTemplate: UfopCurriculumTemplate? {
-        guard let activeId = store.activeTemplateId else { return nil }
-        return availableTemplates.first(where: { $0.id == activeId })
+    private var todayWeekdayShort: String? {
+        let wd = Calendar.current.component(.weekday, from: Date())
+        switch wd {
+        case 2: return "SEG"
+        case 3: return "TER"
+        case 4: return "QUA"
+        case 5: return "QUI"
+        case 6: return "SEX"
+        case 7: return "SÁB"
+        default: return nil
+        }
     }
 
     public var body: some View {
         let timetable = store.currentWeeklyTimetable
-        let legendEntries = store.timetableLegendEntries(for: timetable.slots)
+        let filteredSlots: [TimetableSlotCell] = {
+            guard selectedFilter != "Todas" else { return timetable.slots }
+            let matchingIds = Set(
+                store.disciplines
+                    .filter { $0.semester == store.selectedSemesterFilter && $0.department == selectedFilter }
+                    .map(\.id)
+            )
+            return timetable.slots.filter { matchingIds.contains($0.disciplineId) }
+        }()
+        let displayedTimeRanges: [String] = {
+            guard hideEmptyHours else { return timetable.timeRanges }
+            let nonEmpty = timetable.timeRanges.filter { timeRange in
+                filteredSlots.contains { $0.timeRange == timeRange }
+            }
+            return nonEmpty.isEmpty ? timetable.timeRanges : nonEmpty
+        }()
+        let legendEntries = store.timetableLegendEntries(for: filteredSlots)
 
         ZStack {
-            CampusTheme.cardBackground(for: colorScheme)
-                .ignoresSafeArea()
+            LiquidGlassBackdrop(accent: resolvedAccent, highContrast: hc)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 20) {
-                    headerSection(timetable: timetable)
+            VStack(spacing: 0) {
+                topBar(timetable: timetable)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 10)
 
-                    filterSelectorBar(timetable: timetable)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        controlsBar(timetable: timetable)
 
-                    if let templateFeedbackBannerText = resolvedTemplateBannerText {
-                        templateStatusBanner(text: templateFeedbackBannerText)
+                        if filteredSlots.isEmpty {
+                            emptyTimetableCard
+                        } else if isHorizontalOrientation {
+                            horizontalGridCard(
+                                weekdays: timetable.weekdays,
+                                timeRanges: displayedTimeRanges,
+                                slots: filteredSlots
+                            )
+                        } else {
+                            verticalGridCard(
+                                weekdays: timetable.weekdays,
+                                timeRanges: displayedTimeRanges,
+                                slots: filteredSlots
+                            )
+                        }
+
+                        if !legendEntries.isEmpty {
+                            legendSection(entries: legendEntries)
+                        }
                     }
-
-                    horizontalScheduleGrid(timetable: timetable)
-
-                    departmentLegendSection(entries: legendEntries)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                    .padding(.bottom, 32)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 30)
             }
         }
+        .preferredColorScheme(appearance?.resolvedColorScheme)
+        .sheet(item: $selectedCell) { cell in
+            TimetableCellDetailSheet(
+                cell: cell,
+                store: store,
+                onOpenDiscipline: {
+                    let discId = cell.disciplineId
+                    selectedCell = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        openedDisciplineDetail = store.getDisciplineDetail(disciplineId: discId)
+                    }
+                },
+                onQuickCheckIn: {
+                    if let detail = quickCheckInDetail(for: cell) {
+                        selectedCell = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            activeCheckInDetail = detail
+                        }
+                    }
+                },
+                onClose: {
+                    selectedCell = nil
+                }
+            )
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $activeCheckInDetail) { detail in
+            ClassCheckInSheetView(
+                detail: detail,
+                onSave: { status, colorKey in
+                    store.saveClassCheckIn(agendaItemId: detail.agendaItemId, status: status, colorKey: colorKey)
+                    activeCheckInDetail = nil
+                },
+                onCancel: {
+                    activeCheckInDetail = nil
+                }
+            )
+        }
+        .sheet(item: $openedDisciplineDetail) { detail in
+            DisciplineDetailSheetView(
+                detail: detail,
+                store: store,
+                onUpdateNotes: { notes in
+                    store.updateDisciplineNotes(disciplineId: detail.summary.id, notes: notes)
+                },
+                onDeleteCourse: {
+                    store.deleteCourse(courseId: detail.summary.id)
+                },
+                onClose: {
+                    openedDisciplineDetail = nil
+                }
+            )
+        }
         .confirmationDialog(
-            pendingTemplate.map { "Aplicar template \($0.code)?" } ?? "Aplicar template oficial UFOP?",
+            "Aplicar modelo UFOP?",
             isPresented: Binding(
-                get: { pendingTemplate != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        pendingTemplate = nil
-                    }
-                }
+                get: { pendingTemplateConfirm != nil },
+                set: { if !$0 { pendingTemplateConfirm = nil } }
             ),
-            titleVisibility: .visible,
-            presenting: pendingTemplate
-        ) { template in
-            Button("Aplicar \(template.code)", role: .destructive) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
-                    let count = store.applyUfopTemplate(
-                        templateId: template.id,
-                        semester: timetable.semester
-                    )
-                    appliedTemplateFeedback = "Template \(template.code) aplicado · \(count) disciplinas em \(timetable.semester)"
-                }
-                pendingTemplate = nil
-            }
-            Button("Cancelar", role: .cancel) {
-                pendingTemplate = nil
-            }
-        } message: { template in
-            Text("Aplicar \(template.name) substituirá as disciplinas, marcações de check-in e avaliações atuais do semestre \(timetable.semester).")
-        }
-        .confirmationDialog(
-            "Restaurar grade padrão 2026.2?",
-            isPresented: $isResetConfirmationPresented,
             titleVisibility: .visible
         ) {
-            Button("Restaurar grade padrão 2026.2", role: .destructive) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
-                    let restoredCount = store.resetSemesterToDefaultSeed(semester: "2026.2")
-                    appliedTemplateFeedback = "Grade padrão 2026.2 restaurada · \(restoredCount) disciplinas"
+            if let template = pendingTemplateConfirm {
+                Button("Aplicar \(template.code) · \(template.name)", role: .destructive) {
+                    _ = store.applyUfopTemplate(templateId: template.id, semester: store.selectedSemesterFilter)
+                    pendingTemplateConfirm = nil
                 }
             }
-            Button("Cancelar", role: .cancel) {}
+            Button("Cancelar", role: .cancel) {
+                pendingTemplateConfirm = nil
+            }
         } message: {
-            Text("Esta ação restaurará as 4 disciplinas padrão de 2026.2 (Cálculo II, Algoritmos, Álgebra Linear e Física I), seus horários, sessões e avaliações.")
+            Text("Isso substituirá as disciplinas do semestre \(store.selectedSemesterFilter) pelo modelo oficial escolhido.")
         }
     }
 
-    private var resolvedTemplateBannerText: String? {
-        if let appliedTemplateFeedback {
-            return appliedTemplateFeedback
-        }
-        if let activeTemplate {
-            return "\(activeTemplate.code) · \(activeTemplate.name) (\(activeTemplate.campusName))"
-        }
-        return nil
-    }
+    // MARK: - Top Bar
 
-    // MARK: - Header ("Grade de horários", "Semana de aulas · 2026.2")
+    private func topBar(timetable: WeeklyTimetable) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("SEMESTRE \(timetable.semester)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(0.9)
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
-    private func headerSection(timetable: WeeklyTimetable) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(timetable.title)
+                Text("Grade Horária")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-
-                Text(timetable.subtitle)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
             }
 
             Spacer()
@@ -128,331 +192,420 @@ public struct TimetableGridView: View {
                 onClose()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                    .frame(width: 34, height: 34)
-                    .background(
-                        Circle()
-                            .fill(CampusTheme.secondarySurface(for: colorScheme))
-                    )
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                    .frame(width: 40, height: 40)
+                    .liquidGlassCapsule(selected: false, accent: resolvedAccent.primary(for: colorScheme), highContrast: hc)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Fechar Grade de horários")
+            .minimumTouchTarget(minTouch)
+            .accessibilityLabel("Fechar grade")
         }
     }
 
-    // MARK: - Filter & UFOP Template Selector ("Minha grade" + BCC · DECOM / ENGC · DECSI / CICLO BÁSICO · EM)
+    // MARK: - Controls (Filter, Templates, Orientation, Hide Empty)
 
-    private func filterSelectorBar(timetable: WeeklyTimetable) -> some View {
-        let pickerLabel: String = {
-            if timetable.selectedFilter == "Minha grade", let activeTemplate {
-                return activeTemplate.code
-            }
-            return timetable.selectedFilter
-        }()
+    private func controlsBar(timetable: WeeklyTimetable) -> some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
+        let templates = store.listUfopTemplates()
 
-        return HStack(spacing: 10) {
-            Menu {
-                Section("Filtrar grade") {
-                    ForEach(timetable.availableFilters, id: \.self) { option in
-                        Button {
-                            withAnimation(.snappy) {
-                                store.selectedTimetableFilter = option
-                            }
-                        } label: {
-                            HStack {
-                                Text(option)
-                                if timetable.selectedFilter == option {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("Templates oficiais UFOP") {
-                    ForEach(availableTemplates) { template in
-                        Button {
-                            pendingTemplate = template
-                        } label: {
-                            HStack {
-                                Text("\(template.code) · \(template.name)")
-                                if store.activeTemplateId == template.id {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section {
-                    Button {
-                        isResetConfirmationPresented = true
-                    } label: {
-                        Label("Restaurar grade padrão 2026.2", systemImage: "arrow.counterclockwise")
-                    }
-                }
-            } label: {
+        return VStack(alignment: .leading, spacing: 10) {
+            LiquidGlassGroup(spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: "square.grid.3x2.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(CampusTheme.mathBlue)
-
-                    Text(pickerLabel)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                        .lineLimit(1)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.appBackground(for: colorScheme))
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                )
-            }
-            .accessibilityLabel("Minha grade e templates UFOP")
-
-            Spacer()
-
-            Text("Deslize para os lados →")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
-        }
-    }
-
-    private func templateStatusBanner(text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "graduationcap.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CampusTheme.mathBlue)
-
-            Text(text)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 4)
-
-            if appliedTemplateFeedback != nil {
-                Button {
-                    withAnimation(.snappy) {
-                        appliedTemplateFeedback = nil
+                    Menu {
+                        ForEach(timetable.availableFilters, id: \.self) { filter in
+                            Button {
+                                selectedFilter = filter
+                            } label: {
+                                if selectedFilter == filter {
+                                    Label(filter, systemImage: "checkmark")
+                                } else {
+                                    Text(filter)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(selectedFilter)
+                                .font(.system(size: 12, weight: .semibold))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 38)
+                        .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
                     }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+
+                    Menu {
+                        ForEach(templates) { tpl in
+                            Button {
+                                pendingTemplateConfirm = tpl
+                            } label: {
+                                Text("\(tpl.code) · \(tpl.name)")
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "wand.and.stars")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("Modelos")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 38)
+                        .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    // Vertical / Horizontal persisted toggle
+                    HStack(spacing: 4) {
+                        orientationButton(key: "vertical", icon: "rectangle.split.3x1", label: "Grade vertical")
+                        orientationButton(key: "horizontal", icon: "rectangle.split.1x2", label: "Grade horizontal")
+                    }
+                    .padding(3)
+                    .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
                 }
-                .buttonStyle(.plain)
             }
+
+            Toggle(isOn: $hideEmptyHours) {
+                Text("Ocultar horários vazios")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            }
+            .tint(primary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(CampusTheme.selectedPillBackground(for: colorScheme).opacity(0.7))
-        )
     }
 
-    // MARK: - Horizontal Scrollable Grid (SEG..SÁB × 08:00–09:40, 10:00–11:40, 14:00–15:00)
+    private func orientationButton(key: String, icon: String, label: String) -> some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
+        let isSelected = store.timetableOrientation == key
 
-    private func horizontalScheduleGrid(timetable: WeeklyTimetable) -> some View {
-        ScrollView(.horizontal, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 10) {
-                // Header Row: Horário + SEG .. SÁB
+        return Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                store.timetableOrientation = key
+            }
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(isSelected ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .frame(width: 34, height: 32)
+                .background(Capsule(style: .continuous).fill(isSelected ? primary : Color.clear))
+        }
+        .buttonStyle(.plain)
+        .frame(minWidth: 40, minHeight: 36)
+        .accessibilityLabel(label)
+    }
+
+    // MARK: - Vertical Grid (Time rows x Weekday columns)
+
+    private func verticalGridCard(weekdays: [String], timeRanges: [String], slots: [TimetableSlotCell]) -> some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
+
+        return ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Text("HORÁRIO")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(0.8)
-                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
-                        .frame(width: timeColumnWidth, alignment: .leading)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                        .frame(width: 72, alignment: .leading)
 
-                    ForEach(timetable.weekdays, id: \.self) { weekday in
-                        let isHighlighted = weekday == "TER"
-                        Text(weekday)
+                    ForEach(weekdays, id: \.self) { day in
+                        let isToday = day == todayWeekdayShort
+                        Text(isToday ? "\(day) •" : day)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                isHighlighted
-                                    ? CampusTheme.selectedPillText(for: colorScheme)
-                                    : CampusTheme.secondaryText(for: colorScheme)
-                            )
-                            .frame(width: dayColumnWidth, height: 34)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(
-                                        isHighlighted
-                                            ? CampusTheme.selectedPillBackground(for: colorScheme)
-                                            : CampusTheme.appBackground(for: colorScheme)
-                                    )
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .strokeBorder(
-                                        CampusTheme.cardBorder(for: colorScheme),
-                                        lineWidth: 1
-                                    )
-                            )
+                            .foregroundStyle(isToday ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(width: 112, height: 32)
+                            .liquidGlassCapsule(selected: isToday, accent: primary, interactive: false, highContrast: hc)
                     }
                 }
 
-                // Time Range Rows: 08:00–09:40, 10:00–11:40, 14:00–15:00
-                ForEach(timetable.timeRanges, id: \.self) { timeRange in
-                    HStack(alignment: .center, spacing: 8) {
-                        timeRangeLabelCell(timeRange: timeRange)
+                ForEach(timeRanges, id: \.self) { range in
+                    HStack(spacing: 8) {
+                        Text(range.replacingOccurrences(of: "–", with: "\n"))
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .frame(width: 72, alignment: .leading)
 
-                        ForEach(timetable.weekdays, id: \.self) { weekday in
-                            if let slot = timetable.slot(forWeekday: weekday, timeRange: timeRange) {
-                                occupiedSlotCell(slot: slot)
-                            } else {
-                                emptySlotCell()
-                            }
+                        ForEach(weekdays, id: \.self) { day in
+                            let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
+                            gridCellView(cell: match, isTodayColumn: day == todayWeekdayShort)
+                                .frame(width: 112, height: 74)
                         }
                     }
                 }
             }
             .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(CampusTheme.appBackground(for: colorScheme))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-            )
         }
+        .liquidGlassCard(cornerRadius: 20, tint: primary, highContrast: hc)
     }
 
-    private func timeRangeLabelCell(timeRange: String) -> some View {
-        let parts = timeRange.components(separatedBy: "–")
-        let start = parts.first ?? timeRange
-        let end = parts.count > 1 ? parts[1] : ""
+    // MARK: - Horizontal Grid (Weekday rows x Time columns)
 
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(start)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
+    private func horizontalGridCard(weekdays: [String], timeRanges: [String], slots: [TimetableSlotCell]) -> some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
 
-            if !end.isEmpty {
-                Text("às \(end)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
+        return ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Text("DIA")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                        .frame(width: 58, alignment: .leading)
+
+                    ForEach(timeRanges, id: \.self) { range in
+                        Text(range)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(width: 124, height: 32)
+                            .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
+                    }
+                }
+
+                ForEach(weekdays, id: \.self) { day in
+                    let isToday = day == todayWeekdayShort
+                    HStack(spacing: 8) {
+                        Text(isToday ? "\(day)\nHOJE" : day)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(isToday ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(width: 58, height: 74)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(isToday ? primary : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                            )
+
+                        ForEach(timeRanges, id: \.self) { range in
+                            let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
+                            gridCellView(cell: match, isTodayColumn: isToday)
+                                .frame(width: 124, height: 74)
+                        }
+                    }
+                }
             }
+            .padding(14)
         }
-        .frame(width: timeColumnWidth, height: 74, alignment: .leading)
+        .liquidGlassCard(cornerRadius: 20, tint: primary, highContrast: hc)
     }
 
-    private func occupiedSlotCell(slot: TimetableSlotCell) -> some View {
-        let accent = CampusTheme.departmentColor(for: slot.colorKey)
+    @ViewBuilder
+    private func gridCellView(cell: TimetableSlotCell?, isTodayColumn: Bool) -> some View {
+        if let cell {
+            let deptColor = CampusTheme.departmentColor(for: cell.colorKey)
+            let isEad = store.isCourseEad(cell.disciplineId)
+            let roomSub = isEad ? "EAD" : (cell.roomLabel.isEmpty ? "Sem sala" : cell.roomLabel)
 
-        return HStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(accent)
-                .frame(width: 4)
-                .padding(.vertical, 8)
-                .padding(.leading, 6)
+            Button {
+                selectedCell = cell
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(cell.disciplineShortName)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(slot.disciplineShortName)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                    .lineLimit(2)
+                    Spacer(minLength: 0)
 
-                Text(slot.roomLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(accent)
-                    .lineLimit(1)
+                    Text(roomSub)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                        .lineLimit(1)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(CampusTheme.departmentSoftTint(for: cell.colorKey, scheme: colorScheme))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(deptColor.opacity(isTodayColumn ? 0.85 : 0.40), lineWidth: isTodayColumn ? 1.5 : 1)
+                )
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(cell.disciplineShortName), \(cell.weekdayShort) \(cell.timeRange), \(roomSub)")
+        } else {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    isTodayColumn
+                        ? resolvedAccent.primary(for: colorScheme).opacity(colorScheme == .dark ? 0.08 : 0.05)
+                        : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc).opacity(0.45)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: hc).opacity(0.5), lineWidth: 0.75)
+                )
         }
-        .frame(width: dayColumnWidth, height: 74)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(CampusTheme.cardBackground(for: colorScheme))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(accent.opacity(0.35), lineWidth: 1)
-        )
     }
 
-    private func emptySlotCell() -> some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(CampusTheme.secondarySurface(for: colorScheme).opacity(0.55))
-            .frame(width: dayColumnWidth, height: 74)
-            .overlay(
-                Text("—")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme).opacity(0.45))
-            )
+    private var emptyTimetableCard: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+
+            Text("Sem horários cadastrados neste filtro")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+            Text("Adicione horários nas disciplinas ou escolha um modelo oficial UFOP acima.")
+                .font(.system(size: 13))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .liquidGlassCard(cornerRadius: 20, highContrast: hc)
     }
 
-    // MARK: - Bottom Department Legend
+    // MARK: - Legend Section
 
-    private func departmentLegendSection(entries: [TimetableLegendEntry]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Legenda de departamentos")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme))
+    private func legendSection(entries: [TimetableLegendEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Legenda das disciplinas")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ],
-                spacing: 10
-            ) {
+            VStack(spacing: 8) {
                 ForEach(entries) { entry in
                     HStack(spacing: 10) {
                         Circle()
                             .fill(CampusTheme.departmentColor(for: entry.colorKey))
-                            .frame(width: 12, height: 12)
+                            .frame(width: 10, height: 10)
 
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(entry.title)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme))
-                                .lineLimit(1)
+                        Text(entry.title)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                            Text(entry.subtitle)
-                                .font(.system(size: 11, weight: .regular))
-                                .foregroundStyle(CampusTheme.mutedText(for: colorScheme))
-                                .lineLimit(1)
-                        }
+                        Spacer()
 
-                        Spacer(minLength: 0)
+                        Text(entry.subtitle)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(CampusTheme.appBackground(for: colorScheme))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(CampusTheme.cardBorder(for: colorScheme), lineWidth: 1)
-                    )
+                    .liquidGlassCard(cornerRadius: 14, highContrast: hc)
                 }
             }
         }
     }
+
+    private func quickCheckInDetail(for cell: TimetableSlotCell) -> ClassCheckInDetail? {
+        let dayMap = ["SEG": 0, "TER": 1, "QUA": 2, "QUI": 3, "SEX": 4, "SÁB": 5]
+        let offset = dayMap[cell.weekdayShort] ?? 0
+        let weekDates = CampusStore.mondayToSundayDates(containing: Date())
+        let targetIso = offset < weekDates.count ? CampusStore.isoString(from: weekDates[offset]) : CampusStore.todayIsoDateString()
+        store.selectAgendaDate(isoDate: targetIso)
+        return store.getClassCheckInDetail(agendaItemId: "lecture-\(cell.id)@\(targetIso)")
+            ?? store.getClassCheckInDetail(agendaItemId: "lecture-\(cell.id)")
+    }
 }
 
-#Preview("TimetableGridView - Light") {
-    TimetableGridView(store: CampusStore(), onClose: {})
-        .preferredColorScheme(.light)
+// MARK: - Cell Detail Modal Sheet
+
+private struct TimetableCellDetailSheet: View {
+    let cell: TimetableSlotCell
+    let store: CampusStore
+    let onOpenDiscipline: () -> Void
+    let onQuickCheckIn: () -> Void
+    let onClose: () -> Void
+
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let accent = appearance?.accentColor ?? .green
+        let hc = appearance?.accessibility.highContrastMode ?? false
+        let deptColor = CampusTheme.departmentColor(for: cell.colorKey)
+        let detail = store.getDisciplineDetail(disciplineId: cell.disciplineId)
+        let isEad = store.isCourseEad(cell.disciplineId)
+        let slotMeta = store.courseScheduleSlots.first { $0.slotId == cell.id }
+        let prof = detail?.summary.professor.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let roomDesc: String = {
+            if isEad { return "A distância (EAD)" }
+            if let slotMeta {
+                let r = slotMeta.room.trimmingCharacters(in: .whitespacesAndNewlines)
+                if r.isEmpty { return slotMeta.building.isEmpty ? "Local não informado" : slotMeta.building }
+                return slotMeta.building.isEmpty ? r : "\(slotMeta.building) · \(r)"
+            }
+            return cell.roomLabel.isEmpty ? "Local não informado" : cell.roomLabel
+        }()
+
+        ZStack {
+            LiquidGlassBackdrop(accent: accent, highContrast: hc)
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text(detail?.summary.code ?? cell.weekdayShort)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(CampusTheme.departmentSoftTint(for: cell.colorKey, scheme: colorScheme)))
+
+                    Spacer()
+
+                    Button {
+                        onClose()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(width: 38, height: 38)
+                            .liquidGlassCapsule(selected: false, accent: deptColor, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Text(detail?.summary.name ?? cell.disciplineShortName)
+                    .font(.system(size: 23, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("\(cell.weekdayShort) · \(cell.timeRange)", systemImage: "clock.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Label(roomDesc, systemImage: isEad ? "laptopcomputer" : "building.2.fill")
+                        .font(.system(size: 14, weight: .medium))
+                    if !prof.isEmpty {
+                        Label(prof, systemImage: "person.fill")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                }
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .liquidGlassCard(cornerRadius: 16, tint: deptColor, highContrast: hc)
+
+                Spacer()
+
+                VStack(spacing: 10) {
+                    LiquidGlassPrimaryButton(tint: accent.primary(for: colorScheme), foreground: accent.onPrimary(for: colorScheme), minHeight: 48) {
+                        onQuickCheckIn()
+                    } label: {
+                        Label("Fazer check-in desta aula", systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                    }
+
+                    Button {
+                        onOpenDiscipline()
+                    } label: {
+                        Text("Abrir detalhes da disciplina")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .liquidGlassCapsule(selected: false, accent: deptColor, interactive: true, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(20)
+        }
+    }
 }
 
-#Preview("TimetableGridView - Dark") {
+#Preview("TimetableGridView") {
     TimetableGridView(store: CampusStore(), onClose: {})
-        .preferredColorScheme(.dark)
 }
