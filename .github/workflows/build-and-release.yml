@@ -34,6 +34,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Inspect Xcode and Swift toolchain
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+
       - name: Ensure XcodeGen is installed
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then

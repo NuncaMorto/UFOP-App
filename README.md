@@ -12,7 +12,7 @@ Todos os pacotes instaláveis e o histórico completo de notas de atualização 
 - **iOS (`.ipa` não assinado):** baixe `Vida-Academica-UFOP-vX.Y.Z-unsigned.ipa` na página de Releases e instale via **AltStore**, **SideStore**, **Sideloadly**, **TrollStore** ou **Xcode**. *(Compilações em CI sem conta paga do Apple Developer Program geram `.ipa` não assinado — o conteúdo do app é idêntico e pode ser assinado localmente para o seu iPhone.)*
 - **Como publicar uma nova versão:**
   1. Atualize a versão e as notas de atualização em [CHANGELOG.md](./CHANGELOG.md), crie a tag anotada (`git tag -a vX.Y.Z -m "Vida Acadêmica UFOP vX.Y.Z"`) e envie com `git push origin vX.Y.Z`, **ou**
-  2. Use `scripts/publish-release.ps1 -Tag vX.Y.Z` para criar/atualizar a Release com os binários de `dist/` e `SHA256SUMS.txt` automaticamente (o workflow de CI em `scripts/ci/build-and-release.yml` automatiza os builds Android `.apk` e iOS `.ipa` no GitHub Actions quando ativo em `.github/workflows/`).
+  2. Use `scripts/publish-release.ps1 -Tag vX.Y.Z` para criar/atualizar a Release com os binários de `dist/` e `SHA256SUMS.txt` automaticamente (o workflow de CI em `.github/workflows/build-and-release.yml` automatiza os builds Android `.apk` e iOS `.ipa` no GitHub Actions).
 
 ---
 
