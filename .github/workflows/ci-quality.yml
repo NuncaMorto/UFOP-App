@@ -1,0 +1,136 @@
+name: CI & Quality (Rust, Android & Hygiene)
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-quality:
+    name: Rust Quality (fmt, clippy, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-ci-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting (rustfmt)
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy (-D warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run Rust workspace tests
+        run: cargo test --workspace
+
+  android-quality:
+    name: Android Quality (tests & build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run unit tests & compile debug Kotlin
+        env:
+          FEEDBACK_RECIPIENT: ""
+        run: |
+          chmod +x android-app/gradlew
+          cd android-app
+          ./gradlew :app:testDebugUnitTest :app:compileDebugKotlin --no-daemon
+
+      - name: Run Android Lint (advisory report)
+        continue-on-error: true
+        env:
+          FEEDBACK_RECIPIENT: ""
+        run: |
+          cd android-app
+          ./gradlew :app:lintDebug --no-daemon
+
+      - name: Upload Android Lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-lint-report
+          if-no-files-found: ignore
+          path: android-app/app/build/reports/lint-results-debug.*
+
+  privacy-hygiene:
+    name: Privacy & Security Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify site JavaScript syntax
+        run: node --check docs/app.js
+
+      - name: Verify blocked files, secrets & store-safe applicationId
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git ls-files | grep -E '(\.(apk|aab|pdf|jks|keystore|p12|pem|key)$|(^|/)local\.properties$|(^|/)\.env($|\..*))'; then
+            echo "::error::Arquivo sensível ou binário proibido rastreado no Git."
+            exit 1
+          fi
+
+          if git grep -n -E '(gh[pous]_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,})' -- ':!.github/workflows/ci-quality.yml'; then
+            echo "::error::Possível token ou chave de API encontrado no código."
+            exit 1
+          fi
+
+          if git grep -n -E '[A-Za-z0-9._%+-]+@(gmail|hotmail|outlook|yahoo)\.(com|com\.br)' -- ':!.github/workflows/ci-quality.yml'; then
+            echo "::error::E-mail pessoal literal encontrado em arquivo rastreado."
+            exit 1
+          fi
+
+          if git grep -n -E '([A-Za-z]:\\Users\\[^\\[:space:]]+|/Users/[^/[:space:]]+)' -- ':!.github/workflows/ci-quality.yml' ':!AGENTS.md' ':!scripts/build-apk.ps1'; then
+            echo "::error::Caminho absoluto com usuário local encontrado em arquivo rastreado."
+            exit 1
+          fi
+
+          if ! grep -q 'applicationId = "io.github.nuncamorto.vidaacademica"' android-app/app/build.gradle.kts; then
+            echo "::error::applicationId esperado não encontrado em android-app/app/build.gradle.kts."
+            exit 1
+          fi

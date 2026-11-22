@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Reportar vulnerabilidade de segurança (em privado)
+    url: https://github.com/NuncaMorto/Vida-Academica/security/advisories/new
+    about: NÃO abra Issue pública para falhas de segurança. Envie um aviso privado diretamente ao mantenedor.

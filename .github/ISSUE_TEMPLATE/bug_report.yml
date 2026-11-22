@@ -1,0 +1,51 @@
+name: 🐛 Relatar um Bug
+description: Avise sobre algum erro, travamento ou comportamento inesperado no aplicativo ou no site.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plataforma
+      options:
+        - Android
+        - iOS
+        - Site de downloads (GitHub Pages)
+        - Núcleo Rust / Scripts
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versão do App
+      description: Verifique em Perfil → FAQ / Notas de Atualização (ex.: v1.9.7).
+      placeholder: "v1.9.7"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: O que aconteceu?
+      description: Descreva claramente o erro encontrado. Não anexe PDFs pessoais reais (Atestado/Histórico) nem dados sensíveis.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Abra a aba...
+        2. Toque em...
+        3. Veja o erro...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+    validations:
+      required: false

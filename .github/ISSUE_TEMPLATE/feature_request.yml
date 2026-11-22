@@ -1,0 +1,31 @@
+name: 💡 Sugerir Melhoria ou Recurso
+description: Proponha uma nova funcionalidade, ajuste de usabilidade ou correção de catálogo/matriz.
+title: "[Sugestão]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Área afetada
+      options:
+        - Android
+        - iOS
+        - Ambos (Android + iOS + Rust Core)
+        - Catálogo / Matrizes / Salas
+        - Site de downloads
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual necessidade ou problema essa ideia resolve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Como você imagina a solução?
+    validations:
+      required: true
