@@ -8,16 +8,24 @@ import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.CancellationSignal
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.security.keystore.KeyProperties
+import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
 /**
- * Gerenciador de bloqueio local do aplicativo (senha + biometria nativa Android API 28+).
+ * Gerenciador de bloqueio local do aplicativo (senha + biometria forte vinculada a AndroidKeyStore API 28+).
  *
  * - Hash de senha com PBKDF2-HMAC-SHA256 (120.000 iterações) + salt aleatório de 16 bytes.
+ * - Biometria forte (`BIOMETRIC_STRONG`) vinculada a `BiometricPrompt.CryptoObject` com chave AES-256-GCM no `AndroidKeyStore`.
  * - Verificação em tempo constante (`MessageDigest.isEqual`).
  * - Rate-limiting progressivo após 5 tentativas incorretas (30s -> 60s -> 120s -> 240s -> 300s).
  * - Persistência síncrona via `.commit()` em `SharedPreferences` privado dedicado.
@@ -38,6 +46,11 @@ object AppLockManager {
     private const val HASH_LENGTH_BITS = 256
     private const val SALT_LENGTH_BYTES = 16
     private const val MIN_PASSWORD_LENGTH = 4
+
+    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+    private const val BIOMETRIC_KEY_ALIAS = "vida_academica_biometric_unlock_v1"
+    private const val BIOMETRIC_CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
+    private const val BIOMETRIC_CHALLENGE_BYTES = 32
 
     private const val MAX_ATTEMPTS_BEFORE_LOCKOUT = 5
     private const val INITIAL_LOCKOUT_MS = 30_000L
@@ -95,10 +108,7 @@ object AppLockManager {
                 val manager = appContext.getSystemService(BiometricManager::class.java)
                 if (manager != null) {
                     val status = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        manager.canAuthenticate(
-                            BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                                BiometricManager.Authenticators.BIOMETRIC_WEAK
-                        )
+                        manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                     } else {
                         @Suppress("DEPRECATION")
                         manager.canAuthenticate()
@@ -190,7 +200,7 @@ object AppLockManager {
         }
         if (enabled && !isBiometricAvailable(context)) {
             return Result.failure(
-                IllegalStateException("Biometria não disponível ou não cadastrada neste dispositivo.")
+                IllegalStateException("Biometria forte não disponível ou não cadastrada neste dispositivo.")
             )
         }
         val saved = prefs(context).edit()
@@ -287,6 +297,7 @@ object AppLockManager {
 
     fun clearAllLockData(context: Context) {
         prefs(context).edit().clear().commit()
+        runCatching { deleteBiometricKey() }
     }
 
     fun launchBiometricPrompt(
@@ -300,35 +311,50 @@ object AppLockManager {
             return
         }
         if (!isBiometricAvailable(activity)) {
-            onFailure("Biometria não disponível ou não configurada neste aparelho.")
+            onFailure("Biometria forte não disponível ou não configurada neste aparelho.")
             return
         }
 
+        val challenge = ByteArray(BIOMETRIC_CHALLENGE_BYTES).also { secureRandom.nextBytes(it) }
         runCatching {
+            val cipher = createBiometricUnlockCipher()
+            val cryptoObject = BiometricPrompt.CryptoObject(cipher)
             val executor = activity.mainExecutor
             val builder = BiometricPrompt.Builder(activity)
                 .setTitle("Desbloquear Vida Acadêmica")
                 .setSubtitle("Confirme sua identidade para acessar seus dados")
                 .setNegativeButton("Usar senha", executor) { _, _ ->
+                    challenge.fill(0)
                     onCancel()
                 }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                builder.setAllowedAuthenticators(
-                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                        BiometricManager.Authenticators.BIOMETRIC_WEAK
-                )
+                builder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             }
 
             val prompt = builder.build()
             val cancellationSignal = CancellationSignal()
             val callback = object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                    val authenticatedCipher = result?.cryptoObject?.cipher
+                    if (authenticatedCipher == null) {
+                        challenge.fill(0)
+                        onFailure("Falha na validação criptográfica da biometria. Use sua senha.")
+                        return
+                    }
+                    val sealedProof = runCatching { authenticatedCipher.doFinal(challenge) }.getOrNull()
+                    challenge.fill(0)
+                    if (sealedProof == null || sealedProof.isEmpty()) {
+                        onFailure("Não foi possível validar a chave biométrica. Use sua senha.")
+                        return
+                    }
+                    sealedProof.fill(0)
                     resetFailedAttempts(prefs(activity))
                     onSuccess()
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                    challenge.fill(0)
                     val isCancel = errorCode == BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED ||
                         errorCode == BiometricPrompt.BIOMETRIC_ERROR_CANCELED
                     if (isCancel) {
@@ -345,9 +371,60 @@ object AppLockManager {
                 }
             }
 
-            prompt.authenticate(cancellationSignal, executor, callback)
+            prompt.authenticate(cryptoObject, cancellationSignal, executor, callback)
         }.onFailure {
-            onFailure("Não foi possível abrir o leitor biométrico. Use sua senha.")
+            challenge.fill(0)
+            onFailure("Não foi possível abrir o leitor biométrico com validação criptográfica. Use sua senha.")
+        }
+    }
+
+    private fun deleteBiometricKey() {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+            keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS)
+        }
+    }
+
+    private fun getOrCreateBiometricUnlockKey(forceRecreate: Boolean = false): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        if (forceRecreate && keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+            keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS)
+        } else if (!forceRecreate && keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+            val existing = keyStore.getKey(BIOMETRIC_KEY_ALIAS, null) as? SecretKey
+            if (existing != null) return existing
+        }
+
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        val specBuilder = KeyGenParameterSpec.Builder(
+            BIOMETRIC_KEY_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .setUserAuthenticationRequired(true)
+            .setInvalidatedByBiometricEnrollment(true)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            specBuilder.setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
+        } else {
+            @Suppress("DEPRECATION")
+            specBuilder.setUserAuthenticationValidityDurationSeconds(-1)
+        }
+
+        keyGenerator.init(specBuilder.build())
+        return keyGenerator.generateKey()
+    }
+
+    private fun createBiometricUnlockCipher(): Cipher {
+        val cipher = Cipher.getInstance(BIOMETRIC_CIPHER_TRANSFORMATION)
+        return try {
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateBiometricUnlockKey(forceRecreate = false))
+            cipher
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            val refreshed = Cipher.getInstance(BIOMETRIC_CIPHER_TRANSFORMATION)
+            refreshed.init(Cipher.ENCRYPT_MODE, getOrCreateBiometricUnlockKey(forceRecreate = true))
+            refreshed
         }
     }
 
