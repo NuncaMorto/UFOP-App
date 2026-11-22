@@ -43,7 +43,7 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Select Xcode 26 SDK (Liquid Glass)
         run: |
@@ -109,7 +109,7 @@ jobs:
           ./scripts/build-ios-ipa.sh
 
       - name: Upload iOS .ipa workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vida-academica-ios-ipa
           path: dist/*.ipa*
@@ -166,7 +166,7 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -174,7 +174,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Cargo registry & build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -284,7 +284,7 @@ jobs:
           (cd dist && sha256sum "${APK_NAME}" > "${APK_NAME}.sha256")
 
       - name: Upload Android .apk workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vida-academica-android-apk
           path: dist/*.apk*
