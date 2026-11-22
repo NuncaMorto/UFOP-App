@@ -13,6 +13,11 @@ import br.ufop.campus.MainActivity
 class AppUpdateInstallReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action
+        if (action != null && action != AppUpdateManager.ACTION_INSTALL_SESSION_RESULT) {
+            return
+        }
+
         val status = intent.getIntExtra(
             PackageInstaller.EXTRA_STATUS,
             PackageInstaller.STATUS_FAILURE
@@ -40,7 +45,7 @@ class AppUpdateInstallReceiver : BroadcastReceiver() {
 
 /**
  * Executado automaticamente pelo Android após o app ser atualizado (`MY_PACKAGE_REPLACED`).
- * Limpa APKs temporários em cache e reabre o app mantendo 100% dos dados do aluno intactos.
+ * Limpa APKs temporários e estado pendente, mantendo 100% dos dados do aluno intactos.
  */
 class AppPackageReplacedReceiver : BroadcastReceiver() {
 
@@ -48,8 +53,9 @@ class AppPackageReplacedReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
 
         val appContext = context.applicationContext
-        AppUpdateManager.purgeCachedApks(appContext)
         val shouldRelaunch = AppUpdateManager.consumePendingAutoRelaunch(appContext)
+        AppUpdateManager.onPackageReplacedCleanup(appContext)
+        AppUpdateManager.purgeCachedApks(appContext)
         if (shouldRelaunch) {
             launchMainActivityCleanly(appContext)
         }

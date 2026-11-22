@@ -233,6 +233,61 @@ fun InAppUpdateBanner(
             }
         }
 
+        is AppUpdateUiState.ReadyToInstall -> {
+            Surface(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable(onClick = onOpenDetails),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.SystemUpdate,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Atualização ${state.info.tagName} pronta para instalar",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Verificada (SHA-256) · Toque para abrir o instalador do Android",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    TextButton(
+                        onClick = onOpenDetails,
+                        modifier = Modifier.heightIn(min = minTouch)
+                    ) {
+                        Text(
+                            text = "Instalar",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+
         else -> Unit
     }
 }
@@ -507,9 +562,56 @@ fun AppUpdateDialog(
                         }
                     }
 
+                    is AppUpdateUiState.ReadyToInstall -> {
+                        ReleaseMetadataHeader(info = state.info)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.VerifiedUser,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .padding(top = 1.dp)
+                                )
+                                Text(
+                                    text = "Pacote verificado via SHA-256. Toque em Atualizar na tela do Android, aguarde concluir e depois toque em Abrir — seus dados continuam intactos.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { AppUpdateManager.installDownloadedApkWithSystemUi(context) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = minTouch),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Text("Abrir instalador do Android", fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = { AppUpdateManager.installDownloadedApkWithPackageInstallerSession(context) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = minTouch),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Text("Usar modo alternativo (sessão)")
+                        }
+                    }
+
                     is AppUpdateUiState.Installing -> {
                         Text(
-                            text = "Instalando ${state.info.tagName}...\nO aplicativo será reiniciado ao concluir mantendo todos os seus dados.",
+                            text = "Instalando ${state.info.tagName}...\nConfirme a tela do Android para atualizar mantendo todos os seus dados.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -519,6 +621,15 @@ fun AppUpdateDialog(
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(999.dp))
                         )
+                        OutlinedButton(
+                            onClick = { AppUpdateManager.installDownloadedApkWithSystemUi(context) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = minTouch),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Text("Abrir instalador do Android")
+                        }
                     }
 
                     is AppUpdateUiState.Error -> {
@@ -536,6 +647,17 @@ fun AppUpdateDialog(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error
                             )
+                        }
+                        if (AppUpdateManager.hasPendingVerifiedApk(context)) {
+                            OutlinedButton(
+                                onClick = { AppUpdateManager.installDownloadedApkWithSystemUi(context) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = minTouch),
+                                shape = RoundedCornerShape(18.dp)
+                            ) {
+                                Text("Abrir instalador", fontWeight = FontWeight.SemiBold)
+                            }
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -648,7 +770,7 @@ private fun SecurityPreservationNote() {
                     .padding(top = 1.dp)
             )
             Text(
-                text = "Integridade verificada via SHA-256 antes de instalar. Suas disciplinas, faltas, notas e histórico criptografado são preservados e o app reinicia ao finalizar.",
+                text = "Integridade verificada via SHA-256 antes de instalar. Suas disciplinas, faltas, notas e histórico criptografado são preservados durante a atualização.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )

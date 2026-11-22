@@ -55,10 +55,21 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.8",
-            title = "Grade Dinâmica Interativa (Matriz 2023 de Automação)",
+            version = "v1.9.9",
+            title = "Correção do Atualizador Interno Android",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Corrigida a instalação direta pelo atualizador interno no Android 14/15: após verificar o SHA-256, o app entrega o pacote diretamente ao instalador nativo do sistema (com barra de progresso real e botão Abrir) preservando 100% dos seus dados;",
+                "Cache verificado protegido durante a troca do app para permitir retomar sem baixar novamente e diagnóstico persistido em caso de erro no sistema;",
+                "Modo alternativo via sessão PackageInstaller reforçado com confirmação explícita do usuário e limpeza de sessões antigas."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.8",
+            title = "Grade Dinâmica Interativa (Matriz 2023 de Automação)",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Nova aba Grade Dinâmica no Perfil (logo abaixo de Métricas & CRE), iniciando com a Matriz 2023 (Currículo 2) de Eng. de Controle e Automação (54 disciplinas · 2970h);",
                 "Toque para concluir disciplinas e liberar pré-requisitos em tempo real, com desmarcação automática em cascata para dependentes e aviso dos requisitos faltantes ao tocar em matérias bloqueadas;",

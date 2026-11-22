@@ -10,14 +10,24 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.8"
+    public static let currentVersionString = "1.9.9"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.8",
-            title: "Grade Dinâmica Interativa (Matriz 2023)",
+            version: "v1.9.9",
+            title: "Sincronização de Versão & Estabilidade",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Sincronização de versão com a correção do atualizador interno do Android (v1.9.9).",
+                "Mantém integralmente a Grade Dinâmica Interativa (Matriz 2023 · Automação), Calendários UFOP e criptografia AES-256-GCM."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.8",
+            title: "Grade Dinâmica Interativa (Matriz 2023)",
+            badge: "ANTERIOR",
+            isLatest = false,
             items: [
                 "Nova Grade Dinâmica Interativa na aba Perfil com a matriz completa de Eng. de Controle e Automação (Matriz 2023 · 54 disciplinas, 2970h).",
                 "Desbloqueio automático por pré-requisitos ao marcar disciplinas concluídas e remoção transitiva em cascata ao desmarcar dependentes.",

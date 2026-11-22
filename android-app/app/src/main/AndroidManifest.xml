@@ -8,6 +8,14 @@
     <!-- Usado exclusivamente pelo atualizador interno via GitHub Releases (sem notificações de sistema). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Visibilidade de pacotes no Android 11–15 para conceder permissão de leitura ao instalador do sistema -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"

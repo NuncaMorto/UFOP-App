@@ -249,8 +249,15 @@ class MainActivity : ComponentActivity() {
             VidaAcademicaWidgetProvider.requestWidgetUpdate(applicationContext)
         }
         runCatching {
-            AppUpdateManager.onAppResumed(applicationContext)
+            AppUpdateManager.onActivityResumed(this)
         }
+    }
+
+    override fun onPause() {
+        runCatching {
+            AppUpdateManager.onActivityPaused(this)
+        }
+        super.onPause()
     }
 
     override fun onStop() {

@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.9 — Correção do Atualizador Interno Android
+
+- **Android (`1.9.9` · Beta · Atualizador In-App):**
+  - **Corrigido o fechamento das telas sem concluir a atualização:** após baixar e validar o hash **SHA-256**, o app agora entrega o pacote diretamente ao instalador nativo do sistema (`ACTION_VIEW` + `FileProvider` com `FLAG_ACTIVITY_NEW_TASK` e `<queries>` no manifesto), exibindo o progresso real de instalação e o botão **Abrir**.
+  - **Cache protegido e retomada segura:** o APK verificado não é apagado enquanto a nova versão ainda não assumiu, permitindo reabrir o instalador com um toque sem precisar baixar tudo de novo.
+  - **Fallback reforçado e diagnóstico visível:** o modo alternativo por sessão (`PackageInstaller`) foi endurecido para exigir confirmação explícita (`USER_ACTION_REQUIRED`), encerrar sessões órfãs e persistir eventuais erros de sistema para exibição na reabertura.
+- **iOS (`1.9.9`):** sincronização de versão e notas mantendo a Grade Dinâmica Interativa e todos os recursos da 1.9.8.
+
+<!-- versionCode: 26 -->
+
+---
+
 ## v1.9.8 — Grade Dinâmica Interativa (Matriz 2023 de Automação)
 
 - **Android (`1.9.8` · Beta · Material 3 Expressive) & iOS (`1.9.8` · Apple Liquid Glass):**

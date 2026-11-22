@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   var API = "https://api.github.com/repos/NuncaMorto/Vida-Academica/releases?per_page=10";
-  var FALLBACK = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.8";
+  var FALLBACK = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.9";
   var $ = function (id) { return document.getElementById(id); };
 
   // Theme toggle
@@ -82,10 +82,10 @@
 
   function fallback(reason) {
     $("apk-btn").href = FALLBACK;
-    $("ver-badge").textContent = "v1.9.8 · Beta";
+    $("ver-badge").textContent = "v1.9.9 · Beta";
     $("ver-meta").textContent = "";
     var s = $("dl-status");
-    s.textContent = reason + " Abrindo a página da versão v1.9.8 no GitHub.";
+    s.textContent = reason + " Abrindo a página da versão v1.9.9 no GitHub.";
     s.classList.add("warn");
     setHash(null, FALLBACK);
     $("notes").textContent = "";

@@ -6411,6 +6411,7 @@ private fun ProfileFaqSubView(
                         text = when (val st = appUpdateState) {
                             is br.ufop.campus.core.update.AppUpdateUiState.Checking -> "Verificando atualizações..."
                             is br.ufop.campus.core.update.AppUpdateUiState.Available -> "Atualização ${st.info.tagName} disponível"
+                            is br.ufop.campus.core.update.AppUpdateUiState.ReadyToInstall -> "Instalar ${st.info.tagName} (baixado)"
                             is br.ufop.campus.core.update.AppUpdateUiState.UpToDate -> "App atualizado (v${CampusRepositoryHolder.CURRENT_APP_VERSION})"
                             else -> "Verificar atualizações (GitHub)"
                         },
