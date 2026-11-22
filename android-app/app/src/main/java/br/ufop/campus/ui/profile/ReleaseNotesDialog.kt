@@ -55,10 +55,20 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.9",
-            title = "Correção do Atualizador Interno Android",
+            version = "v1.9.10",
+            title = "Cabeçalho Recolhível na Grade Dinâmica",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Removido o título duplicado dentro do cartão da Grade Dinâmica para deixar o topo mais limpo;",
+                "Novo botão Recolher / Expandir no cabeçalho da Grade Dinâmica, liberando mais área visível para navegar pelas disciplinas sem perder o progresso em tempo real."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.9",
+            title = "Correção do Atualizador Interno Android",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Corrigida a instalação direta pelo atualizador interno no Android 14/15: após verificar o SHA-256, o app entrega o pacote diretamente ao instalador nativo do sistema (com barra de progresso real e botão Abrir) preservando 100% dos seus dados;",
                 "Cache verificado protegido durante a troca do app para permitir retomar sem baixar novamente e diagnóstico persistido em caso de erro no sistema;",

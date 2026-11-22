@@ -10,6 +10,16 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.10 — Mais Espaço na Grade Dinâmica (Cabeçalho Recolhível)
+
+- **Android (`1.9.10` · Beta) & iOS (`1.9.10`):**
+  - **Cabeçalho mais limpo:** removido o título duplicado `Grade Dinâmica` de dentro do cartão superior (Android).
+  - **Botão Recolher / Expandir:** permite recolher os controles superiores (seletor de matriz, orientação, limpar, tela cheia e legenda) para ampliar a área visível da grade mantendo o resumo compacto de horas e progresso.
+
+<!-- versionCode: 27 -->
+
+---
+
 ## v1.9.9 — Correção do Atualizador Interno Android
 
 - **Android (`1.9.9` · Beta · Atualizador In-App):**

@@ -23,6 +23,7 @@ public struct DynamicCurriculumGridView: View {
     @State private var feedbackBanner: DynamicGridFeedbackBanner?
     @State private var showClearConfirmation: Bool = false
     @State private var isFullScreenExpanded: Bool = false
+    @State private var isHeaderCollapsed: Bool = false
 
     private let cardWidth: CGFloat = 136
     private let cardHeight: CGFloat = 112
@@ -142,150 +143,214 @@ public struct DynamicCurriculumGridView: View {
         summary: DynamicGridSummary
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Menu {
-                    ForEach(DynamicCurriculumCatalog.allMatrices) { item in
-                        Button {
-                            selectedMatrixId = item.id
-                            feedbackBanner = nil
-                        } label: {
-                            if item.id == matrix.id {
-                                Label("\(item.courseName) · \(item.curriculumLabel)", systemImage: "checkmark")
-                            } else {
-                                Text("\(item.courseName) · \(item.curriculumLabel)")
+            if isHeaderCollapsed {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(summary.completedHours)/\(summary.totalGridHours)h (\(summary.completionPercent)%) · \(summary.completedCount)/\(summary.totalCount)")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(1)
+
+                        GeometryReader { proxy in
+                            ZStack(alignment: .leading) {
+                                Capsule(style: .continuous)
+                                    .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+
+                                Capsule(style: .continuous)
+                                    .fill(primaryAccent)
+                                    .frame(
+                                        width: max(
+                                            summary.completedHours > 0 ? 6 : 0,
+                                            proxy.size.width * summary.progressFraction
+                                        )
+                                    )
                             }
                         }
+                        .frame(height: 5)
+                        .accessibilityHidden(true)
                     }
-                } label: {
-                    HStack(spacing: 6) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(matrix.courseName)
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                                .lineLimit(1)
 
-                            Text(matrix.curriculumLabel)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
-                                .lineLimit(1)
+                    Button {
+                        applyGridChange {
+                            isHeaderCollapsed = false
                         }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Expandir")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 34)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+                    .accessibilityLabel("Expandir controles da grade dinâmica")
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Menu {
+                        ForEach(DynamicCurriculumCatalog.allMatrices) { item in
+                            Button {
+                                selectedMatrixId = item.id
+                                feedbackBanner = nil
+                            } label: {
+                                if item.id == matrix.id {
+                                    Label("\(item.courseName) · \(item.curriculumLabel)", systemImage: "checkmark")
+                                } else {
+                                    Text("\(item.courseName) · \(item.curriculumLabel)")
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(matrix.courseName)
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                    .lineLimit(1)
+
+                                Text(matrix.curriculumLabel)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 4)
+
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                    }
+                    .minimumTouchTarget(minTouch)
+                    .accessibilityLabel("Selecionar matriz curricular, atual: \(matrix.courseName), \(matrix.curriculumLabel)")
+
+                    Button {
+                        applyGridChange {
+                            isHeaderCollapsed = true
+                        }
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(width: 40, height: 40)
+                            .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+                    .accessibilityLabel("Recolher controles da grade dinâmica")
+
+                    if isExpandedPresentation {
+                        Button {
+                            onCloseExpanded?()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 40, height: 40)
+                                .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Fechar tela cheia da grade")
+                    } else {
+                        Button {
+                            isFullScreenExpanded = true
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .frame(width: 40, height: 40)
+                                .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Expandir grade dinâmica em tela cheia")
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("\(summary.completedHours)/\(summary.totalGridHours)h (\(summary.completionPercent)%) · \(summary.completedCount)/\(summary.totalCount) disciplinas")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule(style: .continuous)
+                                .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+
+                            Capsule(style: .continuous)
+                                .fill(primaryAccent)
+                                .frame(
+                                    width: max(
+                                        summary.completedHours > 0 ? 8 : 0,
+                                        proxy.size.width * summary.progressFraction
+                                    )
+                                )
+                                .animation(
+                                    reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85),
+                                    value: summary.completedHours
+                                )
+                        }
+                    }
+                    .frame(height: 8)
+                    .accessibilityHidden(true)
+
+                    Text("Atividades/TCC/Estágio: \(matrix.requiredActivitiesHours)h · Total do curso: \(matrix.totalCourseHours)h")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                        .lineLimit(1)
+                }
+
+                LiquidGlassGroup(spacing: 8) {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            orientationPill(key: "horizontal", label: "Horizontal", icon: "rectangle.split.3x1")
+                            orientationPill(key: "vertical", label: "Vertical", icon: "rectangle.split.1x2")
+                        }
+                        .padding(3)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: hc)
 
                         Spacer(minLength: 4)
 
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
-                }
-                .minimumTouchTarget(minTouch)
-                .accessibilityLabel("Selecionar matriz curricular, atual: \(matrix.courseName), \(matrix.curriculumLabel)")
-
-                if isExpandedPresentation {
-                    Button {
-                        onCloseExpanded?()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                            .frame(width: 40, height: 40)
-                            .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
-                    }
-                    .buttonStyle(.plain)
-                    .minimumTouchTarget(minTouch)
-                    .accessibilityLabel("Fechar tela cheia da grade")
-                } else {
-                    Button {
-                        isFullScreenExpanded = true
-                    } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                            .frame(width: 40, height: 40)
-                            .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
-                    }
-                    .buttonStyle(.plain)
-                    .minimumTouchTarget(minTouch)
-                    .accessibilityLabel("Expandir grade dinâmica em tela cheia")
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text("\(summary.completedHours)/\(summary.totalGridHours)h (\(summary.completionPercent)%) · \(summary.completedCount)/\(summary.totalCount) disciplinas")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
-
-                        Capsule(style: .continuous)
-                            .fill(primaryAccent)
-                            .frame(
-                                width: max(
-                                    summary.completedHours > 0 ? 8 : 0,
-                                    proxy.size.width * summary.progressFraction
+                        Button {
+                            showClearConfirmation = true
+                        } label: {
+                            Label("Limpar", systemImage: "trash")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(
+                                    summary.completedCount > 0
+                                        ? CampusTheme.accessibleTextColor(lockedBaseColor, scheme: colorScheme)
+                                        : CampusTheme.mutedText(for: colorScheme, highContrast: hc)
                                 )
-                            )
-                            .animation(
-                                reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85),
-                                value: summary.completedHours
-                            )
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 36)
+                                .liquidGlassCapsule(selected: false, accent: lockedBaseColor, interactive: summary.completedCount > 0, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(summary.completedCount == 0)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Limpar disciplinas marcadas na grade")
                     }
                 }
-                .frame(height: 8)
-                .accessibilityHidden(true)
 
-                Text("Atividades/TCC/Estágio: \(matrix.requiredActivitiesHours)h · Total do curso: \(matrix.totalCourseHours)h")
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
-                    .lineLimit(1)
-            }
-
-            LiquidGlassGroup(spacing: 8) {
-                HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        orientationPill(key: "horizontal", label: "Horizontal", icon: "rectangle.split.3x1")
-                        orientationPill(key: "vertical", label: "Vertical", icon: "rectangle.split.1x2")
-                    }
-                    .padding(3)
-                    .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: hc)
-
-                    Spacer(minLength: 4)
-
-                    Button {
-                        showClearConfirmation = true
-                    } label: {
-                        Label("Limpar", systemImage: "trash")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                summary.completedCount > 0
-                                    ? CampusTheme.accessibleTextColor(lockedBaseColor, scheme: colorScheme)
-                                    : CampusTheme.mutedText(for: colorScheme, highContrast: hc)
-                            )
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 36)
-                            .liquidGlassCapsule(selected: false, accent: lockedBaseColor, interactive: summary.completedCount > 0, highContrast: hc)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(summary.completedCount == 0)
-                    .minimumTouchTarget(minTouch)
-                    .accessibilityLabel("Limpar disciplinas marcadas na grade")
+                HStack(spacing: 12) {
+                    legendDot(label: "Concluída", color: completedBaseColor, icon: "checkmark.circle.fill")
+                    legendDot(label: "Disponível", color: availableBaseColor, icon: "circle")
+                    legendDot(label: "Bloqueada", color: lockedBaseColor, icon: "lock.fill")
+                    Spacer(minLength: 0)
                 }
-            }
-
-            HStack(spacing: 12) {
-                legendDot(label: "Concluída", color: completedBaseColor, icon: "checkmark.circle.fill")
-                legendDot(label: "Disponível", color: availableBaseColor, icon: "circle")
-                legendDot(label: "Bloqueada", color: lockedBaseColor, icon: "lock.fill")
-                Spacer(minLength: 0)
             }
         }
-        .padding(14)
-        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+        .padding(isHeaderCollapsed ? 10 : 14)
+        .liquidGlassCard(cornerRadius: isHeaderCollapsed ? 16 : 20, tint: primaryAccent, highContrast: hc)
     }
 
     private func orientationPill(key: String, label: String, icon: String) -> some View {

@@ -242,4 +242,25 @@ class CampusAppUpdaterTest {
         assertNotNull(generic)
         assertTrue(generic!!.contains("INSTALL_FAILED_INTERNAL_ERROR"))
     }
+
+    @Test
+    fun `isNewerRelease handles multi-digit patch transition 1_9_9 to 1_9_10`() {
+        assertTrue(
+            GitHubReleaseParser.isNewerRelease(
+                candidateVersionName = "1.9.10",
+                candidateVersionCode = 27,
+                currentVersionName = "1.9.9",
+                currentVersionCode = 26
+            )
+        )
+        assertTrue(
+            GitHubReleaseParser.isNewerRelease(
+                candidateVersionName = "1.9.10",
+                candidateVersionCode = null,
+                currentVersionName = "1.9.9",
+                currentVersionCode = 26
+            )
+        )
+        assertTrue(GitHubReleaseParser.compareSemver("1.9.10", "1.9.9") > 0)
+    }
 }

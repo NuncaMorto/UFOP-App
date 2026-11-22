@@ -10,14 +10,24 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.9"
+    public static let currentVersionString = "1.9.10"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.9",
-            title: "Sincronização de Versão & Estabilidade",
+            version: "v1.9.10",
+            title: "Cabeçalho Recolhível na Grade Dinâmica",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Novo botão Recolher / Expandir no cartão superior da Grade Dinâmica para liberar mais área de visualização sem perder o progresso visível.",
+                "Sincronização completa de versão com a atualização Android 1.9.10."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.9",
+            title: "Sincronização de Versão & Estabilidade",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Sincronização de versão com a correção do atualizador interno do Android (v1.9.9).",
                 "Mantém integralmente a Grade Dinâmica Interativa (Matriz 2023 · Automação), Calendários UFOP e criptografia AES-256-GCM."
