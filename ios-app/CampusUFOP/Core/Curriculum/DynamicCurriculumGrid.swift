@@ -462,7 +462,7 @@ public enum DynamicCurriculumCatalog {
         if let entryTerm {
             let exactMatches = courseMatrices.filter { matrix in
                 matrix.effectiveFrom <= entryTerm &&
-                    (matrix.effectiveUntil == nullOrFalse(entryTerm: entryTerm, until: matrix.effectiveUntil))
+                    (matrix.effectiveUntil.map { entryTerm <= $0 } ?? true)
             }
             if let bestExact = exactMatches.max(by: { $0.effectiveFrom < $1.effectiveFrom }) {
                 return DynamicMatrixResolution(
@@ -497,11 +497,6 @@ public enum DynamicCurriculumCatalog {
             isExactVersionMatch: entryTerm != nil,
             note: entryTerm.map { "Ingresso \($0.formatLabel()) · \(latest.curriculumLabel)" }
         )
-    }
-
-    private static func nullOrFalse(entryTerm: DynamicSemesterTerm, until: DynamicSemesterTerm?) -> Bool {
-        guard let until else { return true }
-        return entryTerm <= until
     }
 
     private static func findMatrices(forCourseName courseName: String) -> [DynamicCurriculumMatrix] {
