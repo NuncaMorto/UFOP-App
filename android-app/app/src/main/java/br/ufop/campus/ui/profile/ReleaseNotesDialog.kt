@@ -55,10 +55,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.10",
-            title = "Cabeçalho Recolhível na Grade Dinâmica",
+            version = "v1.9.11",
+            title = "Grade Dinâmica com Rotação, Matrizes por Ingresso & Central de Atualizações",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Grade Dinâmica em tela cheia com rotação automática Horizontal/Vertical corrigida e área segura em landscape.",
+                "Botão recolher/expandir apenas com seta e botões Horizontal/Vertical/Limpar simétricos para liberar mais largura ao nome do curso.",
+                "Versionamento curricular automático pelo semestre de ingresso: Automação 2024/1 · Currículo 2 (2024/1–2025/2) e 2026/1 · Currículo 3 (2026/1+).",
+                "Nova aba dedicada de Atualizações & Patches fora do FAQ, e opção Refazer Tour Guiado movida para Configurações."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.10",
+            title = "Cabeçalho Recolhível na Grade Dinâmica",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Removido o título duplicado dentro do cartão da Grade Dinâmica para deixar o topo mais limpo;",
                 "Novo botão Recolher / Expandir no cabeçalho da Grade Dinâmica, liberando mais área visível para navegar pelas disciplinas sem perder o progresso em tempo real."

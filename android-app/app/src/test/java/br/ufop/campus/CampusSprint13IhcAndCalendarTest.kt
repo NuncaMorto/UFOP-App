@@ -399,7 +399,7 @@ class CampusSprint13IhcAndCalendarTest {
 
     @Test
     fun releaseVersionAndSevenAccentColors_preserveSprint13Contract() {
-        assertEquals("1.9.10", CampusRepositoryHolder.CURRENT_APP_VERSION)
+        assertEquals("1.9.11", CampusRepositoryHolder.CURRENT_APP_VERSION)
         assertEquals(
             listOf("GREEN", "RED", "ORANGE", "PURPLE", "YELLOW", "CYAN", "BROWN"),
             CampusAccentColor.entries.map { it.storageKey }

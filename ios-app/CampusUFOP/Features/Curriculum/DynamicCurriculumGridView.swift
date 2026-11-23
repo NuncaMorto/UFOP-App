@@ -13,29 +13,22 @@ private struct DynamicGridFeedbackBanner: Equatable {
 
 public struct DynamicCurriculumGridView: View {
     @Bindable public var store: CampusStore
-    public let isExpandedPresentation: Bool
-    public let onCloseExpanded: (() -> Void)?
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedMatrixId: String = DynamicCurriculumCatalog.defaultMatrix.id
+    @State private var didAutoResolveMatrix: Bool = false
+    @State private var autoResolution: DynamicMatrixResolution?
     @State private var feedbackBanner: DynamicGridFeedbackBanner?
     @State private var showClearConfirmation: Bool = false
-    @State private var isFullScreenExpanded: Bool = false
     @State private var isHeaderCollapsed: Bool = false
 
     private let cardWidth: CGFloat = 136
     private let cardHeight: CGFloat = 112
 
-    public init(
-        store: CampusStore,
-        isExpandedPresentation: Bool = false,
-        onCloseExpanded: (() -> Void)? = nil
-    ) {
+    public init(store: CampusStore) {
         self.store = store
-        self.isExpandedPresentation = isExpandedPresentation
-        self.onCloseExpanded = onCloseExpanded
     }
 
     private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
@@ -68,7 +61,7 @@ public struct DynamicCurriculumGridView: View {
         let completedSet = store.dynamicGridCompletedSet(for: matrix.id)
         let summary = DynamicGridEngine.summarize(matrix: matrix, completedCodes: completedSet)
 
-        let mainContent = VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             compactHeaderCard(matrix: matrix, summary: summary)
                 .padding(.horizontal, 20)
 
@@ -81,11 +74,36 @@ public struct DynamicCurriculumGridView: View {
                 gridContent(matrix: matrix, completedSet: completedSet)
                     .padding(.horizontal, 20)
                     .padding(.top, 2)
-                    .padding(.bottom, isExpandedPresentation ? 28 : 88)
+                    .padding(.bottom, 88)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear {
+            if !didAutoResolveMatrix {
+                didAutoResolveMatrix = true
+                let earliestSemester = store.transcriptEntries
+                    .map { $0.semester.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .min { lhs, rhs in
+                        let l = DynamicCurriculumCatalog.parseSemesterTerm(lhs)
+                        let r = DynamicCurriculumCatalog.parseSemesterTerm(rhs)
+                        switch (l, r) {
+                        case let (.some(a), .some(b)): return (a.year, a.semester) < (b.year, b.semester)
+                        case (.some, .none): return true
+                        case (.none, .some): return false
+                        case (.none, .none): return lhs < rhs
+                        }
+                    }
+                let resolution = DynamicCurriculumCatalog.resolveMatrixForStudent(
+                    courseName: store.studentProfile.courseName,
+                    registrationNumber: store.studentProfile.registrationNumber,
+                    earliestTranscriptSemester: earliestSemester
+                )
+                selectedMatrixId = resolution.matrix.id
+                autoResolution = resolution
+            }
+        }
         .confirmationDialog(
             "Limpar progresso da grade?",
             isPresented: $showClearConfirmation,
@@ -101,39 +119,6 @@ public struct DynamicCurriculumGridView: View {
         } message: {
             Text("Todas as disciplinas marcadas em \(matrix.courseName) serão desmarcadas.")
         }
-
-        return attachExpandedPresentation(to: mainContent)
-    }
-
-    @ViewBuilder
-    private func attachExpandedPresentation<Content: View>(to content: Content) -> some View {
-        #if os(iOS)
-        content.fullScreenCover(isPresented: $isFullScreenExpanded) {
-            expandedModalView
-        }
-        #else
-        content.sheet(isPresented: $isFullScreenExpanded) {
-            expandedModalView
-        }
-        #endif
-    }
-
-    private var expandedModalView: some View {
-        ZStack {
-            LiquidGlassBackdrop(accent: resolvedAccent, highContrast: hc)
-
-            VStack(alignment: .leading, spacing: 10) {
-                DynamicCurriculumGridView(
-                    store: store,
-                    isExpandedPresentation: true,
-                    onCloseExpanded: {
-                        isFullScreenExpanded = false
-                    }
-                )
-            }
-            .padding(.top, 12)
-        }
-        .preferredColorScheme(appearance?.resolvedColorScheme)
     }
 
     // MARK: - Compact Liquid Glass Header Card
@@ -175,16 +160,11 @@ public struct DynamicCurriculumGridView: View {
                             isHeaderCollapsed = false
                         }
                     } label: {
-                        HStack(spacing: 4) {
-                            Text("Expandir")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 34)
-                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .frame(width: 40, height: 40)
+                            .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
                     }
                     .buttonStyle(.plain)
                     .minimumTouchTarget(minTouch)
@@ -246,34 +226,6 @@ public struct DynamicCurriculumGridView: View {
                     .buttonStyle(.plain)
                     .minimumTouchTarget(minTouch)
                     .accessibilityLabel("Recolher controles da grade dinâmica")
-
-                    if isExpandedPresentation {
-                        Button {
-                            onCloseExpanded?()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                                .frame(width: 40, height: 40)
-                                .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
-                        }
-                        .buttonStyle(.plain)
-                        .minimumTouchTarget(minTouch)
-                        .accessibilityLabel("Fechar tela cheia da grade")
-                    } else {
-                        Button {
-                            isFullScreenExpanded = true
-                        } label: {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                                .frame(width: 40, height: 40)
-                                .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
-                        }
-                        .buttonStyle(.plain)
-                        .minimumTouchTarget(minTouch)
-                        .accessibilityLabel("Expandir grade dinâmica em tela cheia")
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -307,15 +259,23 @@ public struct DynamicCurriculumGridView: View {
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                         .lineLimit(1)
+
+                    if let resolution = autoResolution, resolution.matrix.id == matrix.id, let note = resolution.note {
+                        Text(note)
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                            .lineLimit(2)
+                    }
                 }
 
                 LiquidGlassGroup(spacing: 8) {
                     HStack(spacing: 8) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             orientationPill(key: "horizontal", label: "Horizontal", icon: "rectangle.split.3x1")
                             orientationPill(key: "vertical", label: "Vertical", icon: "rectangle.split.1x2")
                         }
                         .padding(3)
+                        .frame(height: 38)
                         .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: hc)
 
                         Spacer(minLength: 4)
@@ -330,8 +290,8 @@ public struct DynamicCurriculumGridView: View {
                                         ? CampusTheme.accessibleTextColor(lockedBaseColor, scheme: colorScheme)
                                         : CampusTheme.mutedText(for: colorScheme, highContrast: hc)
                                 )
-                                .padding(.horizontal, 12)
-                                .frame(minHeight: 36)
+                                .padding(.horizontal, 14)
+                                .frame(height: 38)
                                 .liquidGlassCapsule(selected: false, accent: lockedBaseColor, interactive: summary.completedCount > 0, highContrast: hc)
                         }
                         .buttonStyle(.plain)
@@ -372,8 +332,8 @@ public struct DynamicCurriculumGridView: View {
                     ? onPrimaryAccent
                     : CampusTheme.primaryText(for: colorScheme, highContrast: hc)
             )
-            .padding(.horizontal, 10)
-            .frame(minHeight: 30)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
             .background(
                 Capsule(style: .continuous)
                     .fill(isSelected ? primaryAccent : Color.clear)

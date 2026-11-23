@@ -6,6 +6,7 @@ private enum ProfileSubtab: String, CaseIterable, Identifiable {
     case dynamicGrid = "Grade Dinâmica"
     case calendar = "Calendário"
     case settings = "Ajustes"
+    case updates = "Atualizações"
     case faq = "FAQ"
 
     var id: String { rawValue }
@@ -99,6 +100,8 @@ public struct ProfileView: View {
                             calendarSubtabContent
                         case .settings:
                             settingsSubtabContent
+                        case .updates:
+                            updatesSubtabContent
                         case .faq:
                             faqSubtabContent
                         }
@@ -421,8 +424,30 @@ public struct ProfileView: View {
         .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
     }
 
+    private var resolvedDynamicMatrixResolution: DynamicMatrixResolution {
+        let earliestSemester = activeStore.transcriptEntries
+            .map { $0.semester.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .min { lhs, rhs in
+                let l = DynamicCurriculumCatalog.parseSemesterTerm(lhs)
+                let r = DynamicCurriculumCatalog.parseSemesterTerm(rhs)
+                switch (l, r) {
+                case let (.some(a), .some(b)): return (a.year, a.semester) < (b.year, b.semester)
+                case (.some, .none): return true
+                case (.none, .some): return false
+                case (.none, .none): return lhs < rhs
+                }
+            }
+        return DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName: activeStore.studentProfile.courseName,
+            registrationNumber: activeStore.studentProfile.registrationNumber,
+            earliestTranscriptSemester: earliestSemester
+        )
+    }
+
     private var dynamicGridShortcutCard: some View {
-        let matrix = DynamicCurriculumCatalog.defaultMatrix
+        let resolution = resolvedDynamicMatrixResolution
+        let matrix = resolution.matrix
         let completed = activeStore.dynamicGridCompletedSet(for: matrix.id)
         let gridSummary = DynamicGridEngine.summarize(matrix: matrix, completedCodes: completed)
 
@@ -445,7 +470,7 @@ public struct ProfileView: View {
                         Text("Grade Dinâmica")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                        Text("\(matrix.courseName) · \(gridSummary.completedHours)/\(gridSummary.totalGridHours)h · \(gridSummary.completionPercent)%")
+                        Text("\(matrix.curriculumLabel) · \(gridSummary.completedHours)/\(gridSummary.totalGridHours)h · \(gridSummary.completionPercent)%")
                             .font(.system(size: 12))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
@@ -611,6 +636,7 @@ public struct ProfileView: View {
         securityAndLockCard
         encryptedBackupCard
         AccessibilityControlsSection(appearance: activeAppearance)
+        guidedTourSettingsCard
         maintenanceCard
     }
 
@@ -811,6 +837,32 @@ public struct ProfileView: View {
         .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
     }
 
+    private var guidedTourSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Guia Interativo")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+            Text("Reveja a apresentação inicial com as principais ferramentas do Vida Acadêmica.")
+                .font(.system(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+            Button {
+                activeStore.guidedTourCompleted = false
+            } label: {
+                Label("Refazer Tour Guiado do App", systemImage: "map.fill")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
+                    .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+    }
+
     private var maintenanceCard: some View {
         Button {
             showResetSeedConfirmation = true
@@ -825,7 +877,100 @@ public struct ProfileView: View {
         .minimumTouchTarget(minTouch)
     }
 
-    // MARK: - 4. FAQ, Release Notes, Guided Tour & Sign Out
+    // MARK: - 4. Atualizações & Histórico de Patches
+
+    @ViewBuilder
+    private var updatesSubtabContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Versão Atual")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    Text("Vida Acadêmica v\(CampusReleaseNotesData.currentVersionString)")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                }
+
+                Spacer()
+
+                Text("v\(CampusReleaseNotesData.currentVersionString)")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(onPrimaryAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule(style: .continuous).fill(primaryAccent))
+            }
+
+            Button {
+                isReleaseNotesPresented = true
+            } label: {
+                Label("Abrir resumo em janela", systemImage: "sparkles")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(onPrimaryAccent)
+                    .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
+                    .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: hc)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
+
+        Text("HISTÓRICO DE PATCHES")
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+            .padding(.horizontal, 4)
+
+        VStack(spacing: 10) {
+            ForEach(CampusReleaseNotesData.versions) { entry in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("\(entry.version) · \(entry.title)")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                        Spacer()
+
+                        Text(entry.badge)
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                entry.isLatest
+                                    ? onPrimaryAccent
+                                    : CampusTheme.secondaryText(for: colorScheme, highContrast: hc)
+                            )
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule(style: .continuous).fill(
+                                    entry.isLatest
+                                        ? primaryAccent
+                                        : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc)
+                                )
+                            )
+                    }
+
+                    ForEach(entry.items, id: \.self) { item in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                                .padding(.top, 2)
+
+                            Text(item)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(14)
+                .liquidGlassCard(cornerRadius: 18, tint: entry.isLatest ? primaryAccent : nil, highContrast: hc)
+            }
+        }
+    }
+
+    // MARK: - 5. FAQ & Sign Out
 
     private var faqEntries: [FaqEntry] {
         [
@@ -873,38 +1018,6 @@ public struct ProfileView: View {
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
-
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Novidades & Tour Guiado")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-
-            HStack(spacing: 10) {
-                Button {
-                    isReleaseNotesPresented = true
-                } label: {
-                    Label("Notas v\(CampusReleaseNotesData.currentVersionString)", systemImage: "sparkles")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(onPrimaryAccent)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: hc)
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    activeStore.guidedTourCompleted = false
-                } label: {
-                    Label("Rever Tour", systemImage: "map.fill")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: hc)
-                }
-                .buttonStyle(.plain)
-            }
-        }
         .padding(16)
         .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: hc)
 

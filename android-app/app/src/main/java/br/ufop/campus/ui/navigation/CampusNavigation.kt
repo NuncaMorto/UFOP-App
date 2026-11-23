@@ -110,6 +110,7 @@ fun CampusNavigation(
     val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableStateOf(CampusTab.AGENDA) }
     var showTimetableModal by rememberSaveable { mutableStateOf(false) }
+    var showDynamicGridModal by rememberSaveable { mutableStateOf(false) }
     var showReleaseNotesDialog by rememberSaveable { mutableStateOf(false) }
     var checkedAutoReleaseNotes by rememberSaveable { mutableStateOf(false) }
 
@@ -182,6 +183,7 @@ fun CampusNavigation(
                     br.ufop.campus.ui.profile.ProfilePlaceholderScreen(
                         repository = repository,
                         onOpenReleaseNotes = { showReleaseNotesDialog = true },
+                        onOpenDynamicGrid = { showDynamicGridModal = true },
                         onReplayGuidedTour = {
                             CampusRepositoryHolder.setGuidedTourCompleted(context, repository, false)
                             selectedTab = CampusTab.AGENDA
@@ -224,6 +226,7 @@ fun CampusNavigation(
             avatarRefreshKey = mutationVersion,
             onSelectTab = { tab ->
                 showTimetableModal = false
+                showDynamicGridModal = false
                 selectedTab = tab
             },
             onTabPositioned = { tab, rect ->
@@ -242,11 +245,19 @@ fun CampusNavigation(
             )
         }
 
+        if (showDynamicGridModal) {
+            br.ufop.campus.ui.curriculum.DynamicCurriculumGridScreen(
+                repository = repository,
+                onDismiss = { showDynamicGridModal = false }
+            )
+        }
+
         if (shouldShowGuidedTour) {
             GuidedTourOverlay(
                 tabBounds = tabBounds,
                 onSelectTab = { tab ->
                     showTimetableModal = false
+                    showDynamicGridModal = false
                     selectedTab = tab
                 },
                 onFinish = {

@@ -42,10 +42,11 @@ class DynamicCurriculumGridTest {
 
     @Test
     fun catalog_engControleAutomacao2023_hasExactTotalsPrerequisitesAndNoCycles() {
-        val matrix = DynamicCurriculumCatalog.engControleAutomacao2023
-        assertEquals("eng_controle_automacao_2023", matrix.id)
+        val matrix = DynamicCurriculumCatalog.engControleAutomacao2024_1
+        assertEquals("eng_controle_automacao_2024_1", matrix.id)
         assertEquals("Eng. de Controle e Automação", matrix.courseName)
-        assertEquals("Matriz 2023 (Currículo 2)", matrix.curriculumLabel)
+        assertEquals("2024/1 · Currículo 2", matrix.curriculumLabel)
+        assertEquals(listOf("eng_controle_automacao_2023"), matrix.legacyIds)
         assertEquals(10, matrix.totalPeriods)
         assertEquals(640, matrix.requiredActivitiesHours)
         assertEquals(3610, matrix.totalCourseHours)
@@ -95,6 +96,129 @@ class DynamicCurriculumGridTest {
 
         assertEquals(matrix, DynamicCurriculumCatalog.defaultMatrix)
         assertEquals(matrix, DynamicCurriculumCatalog.findById("eng_controle_automacao_2023"))
+        assertEquals(matrix, DynamicCurriculumCatalog.findById("eng_controle_automacao_2024_1"))
+    }
+
+    @Test
+    fun catalog_engControleAutomacao2026_1_hasExactTotalsPrerequisitesAndNoCycles() {
+        val matrix = DynamicCurriculumCatalog.engControleAutomacao2026_1
+        assertEquals("eng_controle_automacao_2026_1", matrix.id)
+        assertEquals("Eng. de Controle e Automação", matrix.courseName)
+        assertEquals("2026/1 · Currículo 3", matrix.curriculumLabel)
+        assertEquals(10, matrix.totalPeriods)
+        assertEquals(510, matrix.requiredActivitiesHours)
+        assertEquals(3390, matrix.totalCourseHours)
+        assertEquals(55, matrix.courses.size)
+
+        val mandatory = matrix.courses.filter { !it.isElective }
+        val electives = matrix.courses.filter { it.isElective }
+        assertEquals(52, mandatory.size)
+        assertEquals(3, electives.size)
+        assertEquals(2700, mandatory.sumOf { it.workloadHours })
+        assertEquals(180, electives.sumOf { it.workloadHours })
+        assertEquals(2880, matrix.totalGridHours)
+        assertEquals(matrix.totalCourseHours, matrix.totalGridHours + matrix.requiredActivitiesHours)
+
+        val byCode = matrix.courses.associateBy { it.code }
+        assertEquals(55, byCode.size)
+        matrix.courses.forEach { course ->
+            course.prerequisites.forEach { prereq ->
+                assertTrue("Prerequisite $prereq of ${course.code} must exist in matrix", byCode.containsKey(prereq))
+                val prereqNode = byCode.getValue(prereq)
+                assertTrue(
+                    "Prerequisite $prereq (${prereqNode.period}) must precede ${course.code} (${course.period})",
+                    prereqNode.period < course.period
+                )
+            }
+        }
+
+        val cat425 = byCode.getValue("CAT425")
+        assertEquals(2000, cat425.minHoursRequired)
+        val cat491 = byCode.getValue("CAT491")
+        assertEquals(listOf("CAT425"), cat491.prerequisites)
+
+        val visited = HashMap<String, Int>()
+        fun hasCycle(code: String): Boolean {
+            when (visited[code]) {
+                1 -> return true
+                2 -> return false
+            }
+            visited[code] = 1
+            val node = byCode.getValue(code)
+            if (node.prerequisites.any { hasCycle(it) }) return true
+            visited[code] = 2
+            return false
+        }
+        assertFalse(matrix.courses.any { hasCycle(it.code) })
+        assertEquals(matrix, DynamicCurriculumCatalog.findById("eng_controle_automacao_2026_1"))
+    }
+
+    @Test
+    fun resolveMatrixForStudent_selectsApplicableVersionByEntrySemester() {
+        val r24 = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Engenharia de Controle e Automação",
+            registrationNumber = "24.1.4001",
+            earliestTranscriptSemester = null
+        )
+        assertEquals("eng_controle_automacao_2024_1", r24.matrix.id)
+        assertTrue(r24.isCourseMatched)
+        assertTrue(r24.isExactVersionMatch)
+
+        val r25 = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "AUT",
+            registrationNumber = "25.2.9999",
+            earliestTranscriptSemester = null
+        )
+        assertEquals("eng_controle_automacao_2024_1", r25.matrix.id)
+        assertTrue(r25.isExactVersionMatch)
+
+        val r26 = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Eng. de Controle e Automação",
+            registrationNumber = "26.1.1234",
+            earliestTranscriptSemester = null
+        )
+        assertEquals("eng_controle_automacao_2026_1", r26.matrix.id)
+        assertTrue(r26.isCourseMatched)
+        assertTrue(r26.isExactVersionMatch)
+
+        val rTx24 = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Engenharia de Controle e Automação",
+            registrationNumber = "",
+            earliestTranscriptSemester = "2024.1"
+        )
+        assertEquals("eng_controle_automacao_2024_1", rTx24.matrix.id)
+        assertTrue(rTx24.isExactVersionMatch)
+
+        val rLegacy = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Engenharia de Controle e Automação",
+            registrationNumber = "22.2.1000",
+            earliestTranscriptSemester = null
+        )
+        assertEquals("eng_controle_automacao_2024_1", rLegacy.matrix.id)
+        assertTrue(rLegacy.isCourseMatched)
+        assertFalse(rLegacy.isExactVersionMatch)
+        assertNotNull(rLegacy.note)
+    }
+
+    @Test
+    fun loadCompletedCodesWithLegacyFallback_migratesProgressFrom2023Key() {
+        val matrix = DynamicCurriculumCatalog.engControleAutomacao2024_1
+        val legacyOnlyStore = mapOf(
+            "eng_controle_automacao_2023" to setOf("BCC701", "MTM122")
+        )
+        assertEquals(
+            setOf("BCC701", "MTM122"),
+            DynamicCurriculumCatalog.loadCompletedCodesWithLegacyFallback(matrix) { legacyOnlyStore[it] ?: emptySet() }
+        )
+
+        val migratedStore = mapOf(
+            "eng_controle_automacao_2024_1" to setOf("BCC701", "BCC702"),
+            "eng_controle_automacao_2023" to setOf("MTM122")
+        )
+        assertEquals(
+            setOf("BCC701", "BCC702"),
+            DynamicCurriculumCatalog.loadCompletedCodesWithLegacyFallback(matrix) { migratedStore[it] ?: emptySet() }
+        )
     }
 
     @Test

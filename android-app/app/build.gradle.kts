@@ -64,8 +64,8 @@ android {
         applicationId = "io.github.nuncamorto.vidaacademica"
         minSdk = 26
         targetSdk = 35
-        versionCode = 27
-        versionName = "1.9.10"
+        versionCode = 28
+        versionName = "1.9.11"
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", "\"$feedbackEndpoint\"")
 

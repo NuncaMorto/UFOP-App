@@ -152,6 +152,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import br.ufop.campus.BuildConfig
 import br.ufop.campus.core.curriculum.DynamicCurriculumCatalog
 import br.ufop.campus.core.curriculum.DynamicGridEngine
 import br.ufop.campus.core.curriculum.UfopCourseCurriculum
@@ -174,7 +175,6 @@ import br.ufop.campus.core.security.CampusCryptoEngine
 import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
-import br.ufop.campus.ui.curriculum.DynamicCurriculumGridScreen
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
 import br.ufop.campus.ui.theme.CampusAccentColor
 import br.ufop.campus.ui.theme.DepartmentMathBlue
@@ -195,8 +195,8 @@ import java.util.Locale
 
 private enum class ProfileDestination(val title: String) {
     METRICS_CRE("Métricas & CRE"),
-    DYNAMIC_GRID("Grade Dinâmica"),
     SETTINGS("Configurações"),
+    UPDATES("Atualizações"),
     FAQ("FAQ & Ajuda")
 }
 
@@ -328,6 +328,7 @@ fun ProfilePlaceholderScreen(
 fun ProfilePlaceholderScreen(
     repository: CampusCoreRepository,
     modifier: Modifier = Modifier,
+    onOpenDynamicGrid: () -> Unit = {},
     onOpenReleaseNotes: () -> Unit = {},
     onReplayGuidedTour: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
@@ -356,16 +357,39 @@ fun ProfilePlaceholderScreen(
     val exportFolderConfig = remember(mutationVersion) {
         repository.getExportFolderConfig()
     }
-    val defaultDynamicMatrix = DynamicCurriculumCatalog.defaultMatrix
-    val dynamicGridSummary = remember(mutationVersion, defaultDynamicMatrix.id) {
-        val completed = DynamicGridEngine.sanitizeCompleted(
-            matrix = defaultDynamicMatrix,
-            completedCodes = repository.getDynamicGridCompletedCodes(defaultDynamicMatrix.id)
+    val dynamicGridResolution = remember(
+        mutationVersion,
+        studentProfile.courseName,
+        studentProfile.registrationNumber,
+        creReport.semesters
+    ) {
+        val earliestSemester = creReport.semesters
+            .map { it.semester.trim() }
+            .filter { it.isNotEmpty() }
+            .minByOrNull { raw ->
+                DynamicCurriculumCatalog.parseSemesterTerm(raw)
+                    ?.let { (year, sem) -> year * 10 + sem }
+                    ?: Int.MAX_VALUE
+            }
+        DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = studentProfile.courseName,
+            registrationNumber = studentProfile.registrationNumber,
+            earliestTranscriptSemester = earliestSemester
         )
-        DynamicGridEngine.summarize(defaultDynamicMatrix, completed)
+    }
+    val activeDynamicMatrix = dynamicGridResolution.matrix
+    val dynamicGridSummary = remember(mutationVersion, activeDynamicMatrix.id) {
+        val completed = DynamicGridEngine.sanitizeCompleted(
+            matrix = activeDynamicMatrix,
+            completedCodes = DynamicCurriculumCatalog.loadCompletedCodesWithLegacyFallback(
+                matrix = activeDynamicMatrix,
+                reader = repository::getDynamicGridCompletedCodes
+            )
+        )
+        DynamicGridEngine.summarize(activeDynamicMatrix, completed)
     }
     val dynamicGridSubtitle =
-        "${defaultDynamicMatrix.courseName} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
+        "${activeDynamicMatrix.curriculumLabel} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
 
     var avatarRevision by remember { mutableIntStateOf(0) }
     val avatarBitmap = rememberAvatarBitmap(studentProfile.avatarPath, avatarRevision)
@@ -642,13 +666,6 @@ fun ProfilePlaceholderScreen(
                     onBack = { activeDestination = null }
                 )
             }
-            activeDestination == ProfileDestination.DYNAMIC_GRID -> {
-                SettingsSubViewHeader(
-                    title = ProfileDestination.DYNAMIC_GRID.title,
-                    backLabel = "Voltar para Perfil",
-                    onBack = { activeDestination = null }
-                )
-            }
             activeDestination == ProfileDestination.SETTINGS && activeSettingsSection == null -> {
                 SettingsSubViewHeader(
                     title = ProfileDestination.SETTINGS.title,
@@ -663,6 +680,13 @@ fun ProfilePlaceholderScreen(
                     onBack = { activeSettingsSection = null }
                 )
             }
+            activeDestination == ProfileDestination.UPDATES -> {
+                SettingsSubViewHeader(
+                    title = ProfileDestination.UPDATES.title,
+                    backLabel = "Voltar para Perfil",
+                    onBack = { activeDestination = null }
+                )
+            }
             activeDestination == ProfileDestination.FAQ -> {
                 SettingsSubViewHeader(
                     title = ProfileDestination.FAQ.title,
@@ -672,29 +696,21 @@ fun ProfilePlaceholderScreen(
             }
         }
 
-        if (activeDestination == ProfileDestination.DYNAMIC_GRID) {
-            DynamicCurriculumGridScreen(
-                repository = repository,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            )
-        } else {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(contentScrollState)
-                    .padding(
-                        start = 20.dp,
-                        end = 20.dp,
-                        top = if (activeDestination == null) 20.dp else 14.dp
-                    )
-                    .navigationBarsPadding()
-                    .padding(bottom = 136.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                when (activeDestination) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(contentScrollState)
+                .padding(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = if (activeDestination == null) 20.dp else 14.dp
+                )
+                .navigationBarsPadding()
+                .padding(bottom = 136.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            when (activeDestination) {
                 null -> {
                     // Header principal do Perfil
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -745,7 +761,7 @@ fun ProfilePlaceholderScreen(
                         onEditProfile = { showEditProfileSheet = true }
                     )
 
-                    // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, FAQ & Ajuda, Sair da conta)
+                    // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, Atualizações, FAQ & Ajuda, Sair da conta)
                     SettingsCategoryGroup(title = "Central do Perfil") {
                         SettingsMenuRow(
                             icon = Icons.Outlined.Analytics,
@@ -763,7 +779,7 @@ fun ProfilePlaceholderScreen(
                             iconTint = MaterialTheme.colorScheme.primary,
                             title = "Grade Dinâmica",
                             subtitle = dynamicGridSubtitle,
-                            onClick = { activeDestination = ProfileDestination.DYNAMIC_GRID }
+                            onClick = onOpenDynamicGrid
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -773,8 +789,19 @@ fun ProfilePlaceholderScreen(
                             icon = Icons.Outlined.Settings,
                             iconTint = MaterialTheme.colorScheme.primary,
                             title = "Configurações",
-                            subtitle = "Personalização, segurança, acessibilidade, campus, PDFs e suporte",
+                            subtitle = "Personalização, segurança, acessibilidade, campus, PDFs, tour guiado e suporte",
                             onClick = { activeDestination = ProfileDestination.SETTINGS }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+                        )
+                        SettingsMenuRow(
+                            icon = Icons.Outlined.SystemUpdate,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            title = "Atualizações",
+                            subtitle = "Checar novas versões no GitHub e histórico de patches (v${CampusRepositoryHolder.CURRENT_APP_VERSION})",
+                            onClick = { activeDestination = ProfileDestination.UPDATES }
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -784,7 +811,7 @@ fun ProfilePlaceholderScreen(
                             icon = Icons.AutoMirrored.Outlined.HelpOutline,
                             iconTint = DepartmentMathBlue,
                             title = "FAQ & Ajuda",
-                            subtitle = "Dúvidas frequentes, notas da versão ${CampusRepositoryHolder.CURRENT_APP_VERSION} e tour guiado",
+                            subtitle = "Dúvidas frequentes e informações sobre o funcionamento offline",
                             onClick = { activeDestination = ProfileDestination.FAQ }
                         )
                         HorizontalDivider(
@@ -840,6 +867,7 @@ fun ProfilePlaceholderScreen(
                         onAppSecurityChanged = onAppSecurityChanged,
                         onBackupRestored = { avatarRevision += 1 },
                         onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
+                        onReplayGuidedTour = onReplayGuidedTour,
                         onSelectCampus = { campusId ->
                             repository.setActiveCampus(campusId)
                             repository.refreshWeatherIfNeeded(force = false)
@@ -912,15 +940,15 @@ fun ProfilePlaceholderScreen(
                     )
                 }
 
-                ProfileDestination.FAQ -> {
-                    ProfileFaqSubView(
+                ProfileDestination.UPDATES -> {
+                    ProfileUpdatesSubView(
                         onOpenReleaseNotes = onOpenReleaseNotes,
-                        onReplayGuidedTour = onReplayGuidedTour,
                         onCheckForUpdates = onCheckForUpdates
                     )
                 }
 
-                ProfileDestination.DYNAMIC_GRID -> Unit
+                ProfileDestination.FAQ -> {
+                    ProfileFaqSubView()
                 }
             }
         }
@@ -2567,6 +2595,7 @@ private fun ProfileSettingsTab(
     onAppSecurityChanged: () -> Unit,
     onBackupRestored: () -> Unit,
     onOpenCurriculumMatrix: () -> Unit,
+    onReplayGuidedTour: () -> Unit,
     onSelectCampus: (String) -> Unit,
     isRefreshingWeather: Boolean,
     weatherFeedback: String?,
@@ -2738,6 +2767,17 @@ private fun ProfileSettingsTab(
                     title = "Feedback & Suporte",
                     subtitle = "Relatar bug, sugestão ou enviar prints de tela",
                     onClick = { onSelectSection(SettingsSection.FEEDBACK) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+                )
+                SettingsMenuRow(
+                    icon = Icons.Outlined.Explore,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    title = "Refazer Tour Guiado",
+                    subtitle = "Rever a apresentação inicial das principais abas do app",
+                    onClick = onReplayGuidedTour
                 )
             }
         } else {
@@ -6284,14 +6324,236 @@ private val PROFILE_FAQ_ITEMS = listOf(
 )
 
 @Composable
-private fun ProfileFaqSubView(
+private fun ProfileUpdatesSubView(
     onOpenReleaseNotes: () -> Unit,
-    onReplayGuidedTour: () -> Unit,
     onCheckForUpdates: () -> Unit
 ) {
     val minTouchTarget = campusMinTouchTarget()
-    val expandedIds = remember { mutableStateMapOf<String, Boolean>() }
     val appUpdateState by br.ufop.campus.core.update.AppUpdateManager.state.collectAsState()
+    val statusText = when (val st = appUpdateState) {
+        is br.ufop.campus.core.update.AppUpdateUiState.Checking ->
+            "Consultando o GitHub Releases para verificar novas versões..."
+        is br.ufop.campus.core.update.AppUpdateUiState.Available ->
+            "Nova versão ${st.info.tagName} disponível para download e instalação."
+        is br.ufop.campus.core.update.AppUpdateUiState.Downloading ->
+            "Baixando atualização ${st.info.tagName} (${(st.progress * 100f).toInt()}%)..."
+        is br.ufop.campus.core.update.AppUpdateUiState.Verifying ->
+            "Verificando integridade SHA-256 de ${st.info.tagName}..."
+        is br.ufop.campus.core.update.AppUpdateUiState.NeedsInstallPermission ->
+            "Permissão de instalação necessária para concluir ${st.info.tagName}."
+        is br.ufop.campus.core.update.AppUpdateUiState.ReadyToInstall ->
+            "Pacote ${st.info.tagName} baixado e verificado. Pronto para instalar."
+        is br.ufop.campus.core.update.AppUpdateUiState.Installing ->
+            "Instalando ${st.info.tagName}..."
+        is br.ufop.campus.core.update.AppUpdateUiState.UpToDate ->
+            "Você já está na versão mais recente (v${CampusRepositoryHolder.CURRENT_APP_VERSION})."
+        is br.ufop.campus.core.update.AppUpdateUiState.Error ->
+            st.message
+        else ->
+            "Versão instalada: v${CampusRepositoryHolder.CURRENT_APP_VERSION} (build ${BuildConfig.VERSION_CODE})."
+    }
+    val actionLabel = when (val st = appUpdateState) {
+        is br.ufop.campus.core.update.AppUpdateUiState.Checking -> "Verificando atualizações..."
+        is br.ufop.campus.core.update.AppUpdateUiState.Available -> "Baixar ${st.info.tagName}"
+        is br.ufop.campus.core.update.AppUpdateUiState.Downloading -> "Baixando ${st.info.tagName} (${(st.progress * 100f).toInt()}%)"
+        is br.ufop.campus.core.update.AppUpdateUiState.Verifying -> "Verificando pacote..."
+        is br.ufop.campus.core.update.AppUpdateUiState.NeedsInstallPermission -> "Autorizar instalação de ${st.info.tagName}"
+        is br.ufop.campus.core.update.AppUpdateUiState.ReadyToInstall -> "Instalar ${st.info.tagName}"
+        is br.ufop.campus.core.update.AppUpdateUiState.Installing -> "Instalando..."
+        is br.ufop.campus.core.update.AppUpdateUiState.UpToDate -> "Verificar novamente (v${CampusRepositoryHolder.CURRENT_APP_VERSION})"
+        else -> "Verificar atualizações (GitHub)"
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Atualizações do Aplicativo",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "v${CampusRepositoryHolder.CURRENT_APP_VERSION}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Button(
+                    onClick = onCheckForUpdates,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minTouchTarget),
+                    shape = RoundedCornerShape(22.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.SystemUpdate,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = actionLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onOpenReleaseNotes,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minTouchTarget),
+                    shape = RoundedCornerShape(22.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Ver resumo em janela modal",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = "HISTÓRICO DE PATCHES & NOTAS DE VERSÃO",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = 6.dp)
+                .semantics { heading() }
+        )
+
+        CampusReleaseNotes.versions.forEach { entry ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = if (entry.isLatest) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = if (entry.isLatest) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant
+                    }
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${entry.version} · ${entry.title}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (entry.isLatest) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            }
+                        ) {
+                            Text(
+                                text = entry.badge,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (entry.isLatest) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    entry.items.forEach { bullet ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(15.dp)
+                            )
+                            Text(
+                                text = bullet,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileFaqSubView() {
+    val minTouchTarget = campusMinTouchTarget()
+    val expandedIds = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -6326,99 +6588,6 @@ private fun ProfileFaqSubView(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "Novidades e Guia do Aplicativo",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.semantics { heading() }
-                )
-                Text(
-                    text = "Confira tudo o que chegou na versão ${CampusRepositoryHolder.CURRENT_APP_VERSION} ou reveja o tour guiado pelas abas do app.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Button(
-                    onClick = onOpenReleaseNotes,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Notas de Atualização (v${CampusRepositoryHolder.CURRENT_APP_VERSION})",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onReplayGuidedTour,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Explore,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Rever Tour Guiado do App",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onCheckForUpdates,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.SystemUpdate,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = when (val st = appUpdateState) {
-                            is br.ufop.campus.core.update.AppUpdateUiState.Checking -> "Verificando atualizações..."
-                            is br.ufop.campus.core.update.AppUpdateUiState.Available -> "Atualização ${st.info.tagName} disponível"
-                            is br.ufop.campus.core.update.AppUpdateUiState.ReadyToInstall -> "Instalar ${st.info.tagName} (baixado)"
-                            is br.ufop.campus.core.update.AppUpdateUiState.UpToDate -> "App atualizado (v${CampusRepositoryHolder.CURRENT_APP_VERSION})"
-                            else -> "Verificar atualizações (GitHub)"
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
             }
         }
 

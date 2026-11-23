@@ -10,6 +10,15 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+<!-- versionCode: 28 -->
+## v1.9.11 — Rotação da Grade Dinâmica, Matrizes por Ingresso & Aba Atualizações
+
+- **Android (`1.9.11` · Beta) & iOS (`1.9.11`):**
+  - **Rotação e área segura na Grade Dinâmica (Android):** removida a opção duplicada de tela cheia; ao selecionar **Horizontal** ou **Vertical**, o app alterna automaticamente entre paisagem e retrato em tela inteira usando a área segura (`WindowInsets.safeDrawing`), eliminando vazamentos de fundo e deslocamentos laterais.
+  - **Controles simétricos e recolher por ícone:** o botão de recolher/expandir agora mostra apenas uma seta para dar mais espaço ao nome do curso; a pílula Horizontal/Vertical tem espaçamento uniforme em volta da opção selecionada e a mesma altura do botão Limpar.
+  - **Versionamento curricular pelo semestre de ingresso:** a matriz de Eng. de Controle e Automação passa a identificar **2024/1 · Currículo 2** (ingressantes de 2024/1 a 2025/2, preservando seleções anteriores) e adiciona a **2026/1 · Currículo 3** (ingressantes a partir de 2026/1), detectada automaticamente pela matrícula/histórico.
+  - **Perfil reorganizado:** **Atualizações & Histórico de Patches** ganhou aba própria fora de FAQ & Ajuda, e **Refazer Tour Guiado** foi movido para **Configurações / Ajustes**.
+
 ## v1.9.10 — Mais Espaço na Grade Dinâmica (Cabeçalho Recolhível)
 
 - **Android (`1.9.10` · Beta) & iOS (`1.9.10`):**

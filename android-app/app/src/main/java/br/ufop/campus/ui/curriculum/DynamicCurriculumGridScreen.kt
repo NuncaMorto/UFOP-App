@@ -21,33 +21,33 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CheckCircleOutline
 import androidx.compose.material.icons.outlined.DeleteSweep
-import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
-import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -57,7 +57,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -88,10 +87,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import br.ufop.campus.core.curriculum.DynamicCourseNode
 import br.ufop.campus.core.curriculum.DynamicCourseStatus
 import br.ufop.campus.core.curriculum.DynamicCurriculumCatalog
@@ -101,10 +99,10 @@ import br.ufop.campus.core.curriculum.DynamicGridSummary
 import br.ufop.campus.core.curriculum.DynamicGridToggleAction
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.ui.theme.DarkDepartmentBlueText
 import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.DarkTextPrimary
 import br.ufop.campus.ui.theme.DepartmentMathBlue
-import br.ufop.campus.ui.theme.DarkDepartmentBlueText
 import br.ufop.campus.ui.theme.HighContrastDarkTextPrimary
 import br.ufop.campus.ui.theme.HighContrastLightTextPrimary
 import br.ufop.campus.ui.theme.LightTextPrimary
@@ -193,6 +191,7 @@ private fun dynamicCardPaletteFor(
 @Composable
 fun DynamicCurriculumGridScreen(
     repository: CampusCoreRepository,
+    onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -200,8 +199,29 @@ fun DynamicCurriculumGridScreen(
     val a11y = LocalCampusAccessibility.current.settings
     val mutationVersion by repository.mutationVersion.collectAsState()
 
-    var selectedMatrixId by rememberSaveable {
-        mutableStateOf(DynamicCurriculumCatalog.defaultMatrix.id)
+    val studentProfile = remember(mutationVersion) { repository.getStudentProfile() }
+    val creReport = remember(mutationVersion) { repository.getAcademicCreReport() }
+    val autoResolution = remember(
+        studentProfile.courseName,
+        studentProfile.registrationNumber,
+        creReport.semesters
+    ) {
+        val earliestSemester = creReport.semesters
+            .mapNotNull { it.semester.trim().takeIf { s -> s.isNotEmpty() } }
+            .minByOrNull { raw ->
+                DynamicCurriculumCatalog.parseSemesterTerm(raw)
+                    ?.let { (year, sem) -> year * 10 + sem }
+                    ?: Int.MAX_VALUE
+            }
+        DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = studentProfile.courseName,
+            registrationNumber = studentProfile.registrationNumber,
+            earliestTranscriptSemester = earliestSemester
+        )
+    }
+
+    var selectedMatrixId by rememberSaveable(autoResolution.matrix.id) {
+        mutableStateOf(autoResolution.matrix.id)
     }
     val activeMatrix = remember(selectedMatrixId) {
         DynamicCurriculumCatalog.findById(selectedMatrixId) ?: DynamicCurriculumCatalog.defaultMatrix
@@ -210,16 +230,40 @@ fun DynamicCurriculumGridScreen(
     var isHorizontal by rememberSaveable {
         mutableStateOf(CampusRepositoryHolder.loadDynamicGridIsHorizontal(context))
     }
-    var isFullScreen by rememberSaveable { mutableStateOf(false) }
     var isHeaderCollapsed by rememberSaveable { mutableStateOf(false) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var showMatrixDropdown by remember { mutableStateOf(false) }
     var feedbackState by remember { mutableStateOf<DynamicGridFeedbackState?>(null) }
 
+    // Espelha o comportamento da Grade de Horários: Horizontal rotaciona para paisagem; Vertical restaura retrato
+    LaunchedEffect(context, isHorizontal) {
+        context.findActivity()?.requestedOrientation = if (isHorizontal) {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
+    DisposableEffect(context) {
+        val activity = context.findActivity()
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    val handleDismiss: () -> Unit = {
+        context.findActivity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        onDismiss()
+    }
+
+    BackHandler(onBack = handleDismiss)
+
     val completedCodes = remember(mutationVersion, activeMatrix.id) {
         DynamicGridEngine.sanitizeCompleted(
             matrix = activeMatrix,
-            completedCodes = repository.getDynamicGridCompletedCodes(activeMatrix.id)
+            completedCodes = DynamicCurriculumCatalog.loadCompletedCodesWithLegacyFallback(activeMatrix) { id ->
+                repository.getDynamicGridCompletedCodes(id)
+            }
         )
     }
     val summary = remember(activeMatrix, completedCodes) {
@@ -257,7 +301,7 @@ fun DynamicCurriculumGridScreen(
                         add(result.missingPrerequisites.joinToString(", "))
                     }
                     if (result.missingHours > 0) {
-                        add("${result.missingHours}h pendentes")
+                        add("${result.missingHours}h mínimas pendentes")
                     }
                 }.joinToString(" e ").ifBlank { "pré-requisitos pendentes" }
                 feedbackState = DynamicGridFeedbackState(
@@ -282,62 +326,106 @@ fun DynamicCurriculumGridScreen(
         showClearConfirmDialog = false
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        DynamicGridSummaryCard(
-            matrix = activeMatrix,
-            availableMatrices = DynamicCurriculumCatalog.allMatrices,
-            summary = summary,
-            isHorizontal = isHorizontal,
-            isCollapsed = isHeaderCollapsed,
-            onToggleCollapsed = { isHeaderCollapsed = !isHeaderCollapsed },
-            showMatrixDropdown = showMatrixDropdown,
-            onToggleMatrixDropdown = { showMatrixDropdown = it },
-            onSelectMatrix = { chosen ->
-                selectedMatrixId = chosen.id
-                showMatrixDropdown = false
-                feedbackState = null
-            },
-            onSelectOrientation = handleToggleOrientation,
-            onRequestClear = { showClearConfirmDialog = true },
-            onOpenFullScreen = { isFullScreen = true },
-            isDark = isDark,
-            largeTouchTargets = a11y.largeTouchTargets,
-            highContrast = a11y.highContrastMode,
-            reduceMotion = a11y.reduceMotion,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
+    val controlHeight = if (a11y.largeTouchTargets) 48.dp else 40.dp
+    val autoMatchNote = if (activeMatrix.id == autoResolution.matrix.id) {
+        autoResolution.note
+    } else {
+        null
+    }
 
-        feedbackState?.let { banner ->
-            DynamicGridFeedbackBanner(
-                state = banner,
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+        ) {
+            if (isHorizontal) {
+                DynamicGridLandscapeToolbar(
+                    matrix = activeMatrix,
+                    availableMatrices = DynamicCurriculumCatalog.allMatrices,
+                    summary = summary,
+                    isHorizontal = isHorizontal,
+                    isCollapsed = isHeaderCollapsed,
+                    showMatrixDropdown = showMatrixDropdown,
+                    controlHeight = controlHeight,
+                    isDark = isDark,
+                    highContrast = a11y.highContrastMode,
+                    reduceMotion = a11y.reduceMotion,
+                    autoMatchNote = autoMatchNote,
+                    onBack = handleDismiss,
+                    onToggleCollapsed = { isHeaderCollapsed = !isHeaderCollapsed },
+                    onToggleMatrixDropdown = { showMatrixDropdown = it },
+                    onSelectMatrix = { chosen ->
+                        selectedMatrixId = chosen.id
+                        showMatrixDropdown = false
+                        feedbackState = null
+                    },
+                    onSelectOrientation = handleToggleOrientation,
+                    onRequestClear = { showClearConfirmDialog = true }
+                )
+            } else {
+                DynamicGridPortraitTopBar(
+                    onBack = handleDismiss
+                )
+
+                DynamicGridSummaryCard(
+                    matrix = activeMatrix,
+                    availableMatrices = DynamicCurriculumCatalog.allMatrices,
+                    summary = summary,
+                    isHorizontal = isHorizontal,
+                    isCollapsed = isHeaderCollapsed,
+                    onToggleCollapsed = { isHeaderCollapsed = !isHeaderCollapsed },
+                    showMatrixDropdown = showMatrixDropdown,
+                    onToggleMatrixDropdown = { showMatrixDropdown = it },
+                    onSelectMatrix = { chosen ->
+                        selectedMatrixId = chosen.id
+                        showMatrixDropdown = false
+                        feedbackState = null
+                    },
+                    onSelectOrientation = handleToggleOrientation,
+                    onRequestClear = { showClearConfirmDialog = true },
+                    controlHeight = controlHeight,
+                    autoMatchNote = autoMatchNote,
+                    isDark = isDark,
+                    largeTouchTargets = a11y.largeTouchTargets,
+                    highContrast = a11y.highContrastMode,
+                    reduceMotion = a11y.reduceMotion,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
+
+            feedbackState?.let { banner ->
+                DynamicGridFeedbackBanner(
+                    state = banner,
+                    isDark = isDark,
+                    onDismiss = { feedbackState = null },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+
+            DynamicGridScrollableBoard(
+                matrix = activeMatrix,
+                coursesByPeriod = coursesByPeriod,
+                completedCodes = completedCodes,
+                isHorizontal = isHorizontal,
                 isDark = isDark,
-                onDismiss = { feedbackState = null },
+                highContrast = a11y.highContrastMode,
+                fontScaleMultiplier = a11y.fontScaleMultiplier,
+                bottomContentPadding = if (isHorizontal) 20.dp else 28.dp,
+                onCourseClick = handleCourseClick,
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
-
-        DynamicGridScrollableBoard(
-            matrix = activeMatrix,
-            coursesByPeriod = coursesByPeriod,
-            completedCodes = completedCodes,
-            isHorizontal = isHorizontal,
-            isDark = isDark,
-            highContrast = a11y.highContrastMode,
-            fontScaleMultiplier = a11y.fontScaleMultiplier,
-            bottomContentPadding = 104.dp,
-            onCourseClick = handleCourseClick,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        )
     }
 
     if (showClearConfirmDialog) {
@@ -377,32 +465,219 @@ fun DynamicCurriculumGridScreen(
             }
         )
     }
+}
 
-    if (isFullScreen) {
-        Dialog(
-            onDismissRequest = { isFullScreen = false },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
-            )
+@Composable
+private fun DynamicGridPortraitTopBar(
+    onBack: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            onClick = onBack,
+            modifier = Modifier.minimumInteractiveComponentSize(),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            DynamicGridFullScreenDialogContent(
-                matrix = activeMatrix,
-                coursesByPeriod = coursesByPeriod,
-                completedCodes = completedCodes,
-                summary = summary,
-                isHorizontal = isHorizontal,
-                feedbackState = feedbackState,
-                isDark = isDark,
-                highContrast = a11y.highContrastMode,
-                largeTouchTargets = a11y.largeTouchTargets,
-                fontScaleMultiplier = a11y.fontScaleMultiplier,
-                onSelectOrientation = handleToggleOrientation,
-                onRequestClear = { showClearConfirmDialog = true },
-                onDismissFeedback = { feedbackState = null },
-                onCourseClick = handleCourseClick,
-                onDismiss = { isFullScreen = false }
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Voltar para Perfil",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Voltar para Perfil",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+            }
+        }
+
+        Text(
+            text = "Grade Dinâmica",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { heading() }
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DynamicGridLandscapeToolbar(
+    matrix: DynamicCurriculumMatrix,
+    availableMatrices: List<DynamicCurriculumMatrix>,
+    summary: DynamicGridSummary,
+    isHorizontal: Boolean,
+    isCollapsed: Boolean,
+    showMatrixDropdown: Boolean,
+    controlHeight: Dp,
+    isDark: Boolean,
+    highContrast: Boolean,
+    reduceMotion: Boolean,
+    autoMatchNote: String?,
+    onBack: () -> Unit,
+    onToggleCollapsed: () -> Unit,
+    onToggleMatrixDropdown: (Boolean) -> Unit,
+    onSelectMatrix: (DynamicCurriculumMatrix) -> Unit,
+    onSelectOrientation: (Boolean) -> Unit,
+    onRequestClear: () -> Unit
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val progressColor = accessibleTextColor(
+        if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen,
+        isDark,
+        surfaceColor
+    )
+    val progressRatio = if (summary.totalGridHours > 0) {
+        (summary.completedHours.toFloat() / summary.totalGridHours.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = surfaceColor,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isCollapsed) 0.dp else 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        .clip(CircleShape)
+                        .clickable(onClickLabel = "Voltar para Perfil", onClick = onBack)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Voltar para Perfil"
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier.size(controlHeight),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    MatrixSelectorDropdownChip(
+                        matrix = matrix,
+                        availableMatrices = availableMatrices,
+                        expanded = showMatrixDropdown,
+                        height = controlHeight,
+                        compactLabel = "${matrix.courseName} · ${matrix.curriculumLabel} · ${summary.completionPercent}%",
+                        onToggleExpanded = onToggleMatrixDropdown,
+                        onSelectMatrix = onSelectMatrix
+                    )
+                }
+
+                DynamicGridOrientationSegmentedPill(
+                    isHorizontal = isHorizontal,
+                    controlHeight = controlHeight,
+                    onSelectOrientation = onSelectOrientation
+                )
+
+                DynamicGridClearPillButton(
+                    enabled = summary.completedCount > 0,
+                    controlHeight = controlHeight,
+                    onClick = onRequestClear
+                )
+
+                CollapseArrowIconButton(
+                    isCollapsed = isCollapsed,
+                    size = controlHeight,
+                    onClick = onToggleCollapsed
+                )
+            }
+
+            AnimatedVisibility(
+                visible = !isCollapsed,
+                enter = if (reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
+                exit = if (reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        LinearProgressIndicator(
+                            progress = { progressRatio },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(999.dp)),
+                            color = progressColor,
+                            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DynamicGridLegendRow(
+                            isDark = isDark,
+                            highContrast = highContrast
+                        )
+                        if (!autoMatchNote.isNullOrBlank()) {
+                            Text(
+                                text = autoMatchNote,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 10.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -421,7 +696,8 @@ private fun DynamicGridSummaryCard(
     onSelectMatrix: (DynamicCurriculumMatrix) -> Unit,
     onSelectOrientation: (Boolean) -> Unit,
     onRequestClear: () -> Unit,
-    onOpenFullScreen: () -> Unit,
+    controlHeight: Dp,
+    autoMatchNote: String?,
     isDark: Boolean,
     largeTouchTargets: Boolean,
     highContrast: Boolean,
@@ -429,7 +705,7 @@ private fun DynamicGridSummaryCard(
     modifier: Modifier = Modifier
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val controlHeight = if (largeTouchTargets) 48.dp else 36.dp
+    val arrowButtonSize = if (largeTouchTargets) 44.dp else 36.dp
     val progressRatio = if (summary.totalGridHours > 0) {
         (summary.completedHours.toFloat() / summary.totalGridHours.toFloat()).coerceIn(0f, 1f)
     } else {
@@ -485,38 +761,11 @@ private fun DynamicGridSummaryCard(
                         )
                     }
 
-                    Surface(
-                        onClick = onToggleCollapsed,
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .semantics {
-                                contentDescription = "Expandir cabeçalho e controles da grade dinâmica"
-                            },
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "Expandir",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+                    CollapseArrowIconButton(
+                        isCollapsed = true,
+                        size = arrowButtonSize,
+                        onClick = onToggleCollapsed
+                    )
                 }
             } else {
                 Row(
@@ -525,108 +774,22 @@ private fun DynamicGridSummaryCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(modifier = Modifier.weight(1f)) {
-                        Surface(
-                            onClick = { onToggleMatrixDropdown(true) },
-                            modifier = Modifier.minimumInteractiveComponentSize(),
-                            shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "${matrix.courseName} · ${matrix.curriculumLabel}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = "Selecionar matriz curricular",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        DropdownMenu(
+                        MatrixSelectorDropdownChip(
+                            matrix = matrix,
+                            availableMatrices = availableMatrices,
                             expanded = showMatrixDropdown,
-                            onDismissRequest = { onToggleMatrixDropdown(false) },
-                            shape = RoundedCornerShape(20.dp),
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ) {
-                            availableMatrices.forEach { item ->
-                                val isSelected = item.id == matrix.id
-                                DropdownMenuItem(
-                                    text = {
-                                        Column {
-                                            Text(
-                                                text = item.courseName,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                            )
-                                            Text(
-                                                text = "${item.curriculumLabel} · ${item.courses.size} disciplinas (${item.totalGridHours}h)",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    },
-                                    trailingIcon = if (isSelected) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = "Matriz ativa",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    onClick = { onSelectMatrix(item) }
-                                )
-                            }
-                        }
+                            height = arrowButtonSize,
+                            compactLabel = "${matrix.courseName} · ${matrix.curriculumLabel}",
+                            onToggleExpanded = onToggleMatrixDropdown,
+                            onSelectMatrix = onSelectMatrix
+                        )
                     }
 
-                    Surface(
-                        onClick = onToggleCollapsed,
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .semantics {
-                                contentDescription = "Recolher controles para ampliar espaço da grade dinâmica"
-                            },
-                        shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.KeyboardArrowUp,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Recolher",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                    }
+                    CollapseArrowIconButton(
+                        isCollapsed = false,
+                        size = arrowButtonSize,
+                        onClick = onToggleCollapsed
+                    )
                 }
             }
 
@@ -636,7 +799,7 @@ private fun DynamicGridSummaryCard(
                 exit = if (reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
                             text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount} disciplinas",
                             style = MaterialTheme.typography.labelLarge,
@@ -652,6 +815,15 @@ private fun DynamicGridSummaryCard(
                             color = progressColor,
                             trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                         )
+                        if (!autoMatchNote.isNullOrBlank()) {
+                            Text(
+                                text = autoMatchNote,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
                     FlowRow(
@@ -665,60 +837,11 @@ private fun DynamicGridSummaryCard(
                             onSelectOrientation = onSelectOrientation
                         )
 
-                        OutlinedButton(
-                            onClick = onRequestClear,
+                        DynamicGridClearPillButton(
                             enabled = summary.completedCount > 0,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .defaultMinSize(minHeight = controlHeight),
-                            shape = RoundedCornerShape(999.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.DeleteSweep,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "Limpar",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-
-                        Surface(
-                            onClick = onOpenFullScreen,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .defaultMinSize(minHeight = controlHeight),
-                            shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Fullscreen,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "Tela cheia",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-                        }
+                            controlHeight = controlHeight,
+                            onClick = onRequestClear
+                        )
                     }
 
                     DynamicGridLegendRow(
@@ -732,33 +855,173 @@ private fun DynamicGridSummaryCard(
 }
 
 @Composable
+private fun MatrixSelectorDropdownChip(
+    matrix: DynamicCurriculumMatrix,
+    availableMatrices: List<DynamicCurriculumMatrix>,
+    expanded: Boolean,
+    height: Dp,
+    compactLabel: String,
+    onToggleExpanded: (Boolean) -> Unit,
+    onSelectMatrix: (DynamicCurriculumMatrix) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(
+                onClickLabel = "Selecionar matriz curricular",
+                onClick = { onToggleExpanded(true) }
+            ),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Surface(
+            modifier = Modifier.height(height),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = compactLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = "Selecionar matriz curricular",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onToggleExpanded(false) },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            availableMatrices.forEach { item ->
+                val isSelected = item.id == matrix.id
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                text = "${item.courseName} · ${item.curriculumLabel}",
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                            Text(
+                                text = "Vigência ${item.validityLabel()} · ${item.courses.size} disciplinas (${item.totalGridHours}h)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Matriz ativa",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    onClick = { onSelectMatrix(item) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapseArrowIconButton(
+    isCollapsed: Boolean,
+    size: Dp,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .clip(CircleShape)
+            .clickable(
+                onClickLabel = if (isCollapsed) "Expandir cabeçalho da grade" else "Recolher cabeçalho da grade",
+                onClick = onClick
+            )
+            .semantics {
+                role = Role.Button
+                contentDescription = if (isCollapsed) {
+                    "Expandir cabeçalho e controles da grade dinâmica"
+                } else {
+                    "Recolher controles para ampliar espaço da grade dinâmica"
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.size(size),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (isCollapsed) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DynamicGridOrientationSegmentedPill(
     isHorizontal: Boolean,
-    controlHeight: androidx.compose.ui.unit.Dp,
+    controlHeight: Dp,
     onSelectOrientation: (Boolean) -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    Box(
+        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.padding(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        Surface(
+            modifier = Modifier.height(controlHeight),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            OrientationSegmentChip(
-                label = "Horizontal",
-                selected = isHorizontal,
-                controlHeight = controlHeight,
-                onClick = { onSelectOrientation(true) }
-            )
-            OrientationSegmentChip(
-                label = "Vertical",
-                selected = !isHorizontal,
-                controlHeight = controlHeight,
-                onClick = { onSelectOrientation(false) }
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                OrientationSegmentChip(
+                    label = "Horizontal",
+                    selected = isHorizontal,
+                    onClick = { onSelectOrientation(true) }
+                )
+                OrientationSegmentChip(
+                    label = "Vertical",
+                    selected = !isHorizontal,
+                    onClick = { onSelectOrientation(false) }
+                )
+            }
         }
     }
 }
@@ -767,37 +1030,92 @@ private fun DynamicGridOrientationSegmentedPill(
 private fun OrientationSegmentChip(
     label: String,
     selected: Boolean,
-    controlHeight: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
-    Surface(
-        onClick = onClick,
+    Box(
         modifier = Modifier
-            .minimumInteractiveComponentSize()
-            .defaultMinSize(minHeight = (controlHeight - 4.dp).coerceAtLeast(32.dp))
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .clickable(onClick = onClick)
             .semantics {
                 this.role = Role.RadioButton
                 this.selected = selected
-            },
-        shape = RoundedCornerShape(999.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+            }
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+@Composable
+private fun DynamicGridClearPillButton(
+    enabled: Boolean,
+    controlHeight: Dp,
+    onClick: () -> Unit
+) {
+    val contentColor = if (enabled) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    }
+    val borderColor = if (enabled) {
+        MaterialTheme.colorScheme.outlineVariant
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    }
+
+    Box(
+        modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Limpar disciplinas concluídas na grade dinâmica"
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.height(controlHeight),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (enabled) 1f else 0.55f),
+            border = BorderStroke(1.dp, borderColor)
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                maxLines = 1,
-                softWrap = false
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DeleteSweep,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Limpar",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
         }
     }
 }
@@ -809,7 +1127,6 @@ private fun DynamicGridLegendRow(
     highContrast: Boolean
 ) {
     FlowRow(
-        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -924,7 +1241,7 @@ private fun DynamicGridScrollableBoard(
     isDark: Boolean,
     highContrast: Boolean,
     fontScaleMultiplier: Float,
-    bottomContentPadding: androidx.compose.ui.unit.Dp,
+    bottomContentPadding: Dp,
     onCourseClick: (DynamicCourseNode) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1278,180 +1595,6 @@ private fun DynamicCourseCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun DynamicGridFullScreenDialogContent(
-    matrix: DynamicCurriculumMatrix,
-    coursesByPeriod: Map<Int, List<DynamicCourseNode>>,
-    completedCodes: Set<String>,
-    summary: DynamicGridSummary,
-    isHorizontal: Boolean,
-    feedbackState: DynamicGridFeedbackState?,
-    isDark: Boolean,
-    highContrast: Boolean,
-    largeTouchTargets: Boolean,
-    fontScaleMultiplier: Float,
-    onSelectOrientation: (Boolean) -> Unit,
-    onRequestClear: () -> Unit,
-    onDismissFeedback: () -> Unit,
-    onCourseClick: (DynamicCourseNode) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    val controlHeight = if (largeTouchTargets) 48.dp else 36.dp
-    val progressColor = accessibleTextColor(
-        if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen,
-        isDark,
-        MaterialTheme.colorScheme.surface
-    )
-    val progressRatio = if (summary.totalGridHours > 0) {
-        (summary.completedHours.toFloat() / summary.totalGridHours.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-
-    LaunchedEffect(context) {
-        context.findActivity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-    }
-
-    DisposableEffect(context) {
-        val activity = context.findActivity()
-        onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
-    }
-
-    val handleDismiss = {
-        context.findActivity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        onDismiss()
-    }
-
-    BackHandler(onBack = handleDismiss)
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Grade Dinâmica · ${matrix.courseName}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${matrix.curriculumLabel} · ${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        DynamicGridOrientationSegmentedPill(
-                            isHorizontal = isHorizontal,
-                            controlHeight = controlHeight,
-                            onSelectOrientation = onSelectOrientation
-                        )
-
-                        OutlinedButton(
-                            onClick = onRequestClear,
-                            enabled = summary.completedCount > 0,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .defaultMinSize(minHeight = controlHeight),
-                            shape = RoundedCornerShape(999.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "Limpar",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        IconButton(
-                            onClick = handleDismiss,
-                            modifier = Modifier.minimumInteractiveComponentSize()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Sair da tela cheia",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { progressRatio },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(999.dp)),
-                        color = progressColor,
-                        trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                    )
-
-                    DynamicGridLegendRow(
-                        isDark = isDark,
-                        highContrast = highContrast
-                    )
-                }
-            }
-
-            feedbackState?.let { banner ->
-                DynamicGridFeedbackBanner(
-                    state = banner,
-                    isDark = isDark,
-                    onDismiss = onDismissFeedback,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                )
-            }
-
-            DynamicGridScrollableBoard(
-                matrix = matrix,
-                coursesByPeriod = coursesByPeriod,
-                completedCodes = completedCodes,
-                isHorizontal = isHorizontal,
-                isDark = isDark,
-                highContrast = highContrast,
-                fontScaleMultiplier = fontScaleMultiplier,
-                bottomContentPadding = 24.dp,
-                onCourseClick = onCourseClick,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            )
         }
     }
 }

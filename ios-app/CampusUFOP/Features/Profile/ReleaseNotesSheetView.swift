@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.10"
+    public static let currentVersionString = "1.9.11"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.10",
-            title: "Cabeçalho Recolhível na Grade Dinâmica",
+            version: "v1.9.11",
+            title: "Matrizes por Ingresso, UI Alinhada & Aba Atualizações",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Detecção automática da matriz da Grade Dinâmica pelo semestre de ingresso: Automação 2024/1 · Currículo 2 (2024/1–2025/2) e 2026/1 · Currículo 3 (2026/1+).",
+                "Botão de recolher/expandir apenas com ícone de seta e controles Horizontal/Vertical/Limpar alinhados e simétricos sem botão extra de tela cheia.",
+                "Nova subaba Atualizações dedicada ao histórico de patches fora de FAQ e botão Refazer Tour Guiado movido para Ajustes.",
+                "Sincronização completa de versão com o lançamento Android 1.9.11."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.10",
+            title: "Cabeçalho Recolhível na Grade Dinâmica",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Novo botão Recolher / Expandir no cartão superior da Grade Dinâmica para liberar mais área de visualização sem perder o progresso visível.",
                 "Sincronização completa de versão com a atualização Android 1.9.10."

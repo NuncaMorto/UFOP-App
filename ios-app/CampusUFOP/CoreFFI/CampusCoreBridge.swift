@@ -2815,7 +2815,9 @@ public final class CampusStore {
 
     public func dynamicGridCompletedSet(for matrixId: String) -> Set<String> {
         if let matrix = DynamicCurriculumCatalog.find(byId: matrixId) {
-            let raw = Set(dynamicGridCompletedByMatrix[matrix.id] ?? dynamicGridCompletedByMatrix[matrixId] ?? [])
+            let raw = DynamicCurriculumCatalog.loadCompletedCodesWithLegacyFallback(matrix: matrix) { id in
+                Set(dynamicGridCompletedByMatrix[id] ?? [])
+            }
             return DynamicGridEngine.sanitizeCompleted(matrix: matrix, completedCodes: raw)
         }
         return Set(
@@ -2853,6 +2855,9 @@ public final class CampusStore {
             } else {
                 dynamicGridCompletedByMatrix[matrix.id] = sorted
             }
+            for legacyId in matrix.legacyIds {
+                dynamicGridCompletedByMatrix.removeValue(forKey: legacyId)
+            }
             persistEncryptedState()
         }
 
@@ -2860,9 +2865,12 @@ public final class CampusStore {
     }
 
     public func clearDynamicGrid(matrixId: String) {
-        let canonicalId = DynamicCurriculumCatalog.find(byId: matrixId)?.id ?? matrixId
-        dynamicGridCompletedByMatrix.removeValue(forKey: canonicalId)
-        if canonicalId != matrixId {
+        if let matrix = DynamicCurriculumCatalog.find(byId: matrixId) {
+            dynamicGridCompletedByMatrix.removeValue(forKey: matrix.id)
+            for legacyId in matrix.legacyIds {
+                dynamicGridCompletedByMatrix.removeValue(forKey: legacyId)
+            }
+        } else {
             dynamicGridCompletedByMatrix.removeValue(forKey: matrixId)
         }
         persistEncryptedState()

@@ -2,6 +2,25 @@ import Foundation
 
 // MARK: - Dynamic Interactive Curriculum Grid Models & Engine
 
+public struct DynamicSemesterTerm: Comparable, Equatable, Codable, Sendable {
+    public let year: Int
+    public let semester: Int
+
+    public init(year: Int, semester: Int) {
+        self.year = year
+        self.semester = semester
+    }
+
+    public static func < (lhs: DynamicSemesterTerm, rhs: DynamicSemesterTerm) -> Bool {
+        if lhs.year != rhs.year { return lhs.year < rhs.year }
+        return lhs.semester < rhs.semester
+    }
+
+    public func formatLabel() -> String {
+        "\(year)/\(semester)"
+    }
+}
+
 public struct DynamicCourseNode: Identifiable, Equatable, Codable, Sendable {
     public let code: String
     public let name: String
@@ -40,9 +59,21 @@ public struct DynamicCurriculumMatrix: Identifiable, Equatable, Codable, Sendabl
     public let requiredActivitiesHours: Int
     public let totalCourseHours: Int
     public let courses: [DynamicCourseNode]
+    public let courseCode: String
+    public let courseAliases: [String]
+    public let effectiveFrom: DynamicSemesterTerm
+    public let effectiveUntil: DynamicSemesterTerm?
+    public let legacyIds: [String]
 
     public var totalGridHours: Int {
         courses.reduce(0) { $0 + $1.workloadHours }
+    }
+
+    public func validityLabel() -> String {
+        if let effectiveUntil {
+            return "\(effectiveFrom.formatLabel())–\(effectiveUntil.formatLabel())"
+        }
+        return "\(effectiveFrom.formatLabel())+"
     }
 
     public init(
@@ -52,7 +83,12 @@ public struct DynamicCurriculumMatrix: Identifiable, Equatable, Codable, Sendabl
         totalPeriods: Int,
         requiredActivitiesHours: Int,
         totalCourseHours: Int,
-        courses: [DynamicCourseNode]
+        courses: [DynamicCourseNode],
+        courseCode: String = "",
+        courseAliases: [String] = [],
+        effectiveFrom: DynamicSemesterTerm = DynamicSemesterTerm(year: 2024, semester: 1),
+        effectiveUntil: DynamicSemesterTerm? = nil,
+        legacyIds: [String] = []
     ) {
         self.id = id
         self.courseName = courseName
@@ -61,6 +97,11 @@ public struct DynamicCurriculumMatrix: Identifiable, Equatable, Codable, Sendabl
         self.requiredActivitiesHours = requiredActivitiesHours
         self.totalCourseHours = totalCourseHours
         self.courses = courses
+        self.courseCode = courseCode
+        self.courseAliases = courseAliases
+        self.effectiveFrom = effectiveFrom
+        self.effectiveUntil = effectiveUntil
+        self.legacyIds = legacyIds
     }
 
     public func course(forCode code: String) -> DynamicCourseNode? {
@@ -70,6 +111,28 @@ public struct DynamicCurriculumMatrix: Identifiable, Equatable, Codable, Sendabl
 
     public func courses(inPeriod period: Int) -> [DynamicCourseNode] {
         courses.filter { $0.period == period }
+    }
+}
+
+public struct DynamicMatrixResolution: Equatable, Sendable {
+    public let matrix: DynamicCurriculumMatrix
+    public let studentEntryTerm: DynamicSemesterTerm?
+    public let isCourseMatched: Bool
+    public let isExactVersionMatch: Bool
+    public let note: String?
+
+    public init(
+        matrix: DynamicCurriculumMatrix,
+        studentEntryTerm: DynamicSemesterTerm?,
+        isCourseMatched: Bool,
+        isExactVersionMatch: Bool,
+        note: String?
+    ) {
+        self.matrix = matrix
+        self.studentEntryTerm = studentEntryTerm
+        self.isCourseMatched = isCourseMatched
+        self.isExactVersionMatch = isExactVersionMatch
+        self.note = note
     }
 }
 
@@ -141,10 +204,17 @@ public struct DynamicGridSummary: Equatable, Sendable {
 // MARK: - Curriculum Matrices Catalog
 
 public enum DynamicCurriculumCatalog {
-    public static let engControleAutomacao2023 = DynamicCurriculumMatrix(
-        id: "eng_controle_automacao_2023",
+    private static let automacaoAliases: [String] = [
+        "engenharia de controle e automacao",
+        "eng. de controle e automacao",
+        "controle e automacao",
+        "aut"
+    ]
+
+    public static let engControleAutomacao2024_1 = DynamicCurriculumMatrix(
+        id: "eng_controle_automacao_2024_1",
         courseName: "Eng. de Controle e Automação",
-        curriculumLabel: "Matriz 2023 (Currículo 2)",
+        curriculumLabel: "2024/1 · Currículo 2",
         totalPeriods: 10,
         requiredActivitiesHours: 640,
         totalCourseHours: 3610,
@@ -222,22 +292,267 @@ public enum DynamicCurriculumCatalog {
             DynamicCourseNode(code: "ELT003", name: "Disciplina Eletiva III", workloadHours: 60, period: 10, isElective: true),
             DynamicCourseNode(code: "ELT004", name: "Disciplina Eletiva IV", workloadHours: 60, period: 10, isElective: true),
             DynamicCourseNode(code: "ELT005", name: "Disciplina Eletiva V", workloadHours: 60, period: 10, isElective: true)
-        ]
+        ],
+        courseCode: "AUT",
+        courseAliases: automacaoAliases,
+        effectiveFrom: DynamicSemesterTerm(year: 2024, semester: 1),
+        effectiveUntil: DynamicSemesterTerm(year: 2025, semester: 2),
+        legacyIds: ["eng_controle_automacao_2023"]
     )
 
+    public static let engControleAutomacao2026_1 = DynamicCurriculumMatrix(
+        id: "eng_controle_automacao_2026_1",
+        courseName: "Eng. de Controle e Automação",
+        curriculumLabel: "2026/1 · Currículo 3",
+        totalPeriods: 10,
+        requiredActivitiesHours: 510,
+        totalCourseHours: 3390,
+        courses: [
+            // Período 1
+            DynamicCourseNode(code: "ARQ700", name: "Expressão Gráfica", workloadHours: 60, period: 1),
+            DynamicCourseNode(code: "BCC703", name: "Fundamentos de Programação", workloadHours: 60, period: 1),
+            DynamicCourseNode(code: "CAT410", name: "Introdução à Eng. de Controle e Automação", workloadHours: 30, period: 1),
+            DynamicCourseNode(code: "MTM122", name: "Cálculo Diferencial e Integral I", workloadHours: 90, period: 1),
+            DynamicCourseNode(code: "MTM730", name: "Geometria Analítica e Álgebra Linear", workloadHours: 60, period: 1),
+
+            // Período 2
+            DynamicCourseNode(code: "BCC704", name: "Algoritmos e Estruturas de Dados", workloadHours: 60, period: 2, prerequisites: ["BCC703"]),
+            DynamicCourseNode(code: "CAT411", name: "Introdução à Aquisição de Dados e Controle", workloadHours: 30, period: 2, prerequisites: ["BCC703"]),
+            DynamicCourseNode(code: "FIS106", name: "Fundamentos de Mecânica", workloadHours: 60, period: 2, prerequisites: ["MTM122", "MTM730"]),
+            DynamicCourseNode(code: "FIS107", name: "Fundamentos de Termodinâmica", workloadHours: 30, period: 2),
+            DynamicCourseNode(code: "MTM123", name: "Cálculo Diferencial e Integral II", workloadHours: 60, period: 2, prerequisites: ["MTM122"]),
+            DynamicCourseNode(code: "QUI022", name: "Química Geral Experimental AB", workloadHours: 30, period: 2),
+            DynamicCourseNode(code: "QUI075", name: "Química Geral B", workloadHours: 30, period: 2),
+
+            // Período 3
+            DynamicCourseNode(code: "AMB111", name: "Engenharia Ambiental Básica M", workloadHours: 30, period: 3),
+            DynamicCourseNode(code: "BCC721", name: "Circuitos Digitais", workloadHours: 60, period: 3),
+            DynamicCourseNode(code: "BCC760", name: "Cálculo Numérico", workloadHours: 60, period: 3, prerequisites: ["BCC704"]),
+            DynamicCourseNode(code: "FIS108", name: "Fundamentos de Fluidos, Oscilações e Ondas", workloadHours: 30, period: 3, prerequisites: ["FIS106"]),
+            DynamicCourseNode(code: "MTM124", name: "Cálculo Diferencial e Integral III", workloadHours: 60, period: 3, prerequisites: ["MTM123"]),
+            DynamicCourseNode(code: "MTM125", name: "Introdução às Equações Diferenciais Ordinárias", workloadHours: 60, period: 3, prerequisites: ["MTM122"]),
+
+            // Período 4
+            DynamicCourseNode(code: "BCC705", name: "Sistemas Computacionais para Engenharia", workloadHours: 30, period: 4, prerequisites: ["BCC721"]),
+            DynamicCourseNode(code: "CAT176", name: "Análise de Circuitos Elétricos", workloadHours: 60, period: 4),
+            DynamicCourseNode(code: "FIS105", name: "Fundamentos de Física Experimental", workloadHours: 30, period: 4, prerequisites: ["FIS106", "FIS107", "FIS108"]),
+            DynamicCourseNode(code: "FIS109", name: "Fundamentos de Eletromagnetismo", workloadHours: 60, period: 4, prerequisites: ["MTM123"]),
+            DynamicCourseNode(code: "MEC124", name: "Fenômenos de Transporte", workloadHours: 60, period: 4, prerequisites: ["FIS108"]),
+            DynamicCourseNode(code: "MTM146", name: "Matemática Aplicada à Eng. de Controle e Automação", workloadHours: 60, period: 4, prerequisites: ["MTM125"]),
+
+            // Período 5
+            DynamicCourseNode(code: "BCC425", name: "Sistemas Embutidos", workloadHours: 60, period: 5, prerequisites: ["BCC704"]),
+            DynamicCourseNode(code: "CAT412", name: "Teoria de Controle I", workloadHours: 60, period: 5, prerequisites: ["MTM125"]),
+            DynamicCourseNode(code: "CAT413", name: "Eletrotécnica para Controle e Automação", workloadHours: 60, period: 5, prerequisites: ["CAT176"]),
+            DynamicCourseNode(code: "CAT414", name: "Circuitos e Dispositivos Eletrônicos", workloadHours: 60, period: 5, prerequisites: ["CAT176"]),
+            DynamicCourseNode(code: "EST202", name: "Estatística e Probabilidade", workloadHours: 60, period: 5),
+
+            // Período 6
+            DynamicCourseNode(code: "CAT163", name: "Instrumentação", workloadHours: 60, period: 6, prerequisites: ["CAT176"]),
+            DynamicCourseNode(code: "CAT415", name: "Máquinas Elétricas", workloadHours: 60, period: 6, prerequisites: ["CAT413"]),
+            DynamicCourseNode(code: "CAT416", name: "Acionamentos Elétricos", workloadHours: 60, period: 6, prerequisites: ["CAT413", "CAT414"]),
+            DynamicCourseNode(code: "CAT417", name: "Teoria de Controle II", workloadHours: 60, period: 6, prerequisites: ["CAT412"]),
+            DynamicCourseNode(code: "CAT418", name: "Laboratório de Controle I", workloadHours: 60, period: 6, prerequisites: ["CAT412"]),
+
+            // Período 7
+            DynamicCourseNode(code: "BCC740", name: "Inteligência Artificial", workloadHours: 60, period: 7, prerequisites: ["BCC703"]),
+            DynamicCourseNode(code: "CAT182", name: "Elementos de Robótica", workloadHours: 60, period: 7, prerequisites: ["CAT418", "MTM730"]),
+            DynamicCourseNode(code: "CAT420", name: "Informática Industrial", workloadHours: 60, period: 7, prerequisites: ["BCC721", "CAT416"]),
+            DynamicCourseNode(code: "CAT421", name: "Teoria de Controle III", workloadHours: 60, period: 7, prerequisites: ["CAT417"]),
+            DynamicCourseNode(code: "CAT422", name: "Sistemas Integrados de Manufatura", workloadHours: 30, period: 7),
+            DynamicCourseNode(code: "CIV049", name: "Resistência dos Materiais para Controle e Automação", workloadHours: 30, period: 7, prerequisites: ["FIS105"]),
+
+            // Período 8
+            DynamicCourseNode(code: "BCC722", name: "Programação de Sistemas em Tempo Real", workloadHours: 60, period: 8, prerequisites: ["BCC703", "BCC704", "BCC721"]),
+            DynamicCourseNode(code: "CAT423", name: "Instrumentação Inteligente", workloadHours: 60, period: 8, prerequisites: ["CAT163"]),
+            DynamicCourseNode(code: "CAT424", name: "Redes Industriais", workloadHours: 60, period: 8, prerequisites: ["CAT420"]),
+            DynamicCourseNode(code: "MEC142", name: "Acionamentos Fluidomecânicos", workloadHours: 60, period: 8),
+            DynamicCourseNode(code: "ELT001", name: "Disciplina Eletiva I", workloadHours: 60, period: 8, isElective: true),
+
+            // Período 9
+            DynamicCourseNode(code: "CAT425", name: "Trabalho Final de Curso I", workloadHours: 30, period: 9, minHoursRequired: 2000),
+            DynamicCourseNode(code: "DIR250", name: "Introdução ao Direito e Legislação", workloadHours: 30, period: 9),
+            DynamicCourseNode(code: "MET702", name: "Engenharia nos Processos de Metalurgia", workloadHours: 60, period: 9),
+            DynamicCourseNode(code: "MIN107", name: "Engenharia nos Processos de Mineração", workloadHours: 60, period: 9),
+            DynamicCourseNode(code: "PRO224", name: "Economia da Engenharia", workloadHours: 60, period: 9),
+            DynamicCourseNode(code: "ELT002", name: "Disciplina Eletiva II", workloadHours: 60, period: 9, isElective: true),
+
+            // Período 10
+            DynamicCourseNode(code: "CAT491", name: "Trabalho Final de Curso II", workloadHours: 30, period: 10, prerequisites: ["CAT425"]),
+            DynamicCourseNode(code: "PRO215", name: "Planejamento e Controle da Produção I", workloadHours: 60, period: 10),
+            DynamicCourseNode(code: "PRO243", name: "Organização e Administração I", workloadHours: 30, period: 10),
+            DynamicCourseNode(code: "ELT003", name: "Disciplina Eletiva III", workloadHours: 60, period: 10, isElective: true)
+        ],
+        courseCode: "AUT",
+        courseAliases: automacaoAliases,
+        effectiveFrom: DynamicSemesterTerm(year: 2026, semester: 1),
+        effectiveUntil: nil
+    )
+
+    public static var engControleAutomacao2023: DynamicCurriculumMatrix {
+        engControleAutomacao2024_1
+    }
+
     public static let allMatrices: [DynamicCurriculumMatrix] = [
-        engControleAutomacao2023
+        engControleAutomacao2024_1,
+        engControleAutomacao2026_1
     ]
 
     public static var defaultMatrix: DynamicCurriculumMatrix {
-        engControleAutomacao2023
+        engControleAutomacao2024_1
     }
 
     public static func find(byId id: String?) -> DynamicCurriculumMatrix? {
         guard let clean = id?.trimmingCharacters(in: .whitespacesAndNewlines), !clean.isEmpty else {
             return nil
         }
-        return allMatrices.first { $0.id.caseInsensitiveCompare(clean) == .orderedSame }
+        return allMatrices.first { matrix in
+            matrix.id.caseInsensitiveCompare(clean) == .orderedSame ||
+                matrix.legacyIds.contains { $0.caseInsensitiveCompare(clean) == .orderedSame }
+        }
+    }
+
+    public static func loadCompletedCodesWithLegacyFallback(
+        matrix: DynamicCurriculumMatrix,
+        reader: (String) -> Set<String>
+    ) -> Set<String> {
+        let primary = reader(matrix.id)
+        if !primary.isEmpty { return primary }
+        for legacyId in matrix.legacyIds {
+            let legacy = reader(legacyId)
+            if !legacy.isEmpty { return legacy }
+        }
+        return []
+    }
+
+    public static func resolveMatrixForStudent(
+        courseName: String,
+        registrationNumber: String,
+        earliestTranscriptSemester: String? = nil
+    ) -> DynamicMatrixResolution {
+        let regTuple = UfopCurriculumCatalog.parseEnrollmentYearSemester(registrationNumber)
+        let txTuple = earliestTranscriptSemester.flatMap { parseSemesterTerm($0) }
+
+        let entryTuple: (year: Int, semester: Int)? = {
+            switch (regTuple, txTuple) {
+            case let (.some(a), .some(b)):
+                return (a.year, a.semester) <= (b.year, b.semester) ? a : b
+            case let (.some(a), .none):
+                return a
+            case let (.none, .some(b)):
+                return b
+            case (.none, .none):
+                return nil
+            }
+        }()
+        let entryTerm = entryTuple.map { DynamicSemesterTerm(year: $0.year, semester: $0.semester) }
+
+        let courseMatrices = findMatrices(forCourseName: courseName)
+        guard !courseMatrices.isEmpty else {
+            let cleanCourse = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return DynamicMatrixResolution(
+                matrix: defaultMatrix,
+                studentEntryTerm: entryTerm,
+                isCourseMatched: false,
+                isExactVersionMatch: false,
+                note: cleanCourse.isEmpty ? nil : "Matriz de \(cleanCourse) ainda não cadastrada na Grade Dinâmica"
+            )
+        }
+
+        if let entryTerm {
+            let exactMatches = courseMatrices.filter { matrix in
+                matrix.effectiveFrom <= entryTerm &&
+                    (matrix.effectiveUntil == nullOrFalse(entryTerm: entryTerm, until: matrix.effectiveUntil))
+            }
+            if let bestExact = exactMatches.max(by: { $0.effectiveFrom < $1.effectiveFrom }) {
+                return DynamicMatrixResolution(
+                    matrix: bestExact,
+                    studentEntryTerm: entryTerm,
+                    isCourseMatched: true,
+                    isExactVersionMatch: true,
+                    note: "Ingresso \(entryTerm.formatLabel()) · Selecionada automaticamente"
+                )
+            }
+
+            if let oldest = courseMatrices.min(by: { $0.effectiveFrom < $1.effectiveFrom }),
+               entryTerm < oldest.effectiveFrom {
+                return DynamicMatrixResolution(
+                    matrix: oldest,
+                    studentEntryTerm: entryTerm,
+                    isCourseMatched: true,
+                    isExactVersionMatch: false,
+                    note: "Ingresso \(entryTerm.formatLabel()) · Matriz antiga não cadastrada; exibindo \(oldest.curriculumLabel)"
+                )
+            }
+        }
+
+        let latest = courseMatrices.first(where: { $0.effectiveUntil == nil })
+            ?? courseMatrices.max(by: { $0.effectiveFrom < $1.effectiveFrom })
+            ?? defaultMatrix
+
+        return DynamicMatrixResolution(
+            matrix: latest,
+            studentEntryTerm: entryTerm,
+            isCourseMatched: true,
+            isExactVersionMatch: entryTerm != nil,
+            note: entryTerm.map { "Ingresso \($0.formatLabel()) · \(latest.curriculumLabel)" }
+        )
+    }
+
+    private static func nullOrFalse(entryTerm: DynamicSemesterTerm, until: DynamicSemesterTerm?) -> Bool {
+        guard let until else { return true }
+        return entryTerm <= until
+    }
+
+    private static func findMatrices(forCourseName courseName: String) -> [DynamicCurriculumMatrix] {
+        let normInput = normalizeLookupText(courseName)
+        guard !normInput.isEmpty else { return [] }
+
+        return allMatrices.filter { matrix in
+            let normCourse = normalizeLookupText(matrix.courseName)
+            let normCode = normalizeLookupText(matrix.courseCode)
+            let normAliases = matrix.courseAliases.map { normalizeLookupText($0) }
+            if normInput == normCode || normInput == normCourse {
+                return true
+            }
+            return normAliases.contains { alias in
+                !alias.isEmpty && (
+                    normInput == alias ||
+                        normInput.contains(alias) ||
+                        (normInput.count >= 6 && alias.contains(normInput))
+                )
+            }
+        }
+    }
+
+    public static func parseSemesterTerm(_ raw: String) -> (year: Int, semester: Int)? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let pattern = #"(?:^|\D)(\d{4}|\d{2})\s*[./-]\s*([12])(?:\D|$)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+              let r1 = Range(match.range(at: 1), in: trimmed),
+              let r2 = Range(match.range(at: 2), in: trimmed),
+              let rawYearInt = Int(trimmed[r1]),
+              let sem = Int(trimmed[r2]), (sem == 1 || sem == 2) else {
+            return nil
+        }
+        let yearStr = String(trimmed[r1])
+        let fullYear = yearStr.count == 4 ? rawYearInt : (rawYearInt >= 69 ? 1900 + rawYearInt : 2000 + rawYearInt)
+        guard (1969...2099).contains(fullYear) else { return nil }
+        return (fullYear, sem)
+    }
+
+    private static func normalizeLookupText(_ raw: String) -> String {
+        let folded = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "pt_BR"))
+            .lowercased()
+            .replacingOccurrences(of: "eng.", with: "engenharia")
+        let parts = folded
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        return parts.joined(separator: " ")
     }
 }
 
