@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -177,8 +178,11 @@ import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
 import br.ufop.campus.ui.theme.CampusAccentColor
+import br.ufop.campus.ui.theme.CampusFoldPosture
+import br.ufop.campus.ui.theme.CampusWindowWidthClass
 import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -338,6 +342,7 @@ fun ProfilePlaceholderScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val themeController = LocalCampusThemeController.current
+    val adaptive = LocalCampusAdaptiveLayout.current
     val accessibilityController = LocalCampusAccessibility.current
     val mutationVersion by repository.mutationVersion.collectAsState()
 
@@ -582,7 +587,16 @@ fun ProfilePlaceholderScreen(
                             context = context,
                             courseNameOrCode = updatedProfile.courseName,
                             campusHint = updatedProfile.campusName
-                        )
+                        )?.let { found ->
+                            val earliestSem = resolveEarliestSemester(
+                                repository.getAcademicCreReport().semesters.map { it.semester }
+                            )
+                            UfopCurriculumCatalog.resolveCourseForStudent(
+                                baseCourse = found,
+                                registrationNumber = updatedProfile.registrationNumber,
+                                earliestTranscriptSemester = earliestSem
+                            )
+                        }
                         if (matchedCurriculum != null && shouldApplyCatalogRequiredHours(
                                 repository = repository,
                                 registrationNumber = updatedProfile.registrationNumber,
@@ -653,302 +667,377 @@ fun ProfilePlaceholderScreen(
         contentScrollState.scrollTo(0)
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        when {
-            activeDestination == ProfileDestination.METRICS_CRE -> {
-                SettingsSubViewHeader(
-                    title = ProfileDestination.METRICS_CRE.title,
-                    backLabel = "Voltar para Perfil",
-                    onBack = { activeDestination = null }
-                )
-            }
-            activeDestination == ProfileDestination.SETTINGS && activeSettingsSection == null -> {
-                SettingsSubViewHeader(
-                    title = ProfileDestination.SETTINGS.title,
-                    backLabel = "Voltar para Perfil",
-                    onBack = { activeDestination = null }
-                )
-            }
-            activeDestination == ProfileDestination.SETTINGS && activeSettingsSection != null -> {
-                SettingsSubViewHeader(
-                    title = activeSettingsSection!!.title,
-                    backLabel = "Voltar para Configurações",
-                    onBack = { activeSettingsSection = null }
-                )
-            }
-            activeDestination == ProfileDestination.UPDATES -> {
-                SettingsSubViewHeader(
-                    title = ProfileDestination.UPDATES.title,
-                    backLabel = "Voltar para Perfil",
-                    onBack = { activeDestination = null }
-                )
-            }
-            activeDestination == ProfileDestination.FAQ -> {
-                SettingsSubViewHeader(
-                    title = ProfileDestination.FAQ.title,
-                    backLabel = "Voltar para Perfil",
-                    onBack = { activeDestination = null }
-                )
-            }
+    val renderOverviewPane: @Composable () -> Unit = {
+        // Header principal do Perfil
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "APP INDEPENDENTE PARA ESTUDANTES",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Perfil",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.semantics { heading() }
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Identidade Acadêmica · Semestre $activeSemester",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(contentScrollState)
-                .padding(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = if (activeDestination == null) 20.dp else 14.dp
+        // Banner de Atualização Pendente do Calendário Acadêmico UFOP
+        if (pendingCalendarUpdate != null) {
+            PendingCalendarUpdateBanner(
+                pkg = pendingCalendarUpdate,
+                onApply = {
+                    val appliedCount = repository.applyPendingCalendarUpdate()
+                    calendarUpdateAppliedMessage =
+                        "Calendário ${pendingCalendarUpdate.semester} atualizado com sucesso ($appliedCount eventos aplicados)."
+                }
+            )
+        } else if (calendarUpdateAppliedMessage != null) {
+            StatusFeedbackBanner(
+                message = calendarUpdateAppliedMessage!!,
+                isError = false,
+                onDismiss = { calendarUpdateAppliedMessage = null }
+            )
+        }
+
+        // Card Hero Centralizado: Identidade Acadêmica
+        AcademicIdentityCard(
+            studentProfile = studentProfile,
+            activeSemester = activeSemester,
+            activeCampus = profileSummary.activeCampus,
+            avatarBitmap = avatarBitmap,
+            onEditProfile = { showEditProfileSheet = true }
+        )
+
+        // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, Atualizações, FAQ & Ajuda, Sair da conta)
+        SettingsCategoryGroup(title = "Central do Perfil") {
+            SettingsMenuRow(
+                icon = Icons.Outlined.Analytics,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "Métricas & CRE",
+                subtitle = "CRE ${formatScore(creReport.overallCre, 2)} · ${profileSummary.totalAbsences}/${profileSummary.totalMaxAbsences} faltas · ${creReport.completedHours}/${creReport.totalRequiredHours}h",
+                onClick = { activeDestination = ProfileDestination.METRICS_CRE }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            )
+            SettingsMenuRow(
+                icon = Icons.Outlined.AccountTree,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "Grade Dinâmica",
+                subtitle = dynamicGridSubtitle,
+                onClick = onOpenDynamicGrid
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            )
+            SettingsMenuRow(
+                icon = Icons.Outlined.Settings,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "Configurações",
+                subtitle = "Personalização, segurança, acessibilidade, campus, PDFs, tour guiado e suporte",
+                onClick = { activeDestination = ProfileDestination.SETTINGS }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            )
+            SettingsMenuRow(
+                icon = Icons.Outlined.SystemUpdate,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "Atualizações",
+                subtitle = "Checar novas versões no GitHub e histórico de patches (v${CampusRepositoryHolder.CURRENT_APP_VERSION})",
+                onClick = { activeDestination = ProfileDestination.UPDATES }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            )
+            SettingsMenuRow(
+                icon = Icons.AutoMirrored.Outlined.HelpOutline,
+                iconTint = DepartmentMathBlue,
+                title = "FAQ & Ajuda",
+                subtitle = "Dúvidas frequentes e informações sobre o funcionamento offline",
+                onClick = { activeDestination = ProfileDestination.FAQ }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            )
+            SettingsMenuRow(
+                icon = Icons.AutoMirrored.Outlined.ExitToApp,
+                iconTint = StatusAbsentRed,
+                title = "Sair da conta",
+                subtitle = "Fazer backup protegido por senha e encerrar sessão neste aparelho",
+                onClick = {
+                    logoutBackupPassword = ""
+                    logoutBackupError = null
+                    logoutBackupSavedPath = null
+                    logoutBackupShareUri = null
+                    logoutStep = LogoutStep.BACKUP_PROMPT
+                }
+            )
+        }
+    }
+
+    val renderDestinationPane: @Composable (ProfileDestination) -> Unit = { destination ->
+        when (destination) {
+            ProfileDestination.METRICS_CRE -> {
+                ProfileMetricsAndCreTab(
+                    profileSummary = profileSummary,
+                    currentDisciplines = currentDisciplines,
+                    creReport = creReport,
+                    isImportingTranscript = isImportingTranscript,
+                    transcriptFeedbackMessage = transcriptFeedbackMessage,
+                    transcriptFeedbackIsError = transcriptFeedbackIsError,
+                    onImportTranscriptPdf = {
+                        transcriptPdfPickerLauncher.launch(arrayOf("application/pdf"))
+                    },
+                    onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
+                    onSelectTranscriptEntry = { entry ->
+                        editingTranscriptEntry = entry
+                    }
                 )
-                .navigationBarsPadding()
-                .padding(bottom = 136.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            }
+
+            ProfileDestination.SETTINGS -> {
+                ProfileSettingsTab(
+                    repository = repository,
+                    activeSemester = activeSemester,
+                    mutationVersion = mutationVersion,
+                    studentProfile = studentProfile,
+                    profileSummary = profileSummary,
+                    exportFolderLabel = exportFolderConfig.displayLabel,
+                    activeSection = activeSettingsSection,
+                    onSelectSection = { activeSettingsSection = it },
+                    themeController = themeController,
+                    accessibilityController = accessibilityController,
+                    onAppSecurityChanged = onAppSecurityChanged,
+                    onBackupRestored = { avatarRevision += 1 },
+                    onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
+                    onReplayGuidedTour = onReplayGuidedTour,
+                    onSelectCampus = { campusId ->
+                        repository.setActiveCampus(campusId)
+                        repository.refreshWeatherIfNeeded(force = false)
+                    },
+                    isRefreshingWeather = isRefreshingWeather,
+                    weatherFeedback = weatherFeedback,
+                    onRefreshWeather = {
+                        isRefreshingWeather = true
+                        weatherFeedback = null
+                        scope.launch {
+                            val updated = withContext(Dispatchers.IO) {
+                                repository.refreshWeatherIfNeeded(force = true)
+                            }
+                            isRefreshingWeather = false
+                            weatherFeedback =
+                                "Clima atualizado: ${updated.city} · ${updated.weatherTempC} °C (${updated.weatherCondition})"
+                        }
+                    },
+                    isImportingPdf = isImportingPdf,
+                    pdfFeedbackMessage = pdfFeedbackMessage,
+                    pdfFeedbackIsError = pdfFeedbackIsError,
+                    onImportEnrollmentPdf = {
+                        pdfPickerLauncher.launch(arrayOf("application/pdf"))
+                    },
+                    isImportingTranscript = isImportingTranscript,
+                    transcriptFeedbackMessage = transcriptFeedbackMessage,
+                    transcriptFeedbackIsError = transcriptFeedbackIsError,
+                    onImportTranscriptPdf = {
+                        transcriptPdfPickerLauncher.launch(arrayOf("application/pdf"))
+                    },
+                    onOpenShareSchedule = { showShareScheduleSheet = true },
+                    backupStatusMessage = backupStatusMessage,
+                    onExportLocalBackup = {
+                        backupStatusMessage =
+                            "Cópia local dos dados do semestre $activeSemester atualizada neste aparelho."
+                    },
+                    isAdminUnlocked = isAdminUnlocked,
+                    adminPinInput = adminPinInput,
+                    onAdminPinChange = { adminPinInput = it },
+                    onUnlockAdmin = {
+                        val unlocked = repository.unlockAdminMode(adminPinInput)
+                        if (unlocked) {
+                            adminPinInput = ""
+                            adminFeedbackIsError = false
+                            adminFeedbackMessage =
+                                "Modo administrador desbloqueado. Agora você pode importar o calendário em PDF."
+                        } else {
+                            adminFeedbackIsError = true
+                            adminFeedbackMessage = "PIN inválido. Acesso administrador negado."
+                        }
+                    },
+                    isPublishingCalendarPdf = isPublishingCalendarPdf,
+                    onPublishCalendarPdf = { targetSemester ->
+                        adminTargetSemester = targetSemester
+                        adminCalendarPdfLauncher.launch(arrayOf("application/pdf"))
+                    },
+                    isExportingCalendarJson = isExportingCalendarJson,
+                    onExportCalendarJson = { targetSemester ->
+                        val defaultFileName =
+                            "calendario_ufop_${targetSemester.replace(".", "_")}.ufopcal.json"
+                        exportCalendarJsonLauncher.launch(defaultFileName)
+                    },
+                    isImportingCalendarJson = isImportingCalendarJson,
+                    onImportCalendarJson = {
+                        importCalendarJsonLauncher.launch(arrayOf("*/*"))
+                    },
+                    activePkg = pendingCalendarUpdate ?: lastPublishedPackage,
+                    adminFeedbackMessage = adminFeedbackMessage,
+                    adminFeedbackIsError = adminFeedbackIsError
+                )
+            }
+
+            ProfileDestination.UPDATES -> {
+                ProfileUpdatesSubView(
+                    onOpenReleaseNotes = onOpenReleaseNotes,
+                    onCheckForUpdates = onCheckForUpdates
+                )
+            }
+
+            ProfileDestination.FAQ -> {
+                ProfileFaqSubView()
+            }
+        }
+    }
+
+    if (adaptive.useTwoPaneLayout) {
+        val rightDestination = activeDestination ?: ProfileDestination.METRICS_CRE
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            when (activeDestination) {
-                null -> {
-                    // Header principal do Perfil
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "APP INDEPENDENTE PARA ESTUDANTES",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Perfil",
-                            style = MaterialTheme.typography.headlineLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.semantics { heading() }
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Identidade Acadêmica · Semestre $activeSemester",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            Column(
+                modifier = Modifier
+                    .weight(0.38f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, end = 12.dp, top = 20.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = adaptive.bottomContentPaddingDp.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                renderOverviewPane()
+            }
 
-                    // Banner de Atualização Pendente do Calendário Acadêmico UFOP
-                    if (pendingCalendarUpdate != null) {
-                        PendingCalendarUpdateBanner(
-                            pkg = pendingCalendarUpdate,
-                            onApply = {
-                                val appliedCount = repository.applyPendingCalendarUpdate()
-                                calendarUpdateAppliedMessage =
-                                    "Calendário ${pendingCalendarUpdate.semester} atualizado com sucesso ($appliedCount eventos aplicados)."
-                            }
-                        )
-                    } else if (calendarUpdateAppliedMessage != null) {
-                        StatusFeedbackBanner(
-                            message = calendarUpdateAppliedMessage!!,
-                            isError = false,
-                            onDismiss = { calendarUpdateAppliedMessage = null }
-                        )
-                    }
+            if (adaptive.foldPosture == CampusFoldPosture.BOOK_VERTICAL_HINGE) {
+                Spacer(modifier = Modifier.width(adaptive.hingeWidthDp.coerceAtLeast(16).dp))
+            }
 
-                    // Card Hero Centralizado: Identidade Acadêmica
-                    AcademicIdentityCard(
-                        studentProfile = studentProfile,
-                        activeSemester = activeSemester,
-                        activeCampus = profileSummary.activeCampus,
-                        avatarBitmap = avatarBitmap,
-                        onEditProfile = { showEditProfileSheet = true }
+            Column(
+                modifier = Modifier
+                    .weight(0.62f)
+                    .fillMaxHeight()
+            ) {
+                if (rightDestination == ProfileDestination.SETTINGS && activeSettingsSection != null) {
+                    SettingsSubViewHeader(
+                        title = activeSettingsSection!!.title,
+                        backLabel = "Voltar para Configurações",
+                        onBack = { activeSettingsSection = null }
                     )
-
-                    // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, Atualizações, FAQ & Ajuda, Sair da conta)
-                    SettingsCategoryGroup(title = "Central do Perfil") {
-                        SettingsMenuRow(
-                            icon = Icons.Outlined.Analytics,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            title = "Métricas & CRE",
-                            subtitle = "CRE ${formatScore(creReport.overallCre, 2)} · ${profileSummary.totalAbsences}/${profileSummary.totalMaxAbsences} faltas · ${creReport.completedHours}/${creReport.totalRequiredHours}h",
-                            onClick = { activeDestination = ProfileDestination.METRICS_CRE }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
-                        )
-                        SettingsMenuRow(
-                            icon = Icons.Outlined.AccountTree,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            title = "Grade Dinâmica",
-                            subtitle = dynamicGridSubtitle,
-                            onClick = onOpenDynamicGrid
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
-                        )
-                        SettingsMenuRow(
-                            icon = Icons.Outlined.Settings,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            title = "Configurações",
-                            subtitle = "Personalização, segurança, acessibilidade, campus, PDFs, tour guiado e suporte",
-                            onClick = { activeDestination = ProfileDestination.SETTINGS }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
-                        )
-                        SettingsMenuRow(
-                            icon = Icons.Outlined.SystemUpdate,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            title = "Atualizações",
-                            subtitle = "Checar novas versões no GitHub e histórico de patches (v${CampusRepositoryHolder.CURRENT_APP_VERSION})",
-                            onClick = { activeDestination = ProfileDestination.UPDATES }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
-                        )
-                        SettingsMenuRow(
-                            icon = Icons.AutoMirrored.Outlined.HelpOutline,
-                            iconTint = DepartmentMathBlue,
-                            title = "FAQ & Ajuda",
-                            subtitle = "Dúvidas frequentes e informações sobre o funcionamento offline",
-                            onClick = { activeDestination = ProfileDestination.FAQ }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
-                        )
-                        SettingsMenuRow(
-                            icon = Icons.AutoMirrored.Outlined.ExitToApp,
-                            iconTint = StatusAbsentRed,
-                            title = "Sair da conta",
-                            subtitle = "Fazer backup protegido por senha e encerrar sessão neste aparelho",
-                            onClick = {
-                                logoutBackupPassword = ""
-                                logoutBackupError = null
-                                logoutBackupSavedPath = null
-                                logoutBackupShareUri = null
-                                logoutStep = LogoutStep.BACKUP_PROMPT
-                            }
-                        )
-                    }
+                } else {
+                    SettingsSubViewHeader(
+                        title = rightDestination.title,
+                        backLabel = "Voltar para Métricas & CRE",
+                        onBack = { activeDestination = ProfileDestination.METRICS_CRE }
+                    )
                 }
 
-                ProfileDestination.METRICS_CRE -> {
-                    ProfileMetricsAndCreTab(
-                        profileSummary = profileSummary,
-                        currentDisciplines = currentDisciplines,
-                        creReport = creReport,
-                        isImportingTranscript = isImportingTranscript,
-                        transcriptFeedbackMessage = transcriptFeedbackMessage,
-                        transcriptFeedbackIsError = transcriptFeedbackIsError,
-                        onImportTranscriptPdf = {
-                            transcriptPdfPickerLauncher.launch(arrayOf("application/pdf"))
-                        },
-                        onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
-                        onSelectTranscriptEntry = { entry ->
-                            editingTranscriptEntry = entry
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(contentScrollState)
+                        .padding(start = 12.dp, end = 20.dp, top = 14.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = adaptive.bottomContentPaddingDp.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    renderDestinationPane(rightDestination)
+                }
+            }
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            when {
+                activeDestination == ProfileDestination.METRICS_CRE -> {
+                    SettingsSubViewHeader(
+                        title = ProfileDestination.METRICS_CRE.title,
+                        backLabel = "Voltar para Perfil",
+                        onBack = { activeDestination = null }
+                    )
+                }
+                activeDestination == ProfileDestination.SETTINGS && activeSettingsSection == null -> {
+                    SettingsSubViewHeader(
+                        title = ProfileDestination.SETTINGS.title,
+                        backLabel = "Voltar para Perfil",
+                        onBack = { activeDestination = null }
+                    )
+                }
+                activeDestination == ProfileDestination.SETTINGS && activeSettingsSection != null -> {
+                    SettingsSubViewHeader(
+                        title = activeSettingsSection!!.title,
+                        backLabel = "Voltar para Configurações",
+                        onBack = { activeSettingsSection = null }
+                    )
+                }
+                activeDestination == ProfileDestination.UPDATES -> {
+                    SettingsSubViewHeader(
+                        title = ProfileDestination.UPDATES.title,
+                        backLabel = "Voltar para Perfil",
+                        onBack = { activeDestination = null }
+                    )
+                }
+                activeDestination == ProfileDestination.FAQ -> {
+                    SettingsSubViewHeader(
+                        title = ProfileDestination.FAQ.title,
+                        backLabel = "Voltar para Perfil",
+                        onBack = { activeDestination = null }
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (adaptive.widthClass == CampusWindowWidthClass.MEDIUM) {
+                            Modifier
+                                .widthIn(max = 720.dp)
+                                .fillMaxWidth()
+                        } else {
+                            Modifier.fillMaxWidth()
                         }
                     )
-                }
-
-                ProfileDestination.SETTINGS -> {
-                    ProfileSettingsTab(
-                        repository = repository,
-                        activeSemester = activeSemester,
-                        mutationVersion = mutationVersion,
-                        studentProfile = studentProfile,
-                        profileSummary = profileSummary,
-                        exportFolderLabel = exportFolderConfig.displayLabel,
-                        activeSection = activeSettingsSection,
-                        onSelectSection = { activeSettingsSection = it },
-                        themeController = themeController,
-                        accessibilityController = accessibilityController,
-                        onAppSecurityChanged = onAppSecurityChanged,
-                        onBackupRestored = { avatarRevision += 1 },
-                        onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
-                        onReplayGuidedTour = onReplayGuidedTour,
-                        onSelectCampus = { campusId ->
-                            repository.setActiveCampus(campusId)
-                            repository.refreshWeatherIfNeeded(force = false)
-                        },
-                        isRefreshingWeather = isRefreshingWeather,
-                        weatherFeedback = weatherFeedback,
-                        onRefreshWeather = {
-                            isRefreshingWeather = true
-                            weatherFeedback = null
-                            scope.launch {
-                                val updated = withContext(Dispatchers.IO) {
-                                    repository.refreshWeatherIfNeeded(force = true)
-                                }
-                                isRefreshingWeather = false
-                                weatherFeedback =
-                                    "Clima atualizado: ${updated.city} · ${updated.weatherTempC} °C (${updated.weatherCondition})"
-                            }
-                        },
-                        isImportingPdf = isImportingPdf,
-                        pdfFeedbackMessage = pdfFeedbackMessage,
-                        pdfFeedbackIsError = pdfFeedbackIsError,
-                        onImportEnrollmentPdf = {
-                            pdfPickerLauncher.launch(arrayOf("application/pdf"))
-                        },
-                        isImportingTranscript = isImportingTranscript,
-                        transcriptFeedbackMessage = transcriptFeedbackMessage,
-                        transcriptFeedbackIsError = transcriptFeedbackIsError,
-                        onImportTranscriptPdf = {
-                            transcriptPdfPickerLauncher.launch(arrayOf("application/pdf"))
-                        },
-                        onOpenShareSchedule = { showShareScheduleSheet = true },
-                        backupStatusMessage = backupStatusMessage,
-                        onExportLocalBackup = {
-                            backupStatusMessage =
-                                "Cópia local dos dados do semestre $activeSemester atualizada neste aparelho."
-                        },
-                        isAdminUnlocked = isAdminUnlocked,
-                        adminPinInput = adminPinInput,
-                        onAdminPinChange = { adminPinInput = it },
-                        onUnlockAdmin = {
-                            val unlocked = repository.unlockAdminMode(adminPinInput)
-                            if (unlocked) {
-                                adminPinInput = ""
-                                adminFeedbackIsError = false
-                                adminFeedbackMessage =
-                                    "Modo administrador desbloqueado. Agora você pode importar o calendário em PDF."
-                            } else {
-                                adminFeedbackIsError = true
-                                adminFeedbackMessage = "PIN inválido. Acesso administrador negado."
-                            }
-                        },
-                        isPublishingCalendarPdf = isPublishingCalendarPdf,
-                        onPublishCalendarPdf = { targetSemester ->
-                            adminTargetSemester = targetSemester
-                            adminCalendarPdfLauncher.launch(arrayOf("application/pdf"))
-                        },
-                        isExportingCalendarJson = isExportingCalendarJson,
-                        onExportCalendarJson = { targetSemester ->
-                            val defaultFileName =
-                                "calendario_ufop_${targetSemester.replace(".", "_")}.ufopcal.json"
-                            exportCalendarJsonLauncher.launch(defaultFileName)
-                        },
-                        isImportingCalendarJson = isImportingCalendarJson,
-                        onImportCalendarJson = {
-                            importCalendarJsonLauncher.launch(arrayOf("*/*"))
-                        },
-                        activePkg = pendingCalendarUpdate ?: lastPublishedPackage,
-                        adminFeedbackMessage = adminFeedbackMessage,
-                        adminFeedbackIsError = adminFeedbackIsError
+                    .verticalScroll(contentScrollState)
+                    .padding(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = if (activeDestination == null) 20.dp else 14.dp
                     )
-                }
-
-                ProfileDestination.UPDATES -> {
-                    ProfileUpdatesSubView(
-                        onOpenReleaseNotes = onOpenReleaseNotes,
-                        onCheckForUpdates = onCheckForUpdates
-                    )
-                }
-
-                ProfileDestination.FAQ -> {
-                    ProfileFaqSubView()
+                    .navigationBarsPadding()
+                    .padding(bottom = adaptive.bottomContentPaddingDp.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                when (val dest = activeDestination) {
+                    null -> renderOverviewPane()
+                    else -> renderDestinationPane(dest)
                 }
             }
         }
@@ -983,13 +1072,23 @@ fun ProfilePlaceholderScreen(
             },
             onSave = { updated, matchedCourse ->
                 repository.saveStudentProfile(updated)
-                if (matchedCourse != null && shouldApplyCatalogRequiredHours(
+                val earliestSem = resolveEarliestSemester(
+                    creReport.semesters.map { it.semester }
+                )
+                val resolvedMatched = matchedCourse?.let { found ->
+                    UfopCurriculumCatalog.resolveCourseForStudent(
+                        baseCourse = found,
+                        registrationNumber = updated.registrationNumber,
+                        earliestTranscriptSemester = earliestSem
+                    )
+                }
+                if (resolvedMatched != null && shouldApplyCatalogRequiredHours(
                         repository = repository,
                         registrationNumber = updated.registrationNumber,
-                        course = matchedCourse
+                        course = resolvedMatched
                     )
                 ) {
-                    repository.setTotalRequiredHours(matchedCourse.chTotal)
+                    repository.setTotalRequiredHours(resolvedMatched.chTotal)
                 }
                 showEditProfileSheet = false
             }
@@ -2632,18 +2731,38 @@ private fun ProfileSettingsTab(
     val catalogCourses by produceState<List<UfopCourseCurriculum>>(initialValue = emptyList()) {
         value = withContext(Dispatchers.IO) { UfopCurriculumCatalog.getAllCourses(context) }
     }
-    val matchedCourse = remember(catalogCourses, studentProfile.courseName, studentProfile.campusName) {
+    val earliestTranscriptSemester = remember(repository, mutationVersion) {
+        resolveEarliestSemester(repository.getAcademicCreReport().semesters.map { it.semester })
+    }
+    val matchedCourse = remember(
+        catalogCourses,
+        studentProfile.courseName,
+        studentProfile.campusName,
+        studentProfile.registrationNumber,
+        earliestTranscriptSemester
+    ) {
         if (studentProfile.courseName.isBlank()) {
             null
         } else {
-            UfopCurriculumCatalog.findCourse(catalogCourses, studentProfile.courseName, studentProfile.campusName)
+            UfopCurriculumCatalog.findCourse(
+                catalogCourses,
+                studentProfile.courseName,
+                studentProfile.campusName
+            )?.let { found ->
+                UfopCurriculumCatalog.resolveCourseForStudent(
+                    baseCourse = found,
+                    registrationNumber = studentProfile.registrationNumber,
+                    earliestTranscriptSemester = earliestTranscriptSemester
+                )
+            }
         }
     }
 
     val matrixSubtitle = remember(matchedCourse, studentProfile.courseName) {
         when {
             matchedCourse != null && matchedCourse.subjects.isNotEmpty() -> {
-                "${matchedCourse.code} · ${matchedCourse.subjects.size} componentes · ${formatCurriculumHours(matchedCourse.chTotal)}h"
+                val versionSuffix = matchedCourse.curriculumVersion.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+                "${matchedCourse.code}$versionSuffix · ${matchedCourse.subjects.size} componentes · ${formatCurriculumHours(matchedCourse.chTotal)}h"
             }
             matchedCourse != null -> {
                 "${matchedCourse.code} · ${matchedCourse.name} · ${formatCurriculumHours(matchedCourse.chTotal)}h"

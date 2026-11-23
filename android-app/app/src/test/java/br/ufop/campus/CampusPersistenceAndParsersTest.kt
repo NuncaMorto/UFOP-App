@@ -1208,6 +1208,113 @@ class CampusPersistenceAndParsersTest {
         assertEquals(0, freshStudent.unmatchedTranscriptCodesCount)
     }
 
+    @Test
+    fun resolveCourseForStudent_selectsAut2024_1Or2026_2ByEntryAndKeepsLegacyFlagForUnversionedCourses() {
+        val assetFile = listOf(
+            File("src/main/assets/ufop_matrizes_2026_2.json"),
+            File("app/src/main/assets/ufop_matrizes_2026_2.json"),
+            File("android-app/app/src/main/assets/ufop_matrizes_2026_2.json")
+        ).firstOrNull { it.exists() }
+        assertNotNull("Asset ufop_matrizes_2026_2.json must exist", assetFile)
+        val courses = UfopCurriculumCatalog.loadFromJsonString(assetFile!!.readText(Charsets.UTF_8))
+
+        val autBase = UfopCurriculumCatalog.findCourse(courses, "AUT")
+        assertNotNull(autBase)
+        val autVersions = UfopCurriculumCatalog.getCourseVersions(autBase!!)
+        assertEquals(2, autVersions.size)
+
+        // 1. AUT com matrícula 24.1.4001 -> retorna 2024/1 (Currículo 2) (3610h, 49 disciplinas) e isLegacyMatrixMismatch == false
+        val aut2024ByReg = UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse = autBase,
+            registrationNumber = "24.1.4001",
+            earliestTranscriptSemester = null
+        )
+        assertEquals("2024/1 (Currículo 2)", aut2024ByReg.curriculumVersion)
+        assertEquals(3610, aut2024ByReg.chTotal)
+        assertEquals(2670, aut2024ByReg.chMandatory)
+        assertEquals(300, aut2024ByReg.chElective)
+        assertEquals(640, aut2024ByReg.chActivities)
+        assertEquals(49, aut2024ByReg.subjects.size)
+        val compatAut2024 = checkCurriculumCompatibility(
+            registrationNumber = "24.1.4001",
+            earliestTranscriptSemester = null,
+            transcriptCourseCodes = setOf("MTM122", "BCC201", "CAT311"),
+            course = aut2024ByReg
+        )
+        assertFalse(compatAut2024.isLegacyMatrixMismatch)
+        assertEquals("2024/1", compatAut2024.studentEntryLabel)
+        assertEquals("2024/1 (Currículo 2)", compatAut2024.matrixVersionLabel)
+
+        // 2. AUT com matrícula 25.2.9999 ou histórico "2024.1" -> retorna 2024/1 (Currículo 2) e isLegacyMatrixMismatch == false
+        val aut2025ByReg = UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse = autBase,
+            registrationNumber = "25.2.9999",
+            earliestTranscriptSemester = null
+        )
+        assertEquals("2024/1 (Currículo 2)", aut2025ByReg.curriculumVersion)
+        assertEquals(3610, aut2025ByReg.chTotal)
+        assertEquals(49, aut2025ByReg.subjects.size)
+        assertFalse(
+            checkCurriculumCompatibility(
+                registrationNumber = "25.2.9999",
+                earliestTranscriptSemester = null,
+                transcriptCourseCodes = emptySet(),
+                course = aut2025ByReg
+            ).isLegacyMatrixMismatch
+        )
+
+        val aut2024ByTranscript = UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse = autBase,
+            registrationNumber = "",
+            earliestTranscriptSemester = "2024.1"
+        )
+        assertEquals("2024/1 (Currículo 2)", aut2024ByTranscript.curriculumVersion)
+        assertEquals(3610, aut2024ByTranscript.chTotal)
+        assertEquals(49, aut2024ByTranscript.subjects.size)
+        assertFalse(
+            checkCurriculumCompatibility(
+                registrationNumber = "",
+                earliestTranscriptSemester = "2024.1",
+                transcriptCourseCodes = emptySet(),
+                course = aut2024ByTranscript
+            ).isLegacyMatrixMismatch
+        )
+
+        // 3. AUT com matrícula 26.1.1234 -> retorna versão 2026/2 (3390h) e isLegacyMatrixMismatch == false
+        val aut2026 = UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse = autBase,
+            registrationNumber = "26.1.1234",
+            earliestTranscriptSemester = "2026.1"
+        )
+        assertEquals(autBase.curriculumVersion, aut2026.curriculumVersion)
+        assertEquals(3390, aut2026.chTotal)
+        val compatAut2026 = checkCurriculumCompatibility(
+            registrationNumber = "26.1.1234",
+            earliestTranscriptSemester = "2026.1",
+            transcriptCourseCodes = emptySet(),
+            course = aut2026
+        )
+        assertFalse(compatAut2026.isLegacyMatrixMismatch)
+        assertEquals(autBase.curriculumVersion, compatAut2026.matrixVersionLabel)
+
+        // 4. Curso sem matriz histórica 2024 cadastrada (COM) com 24.1.4001 continua retornando isLegacyMatrixMismatch == true
+        val comBase = UfopCurriculumCatalog.findCourse(courses, "COM")
+        assertNotNull(comBase)
+        val comResolved = UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse = comBase!!,
+            registrationNumber = "24.1.4001",
+            earliestTranscriptSemester = "2024.1"
+        )
+        assertEquals(comBase.curriculumVersion, comResolved.curriculumVersion)
+        val compatCom2024 = checkCurriculumCompatibility(
+            registrationNumber = "24.1.4001",
+            earliestTranscriptSemester = "2024.1",
+            transcriptCourseCodes = emptySet(),
+            course = comResolved
+        )
+        assertTrue(compatCom2024.isLegacyMatrixMismatch)
+    }
+
     // ── 15. Sprint 12: Rigorous Syllabus Validation (wrong course, partial, complete) ──────────
 
     @Test

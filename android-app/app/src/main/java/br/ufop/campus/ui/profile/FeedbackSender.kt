@@ -24,7 +24,7 @@ import java.util.UUID
  * em mensagens de status ou em erros.
  */
 
-private const val FEEDBACK_APP_VERSION = "1.9.11"
+private const val FEEDBACK_APP_VERSION = "1.9.12"
 private const val MAX_SCREENSHOTS = 3
 private const val MAX_SCREENSHOT_SIDE_PX = 1280
 private const val SCREENSHOT_JPEG_QUALITY = 75

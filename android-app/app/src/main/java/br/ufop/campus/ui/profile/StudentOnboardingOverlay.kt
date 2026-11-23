@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -177,9 +178,14 @@ internal fun shouldApplyCatalogRequiredHours(
     registrationNumber: String,
     course: UfopCourseCurriculum
 ): Boolean {
-    if (course.chTotal <= 0) return false
     val creReport = repository.getAcademicCreReport()
     val earliestSemester = resolveEarliestSemester(creReport.semesters.map { it.semester })
+    val resolvedCourse = UfopCurriculumCatalog.resolveCourseForStudent(
+        baseCourse = course,
+        registrationNumber = registrationNumber,
+        earliestTranscriptSemester = earliestSemester
+    )
+    if (resolvedCourse.chTotal <= 0) return false
     val transcriptCodes = buildSet {
         creReport.semesters.forEach { sem ->
             sem.courses.forEach { entry ->
@@ -192,7 +198,7 @@ internal fun shouldApplyCatalogRequiredHours(
         registrationNumber = registrationNumber,
         earliestTranscriptSemester = earliestSemester,
         transcriptCourseCodes = transcriptCodes,
-        course = course
+        course = resolvedCourse
     )
     return !compatibility.isLegacyMatrixMismatch
 }
@@ -664,13 +670,23 @@ fun StudentOnboardingOverlay(
             campusHint = selectedCampus
         )
         val trimmedReg = registrationNumber.trim()
-        if (matched != null && shouldApplyCatalogRequiredHours(
+        val earliestSemester = resolveEarliestSemester(
+            repository.getAcademicCreReport().semesters.map { it.semester }
+        )
+        val resolvedCourse = matched?.let {
+            UfopCurriculumCatalog.resolveCourseForStudent(
+                baseCourse = it,
+                registrationNumber = trimmedReg,
+                earliestTranscriptSemester = earliestSemester
+            )
+        }
+        if (resolvedCourse != null && shouldApplyCatalogRequiredHours(
                 repository = repository,
                 registrationNumber = trimmedReg,
-                course = matched
+                course = resolvedCourse
             )
         ) {
-            repository.setTotalRequiredHours(matched.chTotal)
+            repository.setTotalRequiredHours(resolvedCourse.chTotal)
         }
         val latest = repository.getStudentProfile()
         val draftProfile = latest.copy(
@@ -754,7 +770,16 @@ fun StudentOnboardingOverlay(
                             context = context,
                             courseNameOrCode = importedProfile.courseName,
                             campusHint = importedProfile.campusName
-                        )
+                        )?.let { found ->
+                            val earliestSem = resolveEarliestSemester(
+                                repository.getAcademicCreReport().semesters.map { it.semester }
+                            )
+                            UfopCurriculumCatalog.resolveCourseForStudent(
+                                baseCourse = found,
+                                registrationNumber = importedProfile.registrationNumber,
+                                earliestTranscriptSemester = earliestSem
+                            )
+                        }
                         if (matchedCurriculum != null && shouldApplyCatalogRequiredHours(
                                 repository = repository,
                                 registrationNumber = importedProfile.registrationNumber,
@@ -952,15 +977,21 @@ fun StudentOnboardingOverlay(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             // Corpo rolável da etapa ativa
-            Column(
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.TopCenter
             ) {
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 560.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -1074,7 +1105,8 @@ fun StudentOnboardingOverlay(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
             }
         }
     }

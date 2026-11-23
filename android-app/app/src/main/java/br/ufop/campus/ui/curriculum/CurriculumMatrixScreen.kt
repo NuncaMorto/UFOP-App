@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -89,6 +90,7 @@ import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.normalizeUfopPortugueseText
 import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -229,6 +231,7 @@ fun CurriculumMatrixModal(
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
     val a11y = LocalCampusAccessibility.current.settings
+    val adaptive = LocalCampusAdaptiveLayout.current
     val minTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
     val mutationVersion by repository.mutationVersion.collectAsState()
 
@@ -266,8 +269,48 @@ fun CurriculumMatrixModal(
         }
     }
 
-    val selectedCourse = remember(catalogCourses, selectedCourseCode) {
+    val baseCourse = remember(catalogCourses, selectedCourseCode) {
         catalogCourses.firstOrNull { it.code == selectedCourseCode }
+    }
+
+    val earliestTranscriptSemester = remember(creReport) {
+        resolveEarliestTranscriptSemester(creReport.semesters.map { it.semester })
+    }
+
+    val availableVersions = remember(baseCourse) {
+        baseCourse?.let { UfopCurriculumCatalog.getCourseVersions(it) }.orEmpty()
+    }
+
+    val defaultResolvedVersion = remember(
+        baseCourse,
+        studentProfile.registrationNumber,
+        earliestTranscriptSemester
+    ) {
+        baseCourse?.let {
+            UfopCurriculumCatalog.resolveCourseForStudent(
+                baseCourse = it,
+                registrationNumber = studentProfile.registrationNumber,
+                earliestTranscriptSemester = earliestTranscriptSemester
+            )
+        }
+    }
+
+    var selectedCurriculumVersion by rememberSaveable(
+        selectedCourseCode,
+        defaultResolvedVersion?.curriculumVersion
+    ) {
+        mutableStateOf(defaultResolvedVersion?.curriculumVersion)
+    }
+
+    val selectedCourse = remember(
+        availableVersions,
+        selectedCurriculumVersion,
+        defaultResolvedVersion,
+        baseCourse
+    ) {
+        availableVersions.firstOrNull { it.curriculumVersion == selectedCurriculumVersion }
+            ?: defaultResolvedVersion
+            ?: baseCourse
     }
 
     // Cross-reference Histórico Escolar & Semestre ativo
@@ -305,10 +348,6 @@ fun CurriculumMatrixModal(
         }
 
         Triple(approved, inProgress, allCodes)
-    }
-
-    val earliestTranscriptSemester = remember(creReport) {
-        resolveEarliestTranscriptSemester(creReport.semesters.map { it.semester })
     }
 
     val compatibility = remember(
@@ -407,116 +446,189 @@ fun CurriculumMatrixModal(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
+                .navigationBarsPadding(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // Top Bar
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .fillMaxSize()
+                    .widthIn(max = 960.dp)
             ) {
-                Surface(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(minTouchTarget),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                // Top Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Surface(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(minTouchTarget),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = "Voltar",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "MATRIZ CURRICULAR · ${selectedCourse?.curriculumVersion?.ifBlank { "2026/2" } ?: "2026/2"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = selectedCourse?.let { "${it.code} · ${normalizeCurriculumDisplayName(it.name)}" } ?: "Carregando matrizes...",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() }
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { showCoursePickerDialog = true },
+                        enabled = catalogCourses.isNotEmpty(),
+                        modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                        shape = RoundedCornerShape(999.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "${catalogCourses.size.takeIf { it > 0 } ?: 54} cursos",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Voltar",
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Selecionar curso",
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "MATRIZ CURRICULAR · 2026/2",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = selectedCourse?.let { "${it.code} · ${normalizeCurriculumDisplayName(it.name)}" } ?: "Carregando matrizes...",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.semantics { heading() }
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { showCoursePickerDialog = true },
-                    enabled = catalogCourses.isNotEmpty(),
-                    modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
-                    shape = RoundedCornerShape(999.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "${catalogCourses.size.takeIf { it > 0 } ?: 54} cursos",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Selecionar curso",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            if (catalogCourses.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                if (catalogCourses.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = "Carregando catálogo curricular...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else if (selectedCourse != null) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 136.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    if (compatibility != null && compatibility.isLegacyMatrixMismatch) {
-                        item(key = "legacy_consultation_banner") {
-                            LegacyMatrixConsultationBanner(compatibility = compatibility)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CircularProgressIndicator()
+                            Text(
+                                text = "Carregando catálogo curricular...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
+                } else if (selectedCourse != null) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 8.dp,
+                            bottom = adaptive.bottomContentPaddingDp.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (availableVersions.size > 1) {
+                            item(key = "curriculum_version_selector") {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Versão da matriz curricular",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            availableVersions.forEach { version ->
+                                                val isVersionSelected =
+                                                    version.curriculumVersion == selectedCourse.curriculumVersion
+                                                val versionLabel = version.curriculumVersion.ifBlank { "2026/2 (Currículo 3)" }
+                                                FilterChip(
+                                                    selected = isVersionSelected,
+                                                    onClick = {
+                                                        selectedCurriculumVersion = version.curriculumVersion
+                                                    },
+                                                    label = {
+                                                        Text(
+                                                            text = versionLabel,
+                                                            fontWeight = if (isVersionSelected) {
+                                                                FontWeight.Bold
+                                                            } else {
+                                                                FontWeight.Medium
+                                                            }
+                                                        )
+                                                    },
+                                                    leadingIcon = if (isVersionSelected) {
+                                                        {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                                            )
+                                                        }
+                                                    } else {
+                                                        null
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
-                    // Resumo oficial do curso
-                    item(key = "course_header") {
-                        CourseWorkloadSummaryCard(
-                            course = selectedCourse,
-                            evaluatedSubjects = evaluatedSubjects,
-                            isConsultationMode = isConsultationMode,
-                            isDark = isDark
-                        )
-                    }
+                        if (compatibility != null && compatibility.isLegacyMatrixMismatch) {
+                            item(key = "legacy_consultation_banner") {
+                                LegacyMatrixConsultationBanner(compatibility = compatibility)
+                            }
+                        }
+
+                        // Resumo oficial do curso
+                        item(key = "course_header") {
+                            CourseWorkloadSummaryCard(
+                                course = selectedCourse,
+                                evaluatedSubjects = evaluatedSubjects,
+                                isConsultationMode = isConsultationMode,
+                                isDark = isDark
+                            )
+                        }
 
                     if (confirmationBanner != null) {
                         item(key = "confirmation_banner") {
@@ -688,9 +800,9 @@ fun CurriculumMatrixModal(
                         } else {
                             items(
                                 items = groupedSections,
-                                key = { (groupTitle, _) -> "${selectedCourse.code}_${groupMode.name}_$groupTitle" }
+                                key = { (groupTitle, _) -> "${selectedCourse.code}_${selectedCourse.curriculumVersion}_${groupMode.name}_$groupTitle" }
                             ) { (groupTitle, itemsInGroup) ->
-                                val groupKey = "${selectedCourse.code}_${groupMode.name}_$groupTitle"
+                                val groupKey = "${selectedCourse.code}_${selectedCourse.curriculumVersion}_${groupMode.name}_$groupTitle"
                                 val defaultOpen = isSearching || groupTitle.startsWith("1º") || groupTitle.startsWith("2º")
                                 val isExpanded = expandedGroups[groupKey] ?: defaultOpen
 
@@ -715,6 +827,7 @@ fun CurriculumMatrixModal(
                     }
                 }
             }
+        }
         }
     }
 

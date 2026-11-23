@@ -34,8 +34,28 @@ data class UfopCourseCurriculum(
     val chActivities: Int,
     val chTotal: Int,
     val status: String,
-    val subjects: List<UfopCurriculumSubject>
-)
+    val subjects: List<UfopCurriculumSubject>,
+    val effectiveFromYear: Int = 2026,
+    val effectiveFromSemester: Int = 1,
+    val effectiveUntilYear: Int? = null,
+    val effectiveUntilSemester: Int? = null
+) {
+    fun containsEntryTerm(year: Int, semester: Int): Boolean {
+        val entryKey = year * 10 + semester
+        val fromKey = effectiveFromYear * 10 + effectiveFromSemester
+        if (entryKey < fromKey) return false
+        val untilYear = effectiveUntilYear ?: return true
+        val untilSem = effectiveUntilSemester ?: 2
+        val untilKey = untilYear * 10 + untilSem
+        return entryKey <= untilKey
+    }
+
+    fun isEntryBeforeEffectiveStart(year: Int, semester: Int): Boolean {
+        val entryKey = year * 10 + semester
+        val fromKey = effectiveFromYear * 10 + effectiveFromSemester
+        return entryKey < fromKey
+    }
+}
 
 data class CurriculumCompatibilityStatus(
     val isLegacyMatrixMismatch: Boolean,
@@ -45,8 +65,6 @@ data class CurriculumCompatibilityStatus(
 )
 
 private const val MATRIX_REFERENCE_VERSION_LABEL = "2026/2"
-private const val MATRIX_CUTOFF_YEAR = 2026
-private const val MATRIX_CUTOFF_SEMESTER = 1
 
 private val ANCHORED_ENROLLMENT_3_PART_REGEX =
     Regex("""^\s*(\d{2}|\d{4})\s*[./-]\s*([12])\s*[./-]\s*\d{2,6}\s*$""")
@@ -107,10 +125,8 @@ fun checkCurriculumCompatibility(
 
     val studentEntryLabel = effectiveEntry?.let { (year, sem) -> "$year/$sem" }
 
-    val isLegacyByEntry = effectiveEntry != null && (
-        effectiveEntry.first < MATRIX_CUTOFF_YEAR ||
-            (effectiveEntry.first == MATRIX_CUTOFF_YEAR && effectiveEntry.second < MATRIX_CUTOFF_SEMESTER)
-        )
+    val isLegacyByEntry = effectiveEntry != null &&
+        course.isEntryBeforeEffectiveStart(effectiveEntry.first, effectiveEntry.second)
 
     val normalizedTranscriptCodes = transcriptCourseCodes
         .asSequence()
@@ -144,7 +160,7 @@ fun checkCurriculumCompatibility(
     return CurriculumCompatibilityStatus(
         isLegacyMatrixMismatch = isLegacyByEntry || hasRelevantCodeDivergence,
         studentEntryLabel = studentEntryLabel,
-        matrixVersionLabel = MATRIX_REFERENCE_VERSION_LABEL,
+        matrixVersionLabel = course.curriculumVersion.ifBlank { MATRIX_REFERENCE_VERSION_LABEL },
         unmatchedTranscriptCodesCount = unmatchedCount
     )
 }
@@ -165,6 +181,123 @@ object UfopCurriculumCatalog {
 
     @Volatile
     private var cachedCourses: List<UfopCourseCurriculum>? = null
+
+    private fun mapDepartmentCodeForSubjectCode(subjectCode: String): String {
+        val prefix = subjectCode.trim().takeWhile { it.isLetter() }.uppercase()
+        return when (prefix) {
+            "BCC" -> "DECOM"
+            "ARQ" -> "DEARQ"
+            "CSO" -> "DECSO"
+            "MTM" -> "DEMAT"
+            "QUI" -> "DEQUI"
+            "EST" -> "DEEST"
+            "FIS" -> "DEFIS"
+            "CAT" -> "DECAT"
+            "MEC" -> "DEMEC"
+            "CIV" -> "DECIV"
+            "MET" -> "DEMET"
+            "MIN" -> "DEMIN"
+            "DIR" -> "DEDIR"
+            "PRO" -> "DEPRO"
+            "AMB" -> "DEAMB"
+            else -> "UFOP"
+        }
+    }
+
+    val engControleAutomacao2024_1: UfopCourseCurriculum by lazy {
+        val subjects = DynamicCurriculumCatalog.engControleAutomacao2024_1.courses
+            .filter { !it.isElective }
+            .map { node ->
+                val deptCode = mapDepartmentCodeForSubjectCode(node.code)
+                UfopCurriculumSubject(
+                    code = node.code,
+                    name = node.name,
+                    departmentId = deptCode.lowercase(),
+                    departmentCode = deptCode,
+                    period = node.period,
+                    type = "Obrigatória",
+                    chs = node.workloadHours,
+                    che = 0,
+                    cha = node.workloadHours,
+                    weeklyTheory = (node.workloadHours / 15).coerceAtLeast(1),
+                    weeklyPractice = 0,
+                    prerequisites = node.prerequisites
+                )
+            }
+
+        UfopCourseCurriculum(
+            code = "AUT",
+            name = "Engenharia de Controle e Automação",
+            degree = "Bacharelado",
+            campus = "Ouro Preto",
+            curriculumVersion = "2024/1 (Currículo 2)",
+            chMandatory = 2670,
+            chOptional = 0,
+            chElective = 300,
+            chExtension = 0,
+            chActivities = 640,
+            chTotal = 3610,
+            status = "Vigente para ingressantes 2024/1–2025/2",
+            subjects = subjects,
+            effectiveFromYear = 2024,
+            effectiveFromSemester = 1,
+            effectiveUntilYear = 2025,
+            effectiveUntilSemester = 2
+        )
+    }
+
+    val historicalCourseVersions: Map<String, List<UfopCourseCurriculum>> by lazy {
+        mapOf(
+            "AUT" to listOf(engControleAutomacao2024_1)
+        )
+    }
+
+    fun getCourseVersions(baseCourse: UfopCourseCurriculum): List<UfopCourseCurriculum> {
+        val codeKey = baseCourse.code.trim().uppercase()
+        val historical = historicalCourseVersions[codeKey].orEmpty()
+        if (historical.isEmpty()) return listOf(baseCourse)
+
+        val combined = ArrayList<UfopCourseCurriculum>(historical.size + 1)
+        historical.forEach { version ->
+            if (combined.none { it.curriculumVersion == version.curriculumVersion }) {
+                combined.add(version)
+            }
+        }
+        if (combined.none { it.curriculumVersion == baseCourse.curriculumVersion }) {
+            combined.add(baseCourse)
+        }
+        return combined.sortedWith(
+            compareBy<UfopCourseCurriculum> { it.effectiveFromYear }
+                .thenBy { it.effectiveFromSemester }
+        )
+    }
+
+    fun resolveCourseForStudent(
+        baseCourse: UfopCourseCurriculum,
+        registrationNumber: String,
+        earliestTranscriptSemester: String? = null
+    ): UfopCourseCurriculum {
+        val versions = getCourseVersions(baseCourse)
+        if (versions.size <= 1) return baseCourse
+
+        val regEntry = parseEnrollmentYearSemester(registrationNumber)
+        val txEntry = parseSemesterYearTerm(earliestTranscriptSemester)
+        val effectiveEntry = listOfNotNull(regEntry, txEntry)
+            .minWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
+            ?: return baseCourse
+
+        val exactMatch = versions.lastOrNull {
+            it.containsEntryTerm(effectiveEntry.first, effectiveEntry.second)
+        }
+        if (exactMatch != null) return exactMatch
+
+        val oldest = versions.first()
+        if (oldest.isEntryBeforeEffectiveStart(effectiveEntry.first, effectiveEntry.second)) {
+            return oldest
+        }
+
+        return baseCourse
+    }
 
     fun getAllCourses(context: Context): List<UfopCourseCurriculum> {
         cachedCourses?.let { return it }

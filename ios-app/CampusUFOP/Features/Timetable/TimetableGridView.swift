@@ -6,6 +6,7 @@ public struct TimetableGridView: View {
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedFilter: String = "Todas"
     @State private var hideEmptyHours: Bool = true
@@ -19,10 +20,14 @@ public struct TimetableGridView: View {
         self.onClose = onClose
     }
 
+    private var isRegular: Bool { horizontalSizeClass == .regular }
     private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
     private var isHorizontalOrientation: Bool { store.timetableOrientation == "horizontal" }
+    private var verticalColWidth: CGFloat { isRegular ? 136 : 112 }
+    private var horizontalColWidth: CGFloat { isRegular ? 144 : 124 }
+    private var cellSpacing: CGFloat { isRegular ? 10 : 8 }
 
     private var todayWeekdayShort: String? {
         let wd = Calendar.current.component(.weekday, from: Date())
@@ -305,8 +310,8 @@ public struct TimetableGridView: View {
         let primary = resolvedAccent.primary(for: colorScheme)
 
         return ScrollView(.horizontal, showsIndicators: false) {
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
+            VStack(spacing: cellSpacing) {
+                HStack(spacing: cellSpacing) {
                     Text("HORÁRIO")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
@@ -317,13 +322,13 @@ public struct TimetableGridView: View {
                         Text(isToday ? "\(day) •" : day)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(isToday ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                            .frame(width: 112, height: 32)
+                            .frame(width: verticalColWidth, height: 32)
                             .liquidGlassCapsule(selected: isToday, accent: primary, interactive: false, highContrast: hc)
                     }
                 }
 
                 ForEach(timeRanges, id: \.self) { range in
-                    HStack(spacing: 8) {
+                    HStack(spacing: cellSpacing) {
                         Text(range.replacingOccurrences(of: "–", with: "\n"))
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
@@ -332,7 +337,7 @@ public struct TimetableGridView: View {
                         ForEach(weekdays, id: \.self) { day in
                             let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
                             gridCellView(cell: match, isTodayColumn: day == todayWeekdayShort)
-                                .frame(width: 112, height: 74)
+                                .frame(width: verticalColWidth, height: 74)
                         }
                     }
                 }
@@ -348,8 +353,8 @@ public struct TimetableGridView: View {
         let primary = resolvedAccent.primary(for: colorScheme)
 
         return ScrollView(.horizontal, showsIndicators: false) {
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
+            VStack(spacing: cellSpacing) {
+                HStack(spacing: cellSpacing) {
                     Text("DIA")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
@@ -359,14 +364,14 @@ public struct TimetableGridView: View {
                         Text(range)
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                            .frame(width: 124, height: 32)
+                            .frame(width: horizontalColWidth, height: 32)
                             .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
                     }
                 }
 
                 ForEach(weekdays, id: \.self) { day in
                     let isToday = day == todayWeekdayShort
-                    HStack(spacing: 8) {
+                    HStack(spacing: cellSpacing) {
                         Text(isToday ? "\(day)\nHOJE" : day)
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .multilineTextAlignment(.center)
@@ -380,7 +385,7 @@ public struct TimetableGridView: View {
                         ForEach(timeRanges, id: \.self) { range in
                             let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
                             gridCellView(cell: match, isTodayColumn: isToday)
-                                .frame(width: 124, height: 74)
+                                .frame(width: horizontalColWidth, height: 74)
                         }
                     }
                 }
@@ -426,6 +431,7 @@ public struct TimetableGridView: View {
                 )
             }
             .buttonStyle(.plain)
+            .campusHoverLift()
             .accessibilityLabel("\(cell.disciplineShortName), \(cell.weekdayShort) \(cell.timeRange), \(roomSub)")
         } else {
             RoundedRectangle(cornerRadius: 12, style: .continuous)

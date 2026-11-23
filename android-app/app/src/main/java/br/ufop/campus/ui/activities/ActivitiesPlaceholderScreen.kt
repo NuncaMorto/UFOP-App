@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -97,7 +99,9 @@ import br.ufop.campus.ui.components.defaultTodayIsoDate
 import br.ufop.campus.ui.disciplines.DisciplineDetailBottomSheet
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
 import br.ufop.campus.ui.disciplines.normalizeAssessmentDateInput
+import br.ufop.campus.ui.theme.CampusWindowWidthClass
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -158,6 +162,7 @@ fun ActivitiesPlaceholderScreen(
     }
 
     val isDark = LocalCampusThemeController.current.isDark
+    val adaptive = LocalCampusAdaptiveLayout.current
     val a11y = LocalCampusAccessibility.current.settings
     val minTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
     val snackbarHostState = remember { SnackbarHostState() }
@@ -226,6 +231,8 @@ fun ActivitiesPlaceholderScreen(
     val completedCount = allSemesterEntries.count { it.assessment.completed }
     val selectedCourseLabel = disciplines.find { it.courseId == selectedFilterCourseId }?.name
         ?: "Todas as disciplinas"
+    val useTwoColumnCards = adaptive.widthClass != CampusWindowWidthClass.COMPACT
+    val activityRows = remember(filteredEntries) { filteredEntries.chunked(2) }
 
     Box(
         modifier = modifier
@@ -233,8 +240,24 @@ fun ActivitiesPlaceholderScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 136.dp),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxHeight()
+                .then(
+                    if (adaptive.widthClass != CampusWindowWidthClass.COMPACT) {
+                        Modifier
+                            .widthIn(max = 960.dp)
+                            .fillMaxWidth()
+                    } else {
+                        Modifier.fillMaxSize()
+                    }
+                ),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                end = 20.dp,
+                top = 20.dp,
+                bottom = adaptive.bottomContentPaddingDp.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -719,6 +742,38 @@ fun ActivitiesPlaceholderScreen(
                         )
                     }
                 }
+            } else if (useTwoColumnCards) {
+                items(
+                    items = activityRows,
+                    key = { row -> "act_row_${row.joinToString("_") { it.assessment.id }}" }
+                ) { rowEntries ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        rowEntries.forEach { entry ->
+                            Box(modifier = Modifier.weight(1f)) {
+                                ConsolidatedAssessmentCard(
+                                    entry = entry,
+                                    courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
+                                    isDark = isDark,
+                                    minTouchTarget = minTouchTarget,
+                                    onToggleCompleted = {
+                                        repository.toggleAssessmentCompleted(
+                                            assessmentId = entry.assessment.id,
+                                            completed = !entry.assessment.completed
+                                        )
+                                    },
+                                    onClick = { activeAssessmentDetailId = entry.assessment.id }
+                                )
+                            }
+                        }
+                        if (rowEntries.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             } else {
                 items(
                     items = filteredEntries,
@@ -1089,6 +1144,7 @@ private fun CreateAssessmentBottomSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val isDark = LocalCampusThemeController.current.isDark
+    val adaptive = LocalCampusAdaptiveLayout.current
     val a11y = LocalCampusAccessibility.current.settings
     val minTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

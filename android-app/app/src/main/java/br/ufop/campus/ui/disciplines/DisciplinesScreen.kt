@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -86,7 +87,9 @@ import br.ufop.campus.core.ffi.CourseScheduleSlotItem
 import br.ufop.campus.core.ffi.DepartmentColorOption
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
 import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
+import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.parseHexColor
@@ -107,6 +110,7 @@ fun DisciplinesScreen(
     val mutationVersion by repository.mutationVersion.collectAsState()
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
+    val adaptive = LocalCampusAdaptiveLayout.current
     val a11y = LocalCampusAccessibility.current.settings
     val minTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
     val actionButtonVisualHeight = if (a11y.largeTouchTargets) minTouchTarget else 37.dp
@@ -118,23 +122,31 @@ fun DisciplinesScreen(
     var showDepartmentMenu by remember { mutableStateOf(false) }
     var showSemesterMenu by remember { mutableStateOf(false) }
     var showCurriculumMatrix by remember { mutableStateOf(false) }
-    val gridRows = remember(uiState.disciplines) { uiState.disciplines.chunked(2) }
+    val activeDetail = uiState.activeDetail
+    val showSideDetail = adaptive.useTwoPaneLayout && activeDetail != null
+    val columns = adaptive.disciplineGridColumns(hasSideDetailOpen = showSideDetail)
+    val gridRows = remember(uiState.disciplines, columns) {
+        uiState.disciplines.chunked(columns)
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = if (a11y.largeTouchTargets) 18.dp else 14.dp,
-                bottom = 136.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(if (a11y.largeTouchTargets) 12.dp else 10.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = if (a11y.largeTouchTargets) 18.dp else 14.dp,
+                    bottom = adaptive.bottomContentPaddingDp.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(if (a11y.largeTouchTargets) 12.dp else 10.dp)
+            ) {
             // Header da Aba Disciplinas
             item(key = "disciplines_header") {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -520,7 +532,7 @@ fun DisciplinesScreen(
             } else {
                 items(
                     items = gridRows,
-                    key = { row -> "grid_${row.joinToString("_") { it.courseId }}" },
+                    key = { row -> "grid_${columns}_${row.joinToString("_") { it.courseId }}" },
                     contentType = { "discipline_grid_row" }
                 ) { rowCards ->
                     Row(
@@ -546,7 +558,8 @@ fun DisciplinesScreen(
                                 )
                             }
                         }
-                        if (rowCards.size == 1) {
+                        val missingColumns = (columns - rowCards.size).coerceAtLeast(0)
+                        repeat(missingColumns) {
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     }
@@ -581,11 +594,102 @@ fun DisciplinesScreen(
                     Spacer(modifier = Modifier.navigationBarsPadding())
                 }
             }
+            }
+
+            if (adaptive.useTwoPaneLayout && activeDetail != null) {
+                if (adaptive.foldPosture == CampusFoldPosture.BOOK_VERTICAL_HINGE) {
+                    Spacer(modifier = Modifier.width(adaptive.hingeWidthDp.coerceAtLeast(16).dp))
+                }
+                DisciplineDetailPaneContent(
+                    detail = activeDetail,
+                    modifier = Modifier
+                        .weight(1f)
+                        .widthIn(min = 340.dp, max = 480.dp)
+                        .fillMaxHeight(),
+                    onDismiss = { viewModel.dismissDisciplineDetail() },
+                    onSaveNotes = { updatedNotes ->
+                        viewModel.saveDisciplineNotes(
+                            courseId = activeDetail.summary.courseId,
+                            notes = updatedNotes
+                        )
+                    },
+                    onToggleAssessmentCompleted = { assessmentId, completed ->
+                        viewModel.toggleAssessmentCompleted(
+                            assessmentId = assessmentId,
+                            completed = completed
+                        )
+                    },
+                    onCreateAssessment = { title, kind, dueDate, dueTime ->
+                        viewModel.createAssessment(
+                            courseId = activeDetail.summary.courseId,
+                            title = title,
+                            kind = kind,
+                            dueDate = dueDate,
+                            dueTime = dueTime
+                        )
+                    },
+                    onDeleteAssessment = { assessmentId ->
+                        viewModel.deleteAssessment(assessmentId)
+                    },
+                    scheduleSlots = uiState.activeDetailSlots,
+                    absenceHistory = uiState.activeDetailHistory,
+                    onAddScheduleSlot = { dayOfWeek, startTime, endTime, building, room, shortLocation ->
+                        viewModel.addScheduleSlot(
+                            courseId = activeDetail.summary.courseId,
+                            dayOfWeek = dayOfWeek,
+                            startTime = startTime,
+                            endTime = endTime,
+                            building = building,
+                            room = room,
+                            shortLocation = shortLocation
+                        )
+                    },
+                    onUpdateScheduleSlot = { slotId, dayOfWeek, startTime, endTime, building, room, shortLocation ->
+                        viewModel.updateScheduleSlot(
+                            slotId = slotId,
+                            dayOfWeek = dayOfWeek,
+                            startTime = startTime,
+                            endTime = endTime,
+                            building = building,
+                            room = room,
+                            shortLocation = shortLocation
+                        )
+                    },
+                    onDeleteScheduleSlot = { slotId ->
+                        viewModel.deleteScheduleSlot(slotId)
+                    },
+                    onDeleteCourse = {
+                        viewModel.deleteCourse(activeDetail.summary.courseId)
+                    },
+                    onUpdateAbsences = { newTotal ->
+                        viewModel.updateCourseAbsences(activeDetail.summary.courseId, newTotal)
+                    },
+                    onUpdateCourseDetails = { name, professor, departmentId, workloadHours ->
+                        viewModel.updateCourseDetails(
+                            courseId = activeDetail.summary.courseId,
+                            name = name,
+                            professor = professor,
+                            departmentId = departmentId,
+                            workloadHours = workloadHours
+                        )
+                    },
+                    onUpdateAssessment = { assessmentId, courseId, title, kind, dueDate, dueTime, completed ->
+                        viewModel.updateAssessment(
+                            assessmentId = assessmentId,
+                            courseId = courseId,
+                            title = title,
+                            kind = kind,
+                            dueDate = dueDate,
+                            dueTime = dueTime,
+                            completed = completed
+                        )
+                    }
+                )
+            }
         }
 
-        // Bottom Sheet de Detalhe da Disciplina
-        val activeDetail = uiState.activeDetail
-        if (activeDetail != null) {
+        // Bottom Sheet de Detalhe da Disciplina (somente quando não estiver em layout de 2 painéis)
+        if (activeDetail != null && !adaptive.useTwoPaneLayout) {
             DisciplineDetailBottomSheet(
                 detail = activeDetail,
                 onDismiss = { viewModel.dismissDisciplineDetail() },

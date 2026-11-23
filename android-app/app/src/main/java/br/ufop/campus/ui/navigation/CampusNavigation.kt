@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +56,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -71,7 +80,9 @@ import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.agenda.AgendaScreen
 import br.ufop.campus.ui.profile.ReleaseNotesDialog
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.rememberCampusAdaptiveLayout
 import br.ufop.campus.ui.update.AppUpdateDialog
 import br.ufop.campus.ui.update.InAppUpdateBanner
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +127,7 @@ fun CampusNavigation(
 
     val isDark = LocalCampusThemeController.current.isDark
     val a11y = LocalCampusAccessibility.current.settings
+    val adaptive = rememberCampusAdaptiveLayout()
     val mutationVersion by repository.mutationVersion.collectAsState()
     val appUpdateState by AppUpdateManager.state.collectAsState()
     val isUpdateDialogOpen by AppUpdateManager.isDialogOpen.collectAsState()
@@ -138,6 +150,49 @@ fun CampusNavigation(
 
     val tabBounds = remember { mutableStateMapOf<CampusTab, Rect>() }
 
+    val handleSelectTab: (CampusTab) -> Unit = { tab ->
+        showTimetableModal = false
+        showDynamicGridModal = false
+        selectedTab = tab
+    }
+
+    val renderActiveTabContent: @Composable () -> Unit = {
+        when (selectedTab) {
+            CampusTab.AGENDA -> {
+                AgendaScreen(repository = repository)
+            }
+            CampusTab.DISCIPLINES -> {
+                br.ufop.campus.ui.disciplines.DisciplinesScreen(
+                    repository = repository,
+                    onOpenTimetable = { showTimetableModal = true }
+                )
+            }
+            CampusTab.ACTIVITIES -> {
+                br.ufop.campus.ui.activities.ActivitiesPlaceholderScreen(
+                    repository = repository
+                )
+            }
+            CampusTab.PROFILE -> {
+                br.ufop.campus.ui.profile.ProfilePlaceholderScreen(
+                    repository = repository,
+                    onOpenReleaseNotes = { showReleaseNotesDialog = true },
+                    onOpenDynamicGrid = { showDynamicGridModal = true },
+                    onReplayGuidedTour = {
+                        CampusRepositoryHolder.setGuidedTourCompleted(context, repository, false)
+                        selectedTab = CampusTab.AGENDA
+                        tourReplayTrigger += 1
+                    },
+                    onCheckForUpdates = {
+                        AppUpdateManager.checkForUpdates(context, force = true)
+                        AppUpdateManager.openUpdateDialog()
+                    },
+                    onAppSecurityChanged = onAppSecurityChanged,
+                    onExitApp = onExitApp
+                )
+            }
+        }
+    }
+
     LaunchedEffect(selectedTab) {
         if (selectedTab != CampusTab.DISCIPLINES && showTimetableModal) {
             showTimetableModal = false
@@ -154,156 +209,355 @@ fun CampusNavigation(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    CompositionLocalProvider(LocalCampusAdaptiveLayout provides adaptive) {
         Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .onPreviewKeyEvent { event ->
+                    if (!studentProfile.onboardingCompleted) return@onPreviewKeyEvent false
+                    if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
+                        val targetTab = when (event.key) {
+                            Key.One, Key.NumPad1 -> CampusTab.AGENDA
+                            Key.Two, Key.NumPad2 -> CampusTab.DISCIPLINES
+                            Key.Three, Key.NumPad3 -> CampusTab.ACTIVITIES
+                            Key.Four, Key.NumPad4 -> CampusTab.PROFILE
+                            else -> null
+                        }
+                        if (targetTab != null) {
+                            handleSelectTab(targetTab)
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+        ) {
+            if (adaptive.useNavigationRail) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    CampusNavigationRail(
+                        selectedTab = selectedTab,
+                        expanded = adaptive.useExpandedRail,
+                        isDark = isDark,
+                        reduceMotion = a11y.reduceMotion,
+                        avatarPath = studentProfile.avatarPath,
+                        studentName = studentProfile.fullName,
+                        avatarRefreshKey = mutationVersion,
+                        onSelectTab = handleSelectTab,
+                        onTabPositioned = { tab, rect ->
+                            tabBounds[tab] = rect
+                        }
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .statusBarsPadding()
+                    ) {
+                        renderActiveTabContent()
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                ) {
+                    renderActiveTabContent()
+                }
+
+                // IHC-03 Scrim Inferior sob a Barra Flutuante para transição suave de rolagem
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(108.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
+                                    MaterialTheme.colorScheme.background
+                                )
+                            )
+                        )
+                )
+
+                FloatingCampusNavigationBar(
+                    selectedTab = selectedTab,
+                    isDark = isDark,
+                    reduceMotion = a11y.reduceMotion,
+                    avatarPath = studentProfile.avatarPath,
+                    studentName = studentProfile.fullName,
+                    avatarRefreshKey = mutationVersion,
+                    onSelectTab = handleSelectTab,
+                    onTabPositioned = { tab, rect ->
+                        tabBounds[tab] = rect
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+
+            if (showTimetableModal) {
+                br.ufop.campus.ui.timetable.TimetableModalScreen(
+                    repository = repository,
+                    onDismiss = { showTimetableModal = false }
+                )
+            }
+
+            if (showDynamicGridModal) {
+                br.ufop.campus.ui.curriculum.DynamicCurriculumGridScreen(
+                    repository = repository,
+                    onDismiss = { showDynamicGridModal = false }
+                )
+            }
+
+            if (shouldShowGuidedTour) {
+                GuidedTourOverlay(
+                    tabBounds = tabBounds,
+                    onSelectTab = handleSelectTab,
+                    onFinish = {
+                        CampusRepositoryHolder.setGuidedTourCompleted(context, repository, true)
+                        tourDismissTick += 1
+                    }
+                )
+            }
+
+            if (!studentProfile.onboardingCompleted) {
+                br.ufop.campus.ui.profile.StudentOnboardingOverlay(
+                    repository = repository,
+                    onCompleted = { onboardingRefreshTick += 1 }
+                )
+            }
+
+            if (showReleaseNotesDialog) {
+                ReleaseNotesDialog(
+                    onDismiss = {
+                        showReleaseNotesDialog = false
+                        CampusRepositoryHolder.setLastSeenReleaseVersion(
+                            context = context,
+                            repository = repository,
+                            version = CampusRepositoryHolder.CURRENT_APP_VERSION
+                        )
+                    }
+                )
+            }
+
+            if (studentProfile.onboardingCompleted && !shouldShowGuidedTour) {
+                InAppUpdateBanner(
+                    state = appUpdateState,
+                    onOpenDetails = { AppUpdateManager.openUpdateDialog() },
+                    onDismissBanner = { AppUpdateManager.dismissBannerForCurrentRelease(context) },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+
+            if (isUpdateDialogOpen) {
+                AppUpdateDialog(
+                    state = appUpdateState,
+                    onDismiss = { AppUpdateManager.closeUpdateDialog() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CampusNavigationRail(
+    selectedTab: CampusTab,
+    expanded: Boolean,
+    isDark: Boolean,
+    reduceMotion: Boolean,
+    avatarPath: String?,
+    studentName: String,
+    avatarRefreshKey: Any,
+    onSelectTab: (CampusTab) -> Unit,
+    onTabPositioned: (CampusTab, Rect) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val avatarBitmap by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = avatarPath,
+        key2 = avatarRefreshKey
+    ) {
+        value = if (avatarPath.isNullOrBlank()) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                decodeNavAvatarBitmap(avatarPath, maxSizePx = 96)
+            }
+        }
+    }
+
+    val railWidth = if (expanded) 196.dp else 84.dp
+    val railBg = MaterialTheme.colorScheme.surface.copy(
+        alpha = if (isDark) 0.92f else 0.96f
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(railWidth),
+        color = railBg,
+        tonalElevation = 2.dp
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = if (expanded) 12.dp else 8.dp, vertical = 16.dp),
+            horizontalAlignment = if (expanded) Alignment.Start else Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            when (selectedTab) {
-                CampusTab.AGENDA -> {
-                    AgendaScreen(repository = repository)
-                }
-                CampusTab.DISCIPLINES -> {
-                    br.ufop.campus.ui.disciplines.DisciplinesScreen(
-                        repository = repository,
-                        onOpenTimetable = { showTimetableModal = true }
+            if (expanded) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "VIDA ACADÊMICA",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                }
-                CampusTab.ACTIVITIES -> {
-                    br.ufop.campus.ui.activities.ActivitiesPlaceholderScreen(
-                        repository = repository
-                    )
-                }
-                CampusTab.PROFILE -> {
-                    br.ufop.campus.ui.profile.ProfilePlaceholderScreen(
-                        repository = repository,
-                        onOpenReleaseNotes = { showReleaseNotesDialog = true },
-                        onOpenDynamicGrid = { showDynamicGridModal = true },
-                        onReplayGuidedTour = {
-                            CampusRepositoryHolder.setGuidedTourCompleted(context, repository, false)
-                            selectedTab = CampusTab.AGENDA
-                            tourReplayTrigger += 1
-                        },
-                        onCheckForUpdates = {
-                            AppUpdateManager.checkForUpdates(context, force = true)
-                            AppUpdateManager.openUpdateDialog()
-                        },
-                        onAppSecurityChanged = onAppSecurityChanged,
-                        onExitApp = onExitApp
+                    Text(
+                        text = "UFOP",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
-        }
 
-        // IHC-03 Scrim Inferior sob a Barra Flutuante para transição suave de rolagem
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(108.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
-                            MaterialTheme.colorScheme.background
-                        )
-                    )
+            CampusTab.values().forEach { tab ->
+                val isSelected = selectedTab == tab
+                val pillColor by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+                    } else {
+                        Color.Transparent
+                    },
+                    animationSpec = if (reduceMotion) snap() else spring(),
+                    label = "RailNavPillBg_${tab.name}"
                 )
-        )
+                val itemColor by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    animationSpec = if (reduceMotion) snap() else spring(),
+                    label = "RailNavContent_${tab.name}"
+                )
 
-        FloatingCampusNavigationBar(
-            selectedTab = selectedTab,
-            isDark = isDark,
-            reduceMotion = a11y.reduceMotion,
-            avatarPath = studentProfile.avatarPath,
-            studentName = studentProfile.fullName,
-            avatarRefreshKey = mutationVersion,
-            onSelectTab = { tab ->
-                showTimetableModal = false
-                showDynamicGridModal = false
-                selectedTab = tab
-            },
-            onTabPositioned = { tab, rect ->
-                tabBounds[tab] = rect
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 56.dp)
+                        .onGloballyPositioned { coords ->
+                            onTabPositioned(tab, coords.boundsInRoot())
+                        }
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(pillColor)
+                        .semantics {
+                            selected = isSelected
+                            contentDescription = "Aba ${tab.label}"
+                        }
+                        .clickable(
+                            role = Role.Tab,
+                            onClick = { onSelectTab(tab) }
+                        )
+                        .padding(
+                            horizontal = if (expanded) 14.dp else 6.dp,
+                            vertical = if (expanded) 12.dp else 8.dp
+                        ),
+                    contentAlignment = if (expanded) Alignment.CenterStart else Alignment.Center
+                ) {
+                    if (expanded) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (tab == CampusTab.PROFILE) {
+                                ProfileTabAvatarIcon(
+                                    avatarBitmap = avatarBitmap,
+                                    studentName = studentName,
+                                    isSelected = isSelected,
+                                    contentColor = itemColor
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = itemColor,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
 
-        if (showTimetableModal) {
-            br.ufop.campus.ui.timetable.TimetableModalScreen(
-                repository = repository,
-                onDismiss = { showTimetableModal = false }
-            )
-        }
+                            Text(
+                                text = tab.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = itemColor,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (tab == CampusTab.PROFILE) {
+                                ProfileTabAvatarIcon(
+                                    avatarBitmap = avatarBitmap,
+                                    studentName = studentName,
+                                    isSelected = isSelected,
+                                    contentColor = itemColor
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = itemColor,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
 
-        if (showDynamicGridModal) {
-            br.ufop.campus.ui.curriculum.DynamicCurriculumGridScreen(
-                repository = repository,
-                onDismiss = { showDynamicGridModal = false }
-            )
-        }
+                            Spacer(modifier = Modifier.height(4.dp))
 
-        if (shouldShowGuidedTour) {
-            GuidedTourOverlay(
-                tabBounds = tabBounds,
-                onSelectTab = { tab ->
-                    showTimetableModal = false
-                    showDynamicGridModal = false
-                    selectedTab = tab
-                },
-                onFinish = {
-                    CampusRepositoryHolder.setGuidedTourCompleted(context, repository, true)
-                    tourDismissTick += 1
+                            Text(
+                                text = tab.label,
+                                fontSize = 11.sp,
+                                lineHeight = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = itemColor,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
-            )
-        }
-
-        if (!studentProfile.onboardingCompleted) {
-            br.ufop.campus.ui.profile.StudentOnboardingOverlay(
-                repository = repository,
-                onCompleted = { onboardingRefreshTick += 1 }
-            )
-        }
-
-        if (showReleaseNotesDialog) {
-            ReleaseNotesDialog(
-                onDismiss = {
-                    showReleaseNotesDialog = false
-                    CampusRepositoryHolder.setLastSeenReleaseVersion(
-                        context = context,
-                        repository = repository,
-                        version = CampusRepositoryHolder.CURRENT_APP_VERSION
-                    )
-                }
-            )
-        }
-
-        if (studentProfile.onboardingCompleted && !shouldShowGuidedTour) {
-            InAppUpdateBanner(
-                state = appUpdateState,
-                onOpenDetails = { AppUpdateManager.openUpdateDialog() },
-                onDismissBanner = { AppUpdateManager.dismissBannerForCurrentRelease(context) },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            )
-        }
-
-        if (isUpdateDialogOpen) {
-            AppUpdateDialog(
-                state = appUpdateState,
-                onDismiss = { AppUpdateManager.closeUpdateDialog() }
-            )
+            }
         }
     }
 }

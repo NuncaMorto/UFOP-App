@@ -621,6 +621,22 @@ public extension View {
         frame(minHeight: minHeight)
             .contentShape(Rectangle())
     }
+
+    /// Limita a largura máxima de leitura em telas largas (iPadOS Regular Size Class) centralizando o conteúdo.
+    func campusReadableWidth(_ maxWidth: CGFloat = 820) -> some View {
+        frame(maxWidth: maxWidth)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// Efeito de elevação suave para trackpad/ponteiro no iPadOS.
+    @ViewBuilder
+    func campusHoverLift() -> some View {
+        #if os(iOS)
+        self.hoverEffect(.lift)
+        #else
+        self
+        #endif
+    }
 }
 
 public struct LiquidGlassPrimaryButton<Label: View>: View {

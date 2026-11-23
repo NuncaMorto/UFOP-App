@@ -64,8 +64,8 @@ android {
         applicationId = "io.github.nuncamorto.vidaacademica"
         minSdk = 26
         targetSdk = 35
-        versionCode = 28
-        versionName = "1.9.11"
+        versionCode = 29
+        versionName = "1.9.12"
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", "\"$feedbackEndpoint\"")
 
@@ -123,6 +123,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.window:window:1.3.0")
 
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")

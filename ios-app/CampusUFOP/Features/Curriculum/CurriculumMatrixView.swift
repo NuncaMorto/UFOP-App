@@ -14,8 +14,10 @@ public struct CurriculumMatrixView: View {
 
     @Environment(CampusAppearanceController.self) private var appearance
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedCourseCode: String = ""
+    @State private var selectedCurriculumVersion: String = ""
     @State private var searchQuery: String = ""
     @State private var showTranscriptPicker: Bool = false
     @State private var importError: String?
@@ -28,12 +30,67 @@ public struct CurriculumMatrixView: View {
         self.onClose = onClose
     }
 
-    private var selectedCourse: UfopCourseCurriculum? {
+    private var isRegular: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var earliestTranscriptSemester: String? {
+        store.transcriptEntries
+            .map { $0.semester.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .min { lhs, rhs in
+                let l = DynamicCurriculumCatalog.parseSemesterTerm(lhs)
+                let r = DynamicCurriculumCatalog.parseSemesterTerm(rhs)
+                switch (l, r) {
+                case let (.some(a), .some(b)):
+                    return (a.year, a.semester) < (b.year, b.semester)
+                case (.some, .none):
+                    return true
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    return lhs < rhs
+                }
+            }
+    }
+
+    private var baseCourse: UfopCourseCurriculum? {
         let courses = UfopCurriculumCatalog.allCourses
         if let exact = courses.first(where: { $0.code == selectedCourseCode }) {
             return exact
         }
         return UfopCurriculumCatalog.findCourse(matching: store.studentProfile.courseName) ?? courses.first
+    }
+
+    private var availableVersions: [UfopCourseCurriculum] {
+        guard let baseCourse else { return [] }
+        return UfopCurriculumCatalog.courseVersions(for: baseCourse)
+    }
+
+    private var selectedCourse: UfopCourseCurriculum? {
+        guard let baseCourse else { return nil }
+        if !selectedCurriculumVersion.isEmpty,
+           let matched = availableVersions.first(where: { $0.curriculumVersion == selectedCurriculumVersion }) {
+            return matched
+        }
+        return UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse: baseCourse,
+            registrationNumber: store.studentProfile.registrationNumber,
+            earliestTranscriptSemester: earliestTranscriptSemester
+        )
+    }
+
+    private func resolveInitialVersion(for course: UfopCourseCurriculum?) {
+        guard let course else {
+            selectedCurriculumVersion = ""
+            return
+        }
+        let resolved = UfopCurriculumCatalog.resolveCourseForStudent(
+            baseCourse: course,
+            registrationNumber: store.studentProfile.registrationNumber,
+            earliestTranscriptSemester: earliestTranscriptSemester
+        )
+        selectedCurriculumVersion = resolved.curriculumVersion
     }
 
     public var body: some View {
@@ -52,6 +109,7 @@ public struct CurriculumMatrixView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 10)
+                    .campusReadableWidth(isRegular ? 960 : .infinity)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
@@ -78,15 +136,23 @@ public struct CurriculumMatrixView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 30)
+                    .campusReadableWidth(isRegular ? 960 : .infinity)
                 }
             }
         }
         .onAppear {
             if selectedCourseCode.isEmpty {
-                selectedCourseCode = UfopCurriculumCatalog.findCourse(matching: store.studentProfile.courseName)?.code
-                    ?? UfopCurriculumCatalog.allCourses.first?.code
-                    ?? ""
+                let matched = UfopCurriculumCatalog.findCourse(matching: store.studentProfile.courseName)
+                    ?? UfopCurriculumCatalog.allCourses.first
+                selectedCourseCode = matched?.code ?? ""
+                resolveInitialVersion(for: matched)
+            } else if selectedCurriculumVersion.isEmpty {
+                resolveInitialVersion(for: baseCourse)
             }
+        }
+        .onChange(of: selectedCourseCode) { _, newCode in
+            let matched = UfopCurriculumCatalog.allCourses.first(where: { $0.code == newCode })
+            resolveInitialVersion(for: matched)
         }
         .fileImporter(
             isPresented: $showTranscriptPicker,
@@ -99,6 +165,7 @@ public struct CurriculumMatrixView: View {
                 let text = try SecurePdfProcessor.extractTextAndDeleteTemp(from: url)
                 let parsed = try UfopPdfParsers.parseTranscript(text: text)
                 _ = store.applyTranscriptImport(parsed)
+                resolveInitialVersion(for: baseCourse)
             } catch {
                 importError = error.localizedDescription
             }
@@ -151,6 +218,41 @@ public struct CurriculumMatrixView: View {
             .pickerStyle(.menu)
             .tint(accent)
 
+            if availableVersions.count > 1 {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Versão da matriz curricular")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(availableVersions, id: \.curriculumVersion) { version in
+                                let isSelected = course?.curriculumVersion == version.curriculumVersion
+                                Button {
+                                    withAnimation(.snappy) {
+                                        selectedCurriculumVersion = version.curriculumVersion
+                                    }
+                                } label: {
+                                    Text(version.curriculumVersion)
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundStyle(
+                                            isSelected
+                                                ? appearance.accentColor.onPrimary(for: colorScheme)
+                                                : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
+                                        )
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .liquidGlassCapsule(selected: isSelected, accent: accent, interactive: true, highContrast: highContrast)
+                                }
+                                .buttonStyle(.plain)
+                                .campusHoverLift()
+                                .minimumTouchTarget(appearance.accessibility.minTouchHeight)
+                            }
+                        }
+                    }
+                }
+            }
+
             if let course {
                 Text("\(course.degree) · \(course.curriculumVersion) · \(course.chTotal)h totais")
                     .font(.system(size: 12, weight: .medium))
@@ -163,7 +265,7 @@ public struct CurriculumMatrixView: View {
 
     @ViewBuilder
     private func legacyCompatibilityBanner(for course: UfopCourseCurriculum, highContrast: Bool) -> some View {
-        let earliestTx = store.transcriptEntries.map(\.semester).sorted().first
+        let earliestTx = earliestTranscriptSemester
         let txCodes = Set(store.transcriptEntries.map(\.code))
         let status = UfopCurriculumCatalog.checkCompatibility(
             registrationNumber: store.studentProfile.registrationNumber,
@@ -180,7 +282,7 @@ public struct CurriculumMatrixView: View {
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Atenção: Matriz Curricular Legada (< 2026/1)")
+                    Text("Atenção: Matriz Curricular Legada (< \(course.effectiveFromYear)/\(course.effectiveFromSemester))")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     Text("Ingresso detectado (\(status.studentEntryLabel ?? "anterior")) pode seguir PPC anterior ao currículo de referência \(status.matrixVersionLabel). Algumas disciplinas e pré-requisitos podem divergir.")

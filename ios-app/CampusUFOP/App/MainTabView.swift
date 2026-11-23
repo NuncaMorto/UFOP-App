@@ -29,6 +29,7 @@ public struct MainTabView: View {
     @Environment(CampusStore.self) private var store
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @Binding private var externalSelectedTab: CampusTab
     @State private var fallbackSelectedTab: CampusTab = .agenda
@@ -54,32 +55,115 @@ public struct MainTabView: View {
     public var body: some View {
         let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
 
-        TabView(selection: activeTabBinding) {
-            AgendaView(viewModel: resolvedAgendaViewModel)
-                .tabItem {
-                    Label(CampusTab.agenda.title, systemImage: CampusTab.agenda.systemImage)
-                }
-                .tag(CampusTab.agenda)
+        Group {
+            if #available(iOS 18.0, *) {
+                TabView(selection: activeTabBinding) {
+                    Tab(CampusTab.agenda.title, systemImage: CampusTab.agenda.systemImage, value: CampusTab.agenda) {
+                        AgendaView(viewModel: resolvedAgendaViewModel)
+                    }
 
-            DisciplinesView(viewModel: resolvedDisciplinesViewModel)
-                .tabItem {
-                    Label(CampusTab.disciplines.title, systemImage: CampusTab.disciplines.systemImage)
-                }
-                .tag(CampusTab.disciplines)
+                    Tab(CampusTab.disciplines.title, systemImage: CampusTab.disciplines.systemImage, value: CampusTab.disciplines) {
+                        DisciplinesView(viewModel: resolvedDisciplinesViewModel)
+                    }
 
-            ActivitiesView()
-                .tabItem {
-                    Label(CampusTab.activities.title, systemImage: CampusTab.activities.systemImage)
-                }
-                .tag(CampusTab.activities)
+                    Tab(CampusTab.activities.title, systemImage: CampusTab.activities.systemImage, value: CampusTab.activities) {
+                        ActivitiesView()
+                    }
 
-            ProfileView()
-                .tabItem {
-                    Label(CampusTab.profile.title, systemImage: CampusTab.profile.systemImage)
+                    Tab(CampusTab.profile.title, systemImage: CampusTab.profile.systemImage, value: CampusTab.profile) {
+                        ProfileView()
+                    }
                 }
-                .tag(CampusTab.profile)
+                .tabViewStyle(.sidebarAdaptable)
+            } else {
+                legacyAdaptiveContainer
+            }
         }
         .tint(accent)
+        .background(keyboardShortcutsLayer)
+    }
+
+    @ViewBuilder
+    private var legacyAdaptiveContainer: some View {
+        if horizontalSizeClass == .regular {
+            NavigationSplitView {
+                List(CampusTab.allCases, id: \.self, selection: Binding<CampusTab?>(
+                    get: { activeTabBinding.wrappedValue },
+                    set: { newValue in
+                        if let newValue {
+                            activeTabBinding.wrappedValue = newValue
+                        }
+                    }
+                )) { tab in
+                    Label(tab.title, systemImage: tab.systemImage)
+                        .tag(tab)
+                }
+                .navigationTitle("Vida Acadêmica")
+            } detail: {
+                tabDetailContent(for: activeTabBinding.wrappedValue)
+            }
+        } else {
+            TabView(selection: activeTabBinding) {
+                AgendaView(viewModel: resolvedAgendaViewModel)
+                    .tabItem {
+                        Label(CampusTab.agenda.title, systemImage: CampusTab.agenda.systemImage)
+                    }
+                    .tag(CampusTab.agenda)
+
+                DisciplinesView(viewModel: resolvedDisciplinesViewModel)
+                    .tabItem {
+                        Label(CampusTab.disciplines.title, systemImage: CampusTab.disciplines.systemImage)
+                    }
+                    .tag(CampusTab.disciplines)
+
+                ActivitiesView()
+                    .tabItem {
+                        Label(CampusTab.activities.title, systemImage: CampusTab.activities.systemImage)
+                    }
+                    .tag(CampusTab.activities)
+
+                ProfileView()
+                    .tabItem {
+                        Label(CampusTab.profile.title, systemImage: CampusTab.profile.systemImage)
+                    }
+                    .tag(CampusTab.profile)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tabDetailContent(for tab: CampusTab) -> some View {
+        switch tab {
+        case .agenda:
+            AgendaView(viewModel: resolvedAgendaViewModel)
+        case .disciplines:
+            DisciplinesView(viewModel: resolvedDisciplinesViewModel)
+        case .activities:
+            ActivitiesView()
+        case .profile:
+            ProfileView()
+        }
+    }
+
+    @ViewBuilder
+    private var keyboardShortcutsLayer: some View {
+        #if os(iOS)
+        VStack(spacing: 0) {
+            Button("") { activeTabBinding.wrappedValue = .agenda }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("") { activeTabBinding.wrappedValue = .disciplines }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("") { activeTabBinding.wrappedValue = .activities }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("") { activeTabBinding.wrappedValue = .profile }
+                .keyboardShortcut("4", modifiers: .command)
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
+        #else
+        EmptyView()
+        #endif
     }
 
     private var resolvedAgendaViewModel: AgendaViewModel {

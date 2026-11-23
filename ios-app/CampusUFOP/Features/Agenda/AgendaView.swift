@@ -4,11 +4,16 @@ public struct AgendaView: View {
     @Bindable public var viewModel: AgendaViewModel
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var commitmentToDelete: AgendaTimelineItem?
 
     public init(viewModel: AgendaViewModel) {
         self.viewModel = viewModel
+    }
+
+    private var isRegular: Bool {
+        horizontalSizeClass == .regular
     }
 
     private var accent: Color {
@@ -34,25 +39,53 @@ public struct AgendaView: View {
                 LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        headerSection(activeCampus: activeCampus, overview: overview)
+                    if isRegular {
+                        HStack(alignment: .top, spacing: 22) {
+                            VStack(alignment: .leading, spacing: 18) {
+                                headerSection(activeCampus: activeCampus, overview: overview)
 
-                        weekStripCard(overview: overview)
+                                weekStripCard(overview: overview)
 
-                        academicTermCard(banner: termBanner)
+                                academicTermCard(banner: termBanner)
 
-                        // Só exibe o anúncio separado se a próxima aula NÃO estiver no dia já visível abaixo (IHC Sprint 14)
-                        if let spotlight, spotlight.dateIso != overview.selectedDateIso {
-                            nextClassRedirectBanner(spotlight: spotlight)
+                                if let spotlight, spotlight.dateIso != overview.selectedDateIso {
+                                    nextClassRedirectBanner(spotlight: spotlight)
+                                }
+                            }
+                            .frame(width: 380)
+
+                            VStack(alignment: .leading, spacing: 18) {
+                                dayHeaderSection(overview: overview)
+
+                                timelineSection(items: overview.timelineItems, spotlight: spotlight, selectedDateIso: overview.selectedDateIso)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 32)
+                        .campusReadableWidth(1160)
+                    } else {
+                        VStack(alignment: .leading, spacing: 18) {
+                            headerSection(activeCampus: activeCampus, overview: overview)
 
-                        dayHeaderSection(overview: overview)
+                            weekStripCard(overview: overview)
 
-                        timelineSection(items: overview.timelineItems, spotlight: spotlight, selectedDateIso: overview.selectedDateIso)
+                            academicTermCard(banner: termBanner)
+
+                            // Só exibe o anúncio separado se a próxima aula NÃO estiver no dia já visível abaixo (IHC Sprint 14)
+                            if let spotlight, spotlight.dateIso != overview.selectedDateIso {
+                                nextClassRedirectBanner(spotlight: spotlight)
+                            }
+
+                            dayHeaderSection(overview: overview)
+
+                            timelineSection(items: overview.timelineItems, spotlight: spotlight, selectedDateIso: overview.selectedDateIso)
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.top, 12)
+                        .padding(.bottom, 32)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                    .padding(.bottom, 32)
                 }
             }
             #if os(iOS)
@@ -288,6 +321,7 @@ public struct AgendaView: View {
             )
         }
         .buttonStyle(.plain)
+        .campusHoverLift()
         .minimumTouchTarget(minTouch)
         .accessibilityLabel("\(chip.weekdayShort) \(chip.dayNumber)\(chip.isSelected ? ", selecionado" : "")")
     }
@@ -558,6 +592,7 @@ public struct AgendaView: View {
                 }
             }
             .buttonStyle(.plain)
+            .campusHoverLift()
         }
     }
 

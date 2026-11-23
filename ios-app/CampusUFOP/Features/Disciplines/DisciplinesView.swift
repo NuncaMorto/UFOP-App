@@ -5,14 +5,18 @@ public struct DisciplinesView: View {
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var searchQuery: String = ""
     @State private var isMatrixPresented: Bool = false
 
-    private let gridColumns: [GridItem] = [
-        GridItem(.flexible(minimum: 140), spacing: 12),
-        GridItem(.flexible(minimum: 140), spacing: 12)
-    ]
+    private var isRegular: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: isRegular ? 200 : 140), spacing: 12)]
+    }
 
     public init(viewModel: DisciplinesViewModel) {
         self.viewModel = viewModel
@@ -39,18 +43,42 @@ public struct DisciplinesView: View {
         ZStack {
             LiquidGlassBackdrop(accent: resolvedAccent, highContrast: hc)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    headerSection
-                    quickActionsRow
-                    filtersAndLayoutRow
-                    searchBarSection
-                    disciplinesCollectionSection
-                    footerLegendSection
+            HStack(alignment: .top, spacing: 0) {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        headerSection
+                        quickActionsRow
+                        filtersAndLayoutRow
+                        searchBarSection
+                        disciplinesCollectionSection
+                        footerLegendSection
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 18)
+                    .padding(.bottom, 108)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 108)
+
+                if isRegular, let detail = viewModel.activeDisciplineDetail {
+                    Divider()
+                        .overlay(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
+
+                    DisciplineDetailSheetView(
+                        detail: detail,
+                        store: viewModel.store,
+                        onUpdateNotes: { updatedNotes in
+                            viewModel.saveDisciplineNotes(disciplineId: detail.summary.id, notes: updatedNotes)
+                        },
+                        onDeleteCourse: {
+                            viewModel.deleteCourse(courseId: detail.summary.id)
+                        },
+                        onClose: {
+                            viewModel.dismissDisciplineDetail()
+                        }
+                    )
+                    .frame(width: 420)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
         }
         .sheet(item: selectedDisciplineBinding) { detail in
@@ -108,7 +136,7 @@ public struct DisciplinesView: View {
 
     private var selectedDisciplineBinding: Binding<DisciplineDetail?> {
         Binding(
-            get: { viewModel.activeDisciplineDetail },
+            get: { isRegular ? nil : viewModel.activeDisciplineDetail },
             set: { newValue in
                 if newValue == nil {
                     viewModel.dismissDisciplineDetail()
@@ -380,6 +408,7 @@ public struct DisciplinesView: View {
                         disciplineBarCard(card)
                     }
                     .buttonStyle(.plain)
+                    .campusHoverLift()
                     .id("bars-\(card.id)")
                 }
             }
@@ -392,6 +421,7 @@ public struct DisciplinesView: View {
                         disciplineGridCard(card)
                     }
                     .buttonStyle(.plain)
+                    .campusHoverLift()
                     .id("grid-\(card.id)")
                 }
             }

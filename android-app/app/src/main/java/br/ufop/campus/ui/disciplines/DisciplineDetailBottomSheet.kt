@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -146,6 +147,49 @@ private enum class SyllabusFeedbackTone {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
+fun DisciplineDetailPaneContent(
+    detail: DisciplineDetail,
+    onDismiss: () -> Unit,
+    onSaveNotes: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onToggleAssessmentCompleted: ((assessmentId: String, completed: Boolean) -> Unit)? = null,
+    onCreateAssessment: ((title: String, kind: String, dueDate: String, dueTime: String) -> Unit)? = null,
+    onDeleteAssessment: ((assessmentId: String) -> Unit)? = null,
+    scheduleSlots: List<CourseScheduleSlotItem>? = null,
+    absenceHistory: List<AbsenceHistoryEntry>? = null,
+    onAddScheduleSlot: ((dayOfWeek: Int, startTime: String, endTime: String, building: String, room: String, shortLocation: String) -> Result<CourseScheduleSlotItem>)? = null,
+    onUpdateScheduleSlot: ((slotId: String, dayOfWeek: Int, startTime: String, endTime: String, building: String, room: String, shortLocation: String) -> Result<CourseScheduleSlotItem>)? = null,
+    onDeleteScheduleSlot: ((slotId: String) -> Unit)? = null,
+    onDeleteCourse: (() -> Unit)? = null,
+    onImportSyllabusPdf: ((pdfBytes: ByteArray) -> Result<Int>)? = null,
+    onUpdateAbsences: ((totalAbsences: Int) -> Unit)? = null,
+    onUpdateCourseDetails: ((name: String, professor: String, departmentId: String, workloadHours: Int) -> Unit)? = null,
+    onUpdateAssessment: ((assessmentId: String, courseId: String, title: String, kind: String, dueDate: String, dueTime: String, completed: Boolean) -> Unit)? = null
+) {
+    DisciplineDetailBottomSheet(
+        detail = detail,
+        onDismiss = onDismiss,
+        onSaveNotes = onSaveNotes,
+        onToggleAssessmentCompleted = onToggleAssessmentCompleted,
+        onCreateAssessment = onCreateAssessment,
+        onDeleteAssessment = onDeleteAssessment,
+        scheduleSlots = scheduleSlots,
+        absenceHistory = absenceHistory,
+        onAddScheduleSlot = onAddScheduleSlot,
+        onUpdateScheduleSlot = onUpdateScheduleSlot,
+        onDeleteScheduleSlot = onDeleteScheduleSlot,
+        onDeleteCourse = onDeleteCourse,
+        onImportSyllabusPdf = onImportSyllabusPdf,
+        onUpdateAbsences = onUpdateAbsences,
+        onUpdateCourseDetails = onUpdateCourseDetails,
+        onUpdateAssessment = onUpdateAssessment,
+        asSidePane = true,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
 fun DisciplineDetailBottomSheet(
     detail: DisciplineDetail,
     onDismiss: () -> Unit,
@@ -162,7 +206,9 @@ fun DisciplineDetailBottomSheet(
     onImportSyllabusPdf: ((pdfBytes: ByteArray) -> Result<Int>)? = null,
     onUpdateAbsences: ((totalAbsences: Int) -> Unit)? = null,
     onUpdateCourseDetails: ((name: String, professor: String, departmentId: String, workloadHours: Int) -> Unit)? = null,
-    onUpdateAssessment: ((assessmentId: String, courseId: String, title: String, kind: String, dueDate: String, dueTime: String, completed: Boolean) -> Unit)? = null
+    onUpdateAssessment: ((assessmentId: String, courseId: String, title: String, kind: String, dueDate: String, dueTime: String, completed: Boolean) -> Unit)? = null,
+    asSidePane: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -469,18 +515,12 @@ fun DisciplineDetailBottomSheet(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
+    val detailBody: @Composable () -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, top = 6.dp)
+                .padding(start = 24.dp, end = 24.dp, top = if (asSidePane) 18.dp else 6.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 28.dp)
         ) {
@@ -1849,6 +1889,29 @@ fun DisciplineDetailBottomSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
             }
+        }
+    }
+
+    if (asSidePane) {
+        Surface(
+            modifier = modifier.fillMaxHeight(),
+            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            detailBody()
+        }
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            detailBody()
         }
     }
 

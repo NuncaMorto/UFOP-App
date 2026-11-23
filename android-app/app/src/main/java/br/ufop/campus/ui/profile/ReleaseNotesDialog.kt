@@ -55,10 +55,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.11",
-            title = "Grade Dinâmica com Rotação, Matrizes por Ingresso & Central de Atualizações",
+            version = "v1.9.12",
+            title = "Adaptação para Tablets, Dobráveis & Matriz 2024/1 Completa",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Layout adaptativo nativo para tablets, dobráveis e modo multi-janela (Material 3 WindowSizeClass + Jetpack WindowManager): Navigation Rail lateral e painéis mestre-detalhe lado a lado em Agenda, Disciplinas e Perfil.",
+                "Suporte a todas as orientações em tablets e dobráveis abertos, com detecção de dobradiça (Book / Tabletop) e cards em múltiplas colunas na aba Atividades.",
+                "Matriz Curricular 2024/1 (Currículo 2) de Eng. de Controle e Automação completa no catálogo e simulador de CRE (49 disciplinas obrigatórias, 2670h + 300h eletivas + 640h atividades = 3610h), selecionada automaticamente para ingressantes 2024/1–2025/2 sem aviso falso de matriz legada.",
+                "Seletor de versão curricular no modal da Matriz Curricular quando o curso possui mais de uma versão cadastrada."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.11",
+            title = "Grade Dinâmica com Rotação, Matrizes por Ingresso & Central de Atualizações",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Grade Dinâmica em tela cheia com rotação automática Horizontal/Vertical corrigida e área segura em landscape.",
                 "Botão recolher/expandir apenas com seta e botões Horizontal/Vertical/Limpar simétricos para liberar mais largura ao nome do curso.",

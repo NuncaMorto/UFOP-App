@@ -16,6 +16,7 @@ public struct DynamicCurriculumGridView: View {
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedMatrixId: String = DynamicCurriculumCatalog.defaultMatrix.id
     @State private var didAutoResolveMatrix: Bool = false
@@ -24,8 +25,10 @@ public struct DynamicCurriculumGridView: View {
     @State private var showClearConfirmation: Bool = false
     @State private var isHeaderCollapsed: Bool = false
 
-    private let cardWidth: CGFloat = 136
-    private let cardHeight: CGFloat = 112
+    private var isRegular: Bool { horizontalSizeClass == .regular }
+    private var cardWidth: CGFloat { isRegular ? 156 : 136 }
+    private var cardHeight: CGFloat { isRegular ? 120 : 112 }
+    private var gridSpacing: CGFloat { isRegular ? 12 : 8 }
 
     public init(store: CampusStore) {
         self.store = store
@@ -431,7 +434,7 @@ public struct DynamicCurriculumGridView: View {
                         .padding(.vertical, 6)
                         .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: hc)
 
-                        HStack(alignment: .top, spacing: 8) {
+                        HStack(alignment: .top, spacing: gridSpacing) {
                             ForEach(periodCourses) { course in
                                 courseCard(
                                     course: course,
@@ -444,12 +447,12 @@ public struct DynamicCurriculumGridView: View {
                 }
             }
         } else {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: isRegular ? 14 : 10) {
                 ForEach(1...max(1, matrix.totalPeriods), id: \.self) { period in
                     let periodCourses = matrix.courses(inPeriod: period)
                     let doneCount = periodCourses.filter { completedSet.contains($0.code) }.count
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: gridSpacing) {
                         HStack {
                             Text("\(period)º Per.")
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -463,7 +466,7 @@ public struct DynamicCurriculumGridView: View {
                         .frame(width: cardWidth, height: 34)
                         .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: hc)
 
-                        VStack(spacing: 8) {
+                        VStack(spacing: gridSpacing) {
                             ForEach(periodCourses) { course in
                                 courseCard(
                                     course: course,
@@ -604,6 +607,7 @@ public struct DynamicCurriculumGridView: View {
             )
         }
         .buttonStyle(.plain)
+        .campusHoverLift()
         .accessibilityLabel(
             "\(course.code), \(course.name), \(course.period)º período, \(course.workloadHours) horas\(course.isElective ? ", eletiva" : ""), \(statusLabel)"
         )

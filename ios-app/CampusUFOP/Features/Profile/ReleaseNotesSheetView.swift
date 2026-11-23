@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.11"
+    public static let currentVersionString = "1.9.12"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.11",
-            title: "Matrizes por Ingresso, UI Alinhada & Aba Atualizações",
+            version: "v1.9.12",
+            title: "Adaptação iPadOS & Tablets + Matriz 2024/1 Completa",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Experiência nativa para iPadOS, tablets e dobráveis seguindo o Apple HIG: barra lateral adaptativa, painéis mestre-detalhe lado a lado em Agenda, Disciplinas e Perfil, e grade multi-colunas em Atividades.",
+                "Suporte completo às 4 orientações no iPad, múltiplas janelas (Split View / Stage Manager), efeitos de ponteiro/trackpad (.hoverEffect) e atalhos de teclado (⌘1–⌘4).",
+                "Matriz Curricular 2024/1 (Currículo 2) de Eng. de Controle e Automação completa no catálogo e simulador de CRE (49 obrigatórias, 2670h + 300h eletivas + 640h atividades = 3610h), com seleção automática para ingressantes 2024/1–2025/2 sem aviso falso de matriz legada.",
+                "Sincronização completa de versão com o lançamento Android 1.9.12."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.11",
+            title: "Matrizes por Ingresso, UI Alinhada & Aba Atualizações",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Detecção automática da matriz da Grade Dinâmica pelo semestre de ingresso: Automação 2024/1 · Currículo 2 (2024/1–2025/2) e 2026/1 · Currículo 3 (2026/1+).",
                 "Botão de recolher/expandir apenas com ícone de seta e controles Horizontal/Vertical/Limpar alinhados e simétricos sem botão extra de tela cheia.",

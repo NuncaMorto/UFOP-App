@@ -10,6 +10,17 @@ private enum ProfileSubtab: String, CaseIterable, Identifiable {
     case faq = "FAQ"
 
     var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .summary: return "person.text.rectangle"
+        case .dynamicGrid: return "square.grid.3x3.topleft.filled"
+        case .calendar: return "calendar"
+        case .settings: return "slider.horizontal.3"
+        case .updates: return "sparkles"
+        case .faq: return "questionmark.circle"
+        }
+    }
 }
 
 private struct FaqEntry: Identifiable {
@@ -23,6 +34,7 @@ public struct ProfileView: View {
     @Environment(CampusAppearanceController.self) private var environmentAppearance: CampusAppearanceController?
     @Environment(AppLockManager.self) private var environmentLockManager: AppLockManager?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var fallbackStore = CampusStore()
     @State private var fallbackAppearance = CampusAppearanceController()
@@ -67,12 +79,47 @@ public struct ProfileView: View {
     private var minTouch: CGFloat { activeAppearance.accessibility.minTouchHeight }
     private var primaryAccent: Color { activeAppearance.accentColor.primary(for: colorScheme) }
     private var onPrimaryAccent: Color { activeAppearance.accentColor.onPrimary(for: colorScheme) }
+    private var isRegular: Bool { horizontalSizeClass == .regular }
 
     public var body: some View {
         ZStack {
             LiquidGlassBackdrop(accent: activeAppearance.accentColor, highContrast: hc)
 
-            if selectedSubtab == .dynamicGrid {
+            if isRegular {
+                HStack(alignment: .top, spacing: 20) {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            headerSection
+                            studentIdentityCard(profile: activeStore.studentProfile, summary: activeStore.academicProfileSummary)
+                            verticalSubtabPickerSection
+                            campusSelectorCard(summary: activeStore.academicProfileSummary)
+                        }
+                        .padding(.leading, 20)
+                        .padding(.top, 18)
+                        .padding(.bottom, 40)
+                    }
+                    .frame(width: 320)
+
+                    Group {
+                        if selectedSubtab == .dynamicGrid {
+                            DynamicCurriculumGridView(store: activeStore)
+                                .padding(.top, 18)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        } else {
+                            ScrollView(.vertical, showsIndicators: false) {
+                                VStack(alignment: .leading, spacing: 18) {
+                                    activeSubtabContent
+                                }
+                                .padding(.trailing, 20)
+                                .padding(.top, 18)
+                                .padding(.bottom, 108)
+                                .campusReadableWidth(860)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            } else if selectedSubtab == .dynamicGrid {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 18) {
                         headerSection
@@ -90,21 +137,7 @@ public struct ProfileView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         headerSection
                         subtabPickerSection
-
-                        switch selectedSubtab {
-                        case .summary:
-                            summarySubtabContent
-                        case .dynamicGrid:
-                            EmptyView()
-                        case .calendar:
-                            calendarSubtabContent
-                        case .settings:
-                            settingsSubtabContent
-                        case .updates:
-                            updatesSubtabContent
-                        case .faq:
-                            faqSubtabContent
-                        }
+                        activeSubtabContent
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
@@ -232,6 +265,56 @@ public struct ProfileView: View {
         }
     }
 
+    @ViewBuilder
+    private var activeSubtabContent: some View {
+        switch selectedSubtab {
+        case .summary:
+            summarySubtabContent
+        case .dynamicGrid:
+            EmptyView()
+        case .calendar:
+            calendarSubtabContent
+        case .settings:
+            settingsSubtabContent
+        case .updates:
+            updatesSubtabContent
+        case .faq:
+            faqSubtabContent
+        }
+    }
+
+    private var verticalSubtabPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(ProfileSubtab.allCases) { tab in
+                let isSelected = selectedSubtab == tab
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                        selectedSubtab = tab
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: tab.systemImage)
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(width: 22)
+                        Text(tab.rawValue)
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .opacity(isSelected ? 1.0 : 0.45)
+                    }
+                    .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+                .campusHoverLift()
+                .minimumTouchTarget(minTouch)
+            }
+        }
+    }
+
     // MARK: - 1. Resumo
 
     @ViewBuilder
@@ -240,8 +323,10 @@ public struct ProfileView: View {
         let profile = activeStore.studentProfile
         let creReport = activeStore.getAcademicCreReport()
 
-        studentIdentityCard(profile: profile, summary: summary)
-        campusSelectorCard(summary: summary)
+        if !isRegular {
+            studentIdentityCard(profile: profile, summary: summary)
+            campusSelectorCard(summary: summary)
+        }
         metricsGrid(summary: summary)
         creAndTranscriptCard(creReport: creReport)
         dynamicGridShortcutCard
@@ -339,7 +424,7 @@ public struct ProfileView: View {
     }
 
     private func metricsGrid(summary: AcademicProfileSummary) -> some View {
-        let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+        let columns = [GridItem(.adaptive(minimum: isRegular ? 180 : 150), spacing: 10)]
         return LazyVGrid(columns: columns, spacing: 10) {
             metricTile(title: "Disciplinas", value: "\(summary.totalCourses)", subtitle: "Em \(summary.semester)", tint: primaryAccent)
             metricTile(title: "Faltas acumuladas", value: "\(summary.totalAbsences)/\(summary.totalMaxAbsences)", subtitle: "\(summary.coursesAtRisk) em risco", tint: CampusTheme.mathBlue)

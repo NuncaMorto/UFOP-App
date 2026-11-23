@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -82,12 +83,15 @@ import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.DayActivityIndicator
 import br.ufop.campus.core.ffi.DayPillItem
 import br.ufop.campus.core.ffi.TimelineItemKind
+import br.ufop.campus.ui.theme.CampusFoldPosture
+import br.ufop.campus.ui.theme.CampusWindowWidthClass
 import br.ufop.campus.ui.theme.CommitmentNeutralGray
 import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
 import br.ufop.campus.ui.theme.DarkWeatherBadgeText
 import br.ufop.campus.ui.theme.LightWeatherBadgeBg
 import br.ufop.campus.ui.theme.LightWeatherBadgeText
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -105,212 +109,431 @@ fun AgendaScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val themeController = LocalCampusThemeController.current
+    val adaptive = LocalCampusAdaptiveLayout.current
     val a11y = LocalCampusAccessibility.current.settings
     val dayOverview = uiState.dayOverview
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 0.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // 1. Header editorial: Seu dia no campus + badge de clima azul informativo neutro (sem relógio 1Hz)
-            item {
-                AgendaHeaderSection(
-                    campusCity = uiState.activeCampus.city,
-                    weatherTempC = uiState.activeCampus.weatherTempC,
-                    isDark = themeController.isDark
-                )
-            }
-
-            // 2. Seletor de Mês/Semana: Novembro 2026 ▾ + [Hoje] + SEMANA N
-            item {
-                MonthAndWeekSelectorRow(
-                    monthYearLabel = if (uiState.isMonthCalendarExpanded) {
-                        formatYearMonthTitle(uiState.displayedYearMonth)
-                    } else {
-                        dayOverview.monthYearLabel
-                    },
-                    weekNumber = dayOverview.weekNumber,
-                    isCalendarExpanded = uiState.isMonthCalendarExpanded,
-                    showTodayButton = !uiState.isViewingToday,
-                    reduceMotion = a11y.reduceMotion,
-                    largeTouchTargets = a11y.largeTouchTargets,
-                    onToggleCalendar = { viewModel.toggleMonthCalendar() },
-                    onJumpToToday = { viewModel.jumpToToday() }
-                )
-            }
-
-            // 2b. Calendário mensal expansível do semestre letivo com indicadores de atividades
-            item {
-                AnimatedVisibility(
-                    visible = uiState.isMonthCalendarExpanded,
-                    enter = if (a11y.reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
-                    exit = if (a11y.reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
+        if (adaptive.useTwoPaneLayout) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(0.45f)
+                        .fillMaxHeight(),
+                    contentPadding = PaddingValues(
+                        start = 20.dp,
+                        end = 12.dp,
+                        top = 18.dp,
+                        bottom = adaptive.bottomContentPaddingDp.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    ExpandableSemesterCalendarCard(
-                        displayedYearMonth = uiState.displayedYearMonth,
-                        selectedIsoDate = uiState.selectedIsoDate,
-                        monthIndicators = uiState.monthIndicators,
-                        reduceMotion = a11y.reduceMotion,
-                        largeTouchTargets = a11y.largeTouchTargets,
-                        onPreviousMonth = { viewModel.previousMonth() },
-                        onNextMonth = { viewModel.nextMonth() },
-                        onSelectMonth = { ym -> viewModel.selectDisplayedMonth(ym) },
-                        onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
-                    )
-                }
-            }
-
-            // 3. Semana completa sem corte (DOM..SÁB distribuídos em weight(1f))
-            item {
-                WeekDayPillsRow(
-                    days = dayOverview.weekDays,
-                    selectedIsoDate = uiState.selectedIsoDate,
-                    isDark = themeController.isDark,
-                    largeTouchTargets = a11y.largeTouchTargets,
-                    onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
-                )
-            }
-
-            // 3b. Banner de aviso de fora do período letivo (IHC-13)
-            uiState.semesterRangeNotice?.let { notice ->
-                item {
-                    AgendaBannerCard(
-                        message = notice,
-                        isError = false,
-                        isDark = themeController.isDark,
-                        largeTouchTargets = a11y.largeTouchTargets,
-                        dismissLabel = "Dispensar aviso de período letivo",
-                        onDismiss = { viewModel.dismissSemesterRangeNotice() }
-                    )
-                }
-            }
-
-            // 3c. Banner de erro de ação (IHC-13)
-            uiState.actionErrorMessage?.let { errMessage ->
-                item {
-                    AgendaBannerCard(
-                        message = errMessage,
-                        isError = true,
-                        isDark = themeController.isDark,
-                        largeTouchTargets = a11y.largeTouchTargets,
-                        dismissLabel = "Dispensar mensagem de erro",
-                        onDismiss = { viewModel.clearActionError() }
-                    )
-                }
-            }
-
-            // 4. Resumo do Dia + botão "+ Compromisso"
-            item {
-                DaySummaryHeader(
-                    formattedDate = dayOverview.formattedDate,
-                    classesCount = dayOverview.classesCount,
-                    commitmentsCount = dayOverview.commitmentsCount,
-                    largeTouchTargets = a11y.largeTouchTargets,
-                    onAddCommitmentClick = { viewModel.openAddCommitmentSheet() }
-                )
-            }
-
-            // 4b. Hero Card "Em andamento agora" / "Próxima aula" (IHC-01) — somente quando visualizando outro dia
-            uiState.nextClassPreview
-                ?.takeIf { it.isoDate != uiState.selectedIsoDate }
-                ?.let { nextClass ->
                     item {
-                        NextClassHeroCard(
-                            preview = nextClass,
-                            isSameSelectedDay = false,
+                        AgendaHeaderSection(
+                            campusCity = uiState.activeCampus.city,
+                            weatherTempC = uiState.activeCampus.weatherTempC,
+                            isDark = themeController.isDark
+                        )
+                    }
+                    item {
+                        MonthAndWeekSelectorRow(
+                            monthYearLabel = if (uiState.isMonthCalendarExpanded) {
+                                formatYearMonthTitle(uiState.displayedYearMonth)
+                            } else {
+                                dayOverview.monthYearLabel
+                            },
+                            weekNumber = dayOverview.weekNumber,
+                            isCalendarExpanded = uiState.isMonthCalendarExpanded,
+                            showTodayButton = !uiState.isViewingToday,
+                            reduceMotion = a11y.reduceMotion,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            onToggleCalendar = { viewModel.toggleMonthCalendar() },
+                            onJumpToToday = { viewModel.jumpToToday() }
+                        )
+                    }
+                    item {
+                        AnimatedVisibility(
+                            visible = uiState.isMonthCalendarExpanded,
+                            enter = if (a11y.reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
+                            exit = if (a11y.reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
+                        ) {
+                            ExpandableSemesterCalendarCard(
+                                displayedYearMonth = uiState.displayedYearMonth,
+                                selectedIsoDate = uiState.selectedIsoDate,
+                                monthIndicators = uiState.monthIndicators,
+                                reduceMotion = a11y.reduceMotion,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                onPreviousMonth = { viewModel.previousMonth() },
+                                onNextMonth = { viewModel.nextMonth() },
+                                onSelectMonth = { ym -> viewModel.selectDisplayedMonth(ym) },
+                                onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
+                            )
+                        }
+                    }
+                    item {
+                        WeekDayPillsRow(
+                            days = dayOverview.weekDays,
+                            selectedIsoDate = uiState.selectedIsoDate,
                             isDark = themeController.isDark,
                             largeTouchTargets = a11y.largeTouchTargets,
-                            onJumpToNextClass = { viewModel.jumpToNextClassDay() }
+                            onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
+                        )
+                    }
+                    uiState.semesterRangeNotice?.let { notice ->
+                        item {
+                            AgendaBannerCard(
+                                message = notice,
+                                isError = false,
+                                isDark = themeController.isDark,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                dismissLabel = "Dispensar aviso de período letivo",
+                                onDismiss = { viewModel.dismissSemesterRangeNotice() }
+                            )
+                        }
+                    }
+                    uiState.actionErrorMessage?.let { errMessage ->
+                        item {
+                            AgendaBannerCard(
+                                message = errMessage,
+                                isError = true,
+                                isDark = themeController.isDark,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                dismissLabel = "Dispensar mensagem de erro",
+                                onDismiss = { viewModel.clearActionError() }
+                            )
+                        }
+                    }
+                    uiState.nextClassPreview
+                        ?.takeIf { it.isoDate != uiState.selectedIsoDate }
+                        ?.let { nextClass ->
+                            item {
+                                NextClassHeroCard(
+                                    preview = nextClass,
+                                    isSameSelectedDay = false,
+                                    isDark = themeController.isDark,
+                                    largeTouchTargets = a11y.largeTouchTargets,
+                                    onJumpToNextClass = { viewModel.jumpToNextClassDay() }
+                                )
+                            }
+                        }
+                    item {
+                        AcademicEventsAccordionCard(
+                            events = uiState.academicEvents,
+                            selectedIsoDate = uiState.selectedIsoDate,
+                            isDark = themeController.isDark,
+                            reduceMotion = a11y.reduceMotion,
+                            largeTouchTargets = a11y.largeTouchTargets
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.navigationBarsPadding())
+                    }
+                }
+
+                if (adaptive.foldPosture == CampusFoldPosture.BOOK_VERTICAL_HINGE) {
+                    Spacer(modifier = Modifier.width(adaptive.hingeWidthDp.coerceAtLeast(16).dp))
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(0.55f)
+                        .fillMaxHeight(),
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 20.dp,
+                        top = 18.dp,
+                        bottom = adaptive.bottomContentPaddingDp.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        DaySummaryHeader(
+                            formattedDate = dayOverview.formattedDate,
+                            classesCount = dayOverview.classesCount,
+                            commitmentsCount = dayOverview.commitmentsCount,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            onAddCommitmentClick = { viewModel.openAddCommitmentSheet() }
+                        )
+                    }
+                    uiState.statusBannerMessage?.let { message ->
+                        item {
+                            AgendaBannerCard(
+                                message = message,
+                                isError = false,
+                                isDark = themeController.isDark,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                dismissLabel = "Dispensar aviso",
+                                onDismiss = { viewModel.clearBannerMessage() }
+                            )
+                        }
+                    }
+                    if (dayOverview.items.isEmpty()) {
+                        item {
+                            AgendaEmptyStateCard(
+                                hasCoursesInSemester = uiState.hasCoursesInSemester,
+                                nextClassPreview = uiState.nextClassPreview,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                onJumpToNextClass = { viewModel.jumpToNextClassDay() },
+                                onAddCommitmentClick = { viewModel.openAddCommitmentSheet() }
+                            )
+                        }
+                    } else {
+                        val nextClassOnSelectedDay = uiState.nextClassPreview
+                            ?.takeIf { it.isoDate == uiState.selectedIsoDate }
+                        items(
+                            items = dayOverview.items,
+                            key = { it.id }
+                        ) { item ->
+                            val inlineNextClassLabel = nextClassOnSelectedDay?.let { nextClass ->
+                                val isMatchingClass = item.kind == TimelineItemKind.CLASS_SESSION && (
+                                    (nextClass.slotId != null && item.slotId == nextClass.slotId) ||
+                                        (item.title == nextClass.courseName && item.startTime == nextClass.startTime)
+                                    )
+                                if (isMatchingClass) {
+                                    if (nextClass.isHappeningNow) "Agora" else "Próxima aula"
+                                } else {
+                                    null
+                                }
+                            }
+                            AgendaTimelineCard(
+                                item = item,
+                                isDark = themeController.isDark,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                inlineNextClassLabel = inlineNextClassLabel,
+                                onClick = {
+                                    when (item.kind) {
+                                        TimelineItemKind.CLASS_SESSION -> {
+                                            item.slotId?.let { viewModel.openClassCheckIn(it) }
+                                        }
+                                        TimelineItemKind.COMMITMENT -> {
+                                            viewModel.openCommitmentDetail(item)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.navigationBarsPadding())
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .then(
+                        if (adaptive.widthClass == CampusWindowWidthClass.MEDIUM) {
+                            Modifier
+                                .widthIn(max = 760.dp)
+                                .fillMaxWidth()
+                        } else {
+                            Modifier.fillMaxSize()
+                        }
+                    ),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = 18.dp,
+                    bottom = adaptive.bottomContentPaddingDp.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 1. Header editorial: Seu dia no campus + badge de clima azul informativo neutro (sem relógio 1Hz)
+                item {
+                    AgendaHeaderSection(
+                        campusCity = uiState.activeCampus.city,
+                        weatherTempC = uiState.activeCampus.weatherTempC,
+                        isDark = themeController.isDark
+                    )
+                }
+
+                // 2. Seletor de Mês/Semana: Novembro 2026 ▾ + [Hoje] + SEMANA N
+                item {
+                    MonthAndWeekSelectorRow(
+                        monthYearLabel = if (uiState.isMonthCalendarExpanded) {
+                            formatYearMonthTitle(uiState.displayedYearMonth)
+                        } else {
+                            dayOverview.monthYearLabel
+                        },
+                        weekNumber = dayOverview.weekNumber,
+                        isCalendarExpanded = uiState.isMonthCalendarExpanded,
+                        showTodayButton = !uiState.isViewingToday,
+                        reduceMotion = a11y.reduceMotion,
+                        largeTouchTargets = a11y.largeTouchTargets,
+                        onToggleCalendar = { viewModel.toggleMonthCalendar() },
+                        onJumpToToday = { viewModel.jumpToToday() }
+                    )
+                }
+
+                // 2b. Calendário mensal expansível do semestre letivo com indicadores de atividades
+                item {
+                    AnimatedVisibility(
+                        visible = uiState.isMonthCalendarExpanded,
+                        enter = if (a11y.reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
+                        exit = if (a11y.reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
+                    ) {
+                        ExpandableSemesterCalendarCard(
+                            displayedYearMonth = uiState.displayedYearMonth,
+                            selectedIsoDate = uiState.selectedIsoDate,
+                            monthIndicators = uiState.monthIndicators,
+                            reduceMotion = a11y.reduceMotion,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            onPreviousMonth = { viewModel.previousMonth() },
+                            onNextMonth = { viewModel.nextMonth() },
+                            onSelectMonth = { ym -> viewModel.selectDisplayedMonth(ym) },
+                            onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
                         )
                     }
                 }
 
-            // Banner de confirmação
-            uiState.statusBannerMessage?.let { message ->
+                // 3. Semana completa sem corte (DOM..SÁB distribuídos em weight(1f))
                 item {
-                    AgendaBannerCard(
-                        message = message,
-                        isError = false,
+                    WeekDayPillsRow(
+                        days = dayOverview.weekDays,
+                        selectedIsoDate = uiState.selectedIsoDate,
                         isDark = themeController.isDark,
                         largeTouchTargets = a11y.largeTouchTargets,
-                        dismissLabel = "Dispensar aviso",
-                        onDismiss = { viewModel.clearBannerMessage() }
+                        onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
                     )
                 }
-            }
 
-            // 5. Timeline de Cards ou Estado Vazio
-            if (dayOverview.items.isEmpty()) {
+                // 3b. Banner de aviso de fora do período letivo (IHC-13)
+                uiState.semesterRangeNotice?.let { notice ->
+                    item {
+                        AgendaBannerCard(
+                            message = notice,
+                            isError = false,
+                            isDark = themeController.isDark,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            dismissLabel = "Dispensar aviso de período letivo",
+                            onDismiss = { viewModel.dismissSemesterRangeNotice() }
+                        )
+                    }
+                }
+
+                // 3c. Banner de erro de ação (IHC-13)
+                uiState.actionErrorMessage?.let { errMessage ->
+                    item {
+                        AgendaBannerCard(
+                            message = errMessage,
+                            isError = true,
+                            isDark = themeController.isDark,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            dismissLabel = "Dispensar mensagem de erro",
+                            onDismiss = { viewModel.clearActionError() }
+                        )
+                    }
+                }
+
+                // 4. Resumo do Dia + botão "+ Compromisso"
                 item {
-                    AgendaEmptyStateCard(
-                        hasCoursesInSemester = uiState.hasCoursesInSemester,
-                        nextClassPreview = uiState.nextClassPreview,
+                    DaySummaryHeader(
+                        formattedDate = dayOverview.formattedDate,
+                        classesCount = dayOverview.classesCount,
+                        commitmentsCount = dayOverview.commitmentsCount,
                         largeTouchTargets = a11y.largeTouchTargets,
-                        onJumpToNextClass = { viewModel.jumpToNextClassDay() },
                         onAddCommitmentClick = { viewModel.openAddCommitmentSheet() }
                     )
                 }
-            } else {
-                val nextClassOnSelectedDay = uiState.nextClassPreview
-                    ?.takeIf { it.isoDate == uiState.selectedIsoDate }
-                items(
-                    items = dayOverview.items,
-                    key = { it.id }
-                ) { item ->
-                    val inlineNextClassLabel = nextClassOnSelectedDay?.let { nextClass ->
-                        val isMatchingClass = item.kind == TimelineItemKind.CLASS_SESSION && (
-                            (nextClass.slotId != null && item.slotId == nextClass.slotId) ||
-                                (item.title == nextClass.courseName && item.startTime == nextClass.startTime)
+
+                // 4b. Hero Card "Em andamento agora" / "Próxima aula" (IHC-01) — somente quando visualizando outro dia
+                uiState.nextClassPreview
+                    ?.takeIf { it.isoDate != uiState.selectedIsoDate }
+                    ?.let { nextClass ->
+                        item {
+                            NextClassHeroCard(
+                                preview = nextClass,
+                                isSameSelectedDay = false,
+                                isDark = themeController.isDark,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                onJumpToNextClass = { viewModel.jumpToNextClassDay() }
                             )
-                        if (isMatchingClass) {
-                            if (nextClass.isHappeningNow) "Agora" else "Próxima aula"
-                        } else {
-                            null
                         }
                     }
-                    AgendaTimelineCard(
-                        item = item,
-                        isDark = themeController.isDark,
-                        largeTouchTargets = a11y.largeTouchTargets,
-                        inlineNextClassLabel = inlineNextClassLabel,
-                        onClick = {
-                            when (item.kind) {
-                                TimelineItemKind.CLASS_SESSION -> {
-                                    item.slotId?.let { viewModel.openClassCheckIn(it) }
-                                }
-                                TimelineItemKind.COMMITMENT -> {
-                                    viewModel.openCommitmentDetail(item)
-                                }
+
+                // Banner de confirmação
+                uiState.statusBannerMessage?.let { message ->
+                    item {
+                        AgendaBannerCard(
+                            message = message,
+                            isError = false,
+                            isDark = themeController.isDark,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            dismissLabel = "Dispensar aviso",
+                            onDismiss = { viewModel.clearBannerMessage() }
+                        )
+                    }
+                }
+
+                // 5. Timeline de Cards ou Estado Vazio
+                if (dayOverview.items.isEmpty()) {
+                    item {
+                        AgendaEmptyStateCard(
+                            hasCoursesInSemester = uiState.hasCoursesInSemester,
+                            nextClassPreview = uiState.nextClassPreview,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            onJumpToNextClass = { viewModel.jumpToNextClassDay() },
+                            onAddCommitmentClick = { viewModel.openAddCommitmentSheet() }
+                        )
+                    }
+                } else {
+                    val nextClassOnSelectedDay = uiState.nextClassPreview
+                        ?.takeIf { it.isoDate == uiState.selectedIsoDate }
+                    items(
+                        items = dayOverview.items,
+                        key = { it.id }
+                    ) { item ->
+                        val inlineNextClassLabel = nextClassOnSelectedDay?.let { nextClass ->
+                            val isMatchingClass = item.kind == TimelineItemKind.CLASS_SESSION && (
+                                (nextClass.slotId != null && item.slotId == nextClass.slotId) ||
+                                    (item.title == nextClass.courseName && item.startTime == nextClass.startTime)
+                                )
+                            if (isMatchingClass) {
+                                if (nextClass.isHappeningNow) "Agora" else "Próxima aula"
+                            } else {
+                                null
                             }
                         }
+                        AgendaTimelineCard(
+                            item = item,
+                            isDark = themeController.isDark,
+                            largeTouchTargets = a11y.largeTouchTargets,
+                            inlineNextClassLabel = inlineNextClassLabel,
+                            onClick = {
+                                when (item.kind) {
+                                    TimelineItemKind.CLASS_SESSION -> {
+                                        item.slotId?.let { viewModel.openClassCheckIn(it) }
+                                    }
+                                    TimelineItemKind.COMMITMENT -> {
+                                        viewModel.openCommitmentDetail(item)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // 6. Acordeão colapsável: Próximos eventos do Calendário Acadêmico (fechado por padrão)
+                item {
+                    AcademicEventsAccordionCard(
+                        events = uiState.academicEvents,
+                        selectedIsoDate = uiState.selectedIsoDate,
+                        isDark = themeController.isDark,
+                        reduceMotion = a11y.reduceMotion,
+                        largeTouchTargets = a11y.largeTouchTargets
                     )
                 }
-            }
 
-            // 6. Acordeão colapsável: Próximos eventos do Calendário Acadêmico (fechado por padrão)
-            item {
-                AcademicEventsAccordionCard(
-                    events = uiState.academicEvents,
-                    selectedIsoDate = uiState.selectedIsoDate,
-                    isDark = themeController.isDark,
-                    reduceMotion = a11y.reduceMotion,
-                    largeTouchTargets = a11y.largeTouchTargets
-                )
-            }
-
-            // Folga inferior explícita para barra flutuante + navegação do sistema (IHC-03)
-            item {
-                Spacer(
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .height(136.dp)
-                )
+                // Folga inferior explícita para barra flutuante + navegação do sistema (IHC-03)
+                item {
+                    Spacer(modifier = Modifier.navigationBarsPadding())
+                }
             }
         }
 

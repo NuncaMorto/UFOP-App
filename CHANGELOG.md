@@ -10,6 +10,13 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+<!-- versionCode: 29 -->
+## v1.9.12 — Adaptação para Tablets, iPadOS & Dobráveis + Matriz 2024/1 Completa
+
+- **Android (`1.9.12` · Beta) & iOS (`1.9.12`):**
+  - **Layouts adaptativos para tablets, iPadOS e dobráveis:** barra lateral adaptativa (`NavigationRail` / `TabView(.sidebarAdaptable)`), painéis mestre-detalhe lado a lado em **Agenda**, **Disciplinas** e **Perfil**, grade multi-colunas em **Atividades**, suporte a dobradiça (`FoldingFeature`) e múltiplas janelas / rotação livre em telas grandes.
+  - **Matriz Curricular 2024/1 (Currículo 2) de Eng. de Controle e Automação completa no catálogo:** `49` disciplinas obrigatórias (`2670h` obrigatórias + `300h` eletivas + `640h` atividades = `3610h` totais), selecionada automaticamente pela matrícula ou histórico para ingressantes de `2024/1` a `2025/2` sem aviso falso de matriz legada, além de seletor de versão curricular no modal da Matriz.
+
 <!-- versionCode: 28 -->
 ## v1.9.11 — Rotação da Grade Dinâmica, Matrizes por Ingresso & Aba Atualizações
 

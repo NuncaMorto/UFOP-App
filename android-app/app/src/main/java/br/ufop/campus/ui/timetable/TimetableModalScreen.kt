@@ -119,6 +119,7 @@ import br.ufop.campus.core.ffi.TimetableCell
 import br.ufop.campus.core.ffi.TimetableRow
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -408,6 +409,7 @@ fun TimetableModalScreen(
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
     val a11y = LocalCampusAccessibility.current.settings
+    val adaptive = LocalCampusAdaptiveLayout.current
     val minTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
     val toolbarVisualHeight = if (a11y.largeTouchTargets) 52.dp else 36.dp
 
@@ -417,24 +419,35 @@ fun TimetableModalScreen(
     var isReducedMode by rememberSaveable { mutableStateOf(false) }
     var showFullDayGrid by rememberSaveable { mutableStateOf(false) }
 
-    // Aplica orientação persistida (Horizontal por padrão, alternável para Vertical) e restaura ao sair
-    LaunchedEffect(context, isLandscape) {
-        context.findActivity()?.requestedOrientation = if (isLandscape) {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    // Em smartphones compactos, aplica orientação persistida (Horizontal por padrão, alternável para Vertical)
+    // e restaura ao sair; em tablets, dobráveis abertos e Split Screen, mantém rotação livre.
+    LaunchedEffect(context, isLandscape, adaptive.shouldForceScreenOrientation) {
+        val activity = context.findActivity() ?: return@LaunchedEffect
+        if (adaptive.shouldForceScreenOrientation) {
+            activity.requestedOrientation = if (isLandscape) {
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        } else if (activity.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
 
     DisposableEffect(context) {
         val activity = context.findActivity()
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if (activity != null && activity.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
         }
     }
 
     val handleDismiss: () -> Unit = {
-        context.findActivity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        val activity = context.findActivity()
+        if (activity != null && activity.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
         onDismiss()
     }
 

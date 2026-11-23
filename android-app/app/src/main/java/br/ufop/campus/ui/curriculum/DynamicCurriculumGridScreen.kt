@@ -107,6 +107,7 @@ import br.ufop.campus.ui.theme.HighContrastDarkTextPrimary
 import br.ufop.campus.ui.theme.HighContrastLightTextPrimary
 import br.ufop.campus.ui.theme.LightTextPrimary
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -197,6 +198,7 @@ fun DynamicCurriculumGridScreen(
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
     val a11y = LocalCampusAccessibility.current.settings
+    val adaptive = LocalCampusAdaptiveLayout.current
     val mutationVersion by repository.mutationVersion.collectAsState()
 
     val studentProfile = remember(mutationVersion) { repository.getStudentProfile() }
@@ -235,24 +237,35 @@ fun DynamicCurriculumGridScreen(
     var showMatrixDropdown by remember { mutableStateOf(false) }
     var feedbackState by remember { mutableStateOf<DynamicGridFeedbackState?>(null) }
 
-    // Espelha o comportamento da Grade de Horários: Horizontal rotaciona para paisagem; Vertical restaura retrato
-    LaunchedEffect(context, isHorizontal) {
-        context.findActivity()?.requestedOrientation = if (isHorizontal) {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    // Em smartphones compactos, Horizontal rotaciona para paisagem e Vertical restaura retrato;
+    // em tablets, dobráveis abertos e Split Screen, mantém rotação livre e alterna apenas o eixo da grade.
+    LaunchedEffect(context, isHorizontal, adaptive.shouldForceScreenOrientation) {
+        val activity = context.findActivity() ?: return@LaunchedEffect
+        if (adaptive.shouldForceScreenOrientation) {
+            activity.requestedOrientation = if (isHorizontal) {
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        } else if (activity.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
 
     DisposableEffect(context) {
         val activity = context.findActivity()
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if (activity != null && activity.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
         }
     }
 
     val handleDismiss: () -> Unit = {
-        context.findActivity()?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        val activity = context.findActivity()
+        if (activity != null && activity.requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
         onDismiss()
     }
 

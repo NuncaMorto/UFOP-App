@@ -4,6 +4,7 @@ public struct ActivitiesView: View {
     @Environment(CampusStore.self) private var store
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedTypes: Set<String> = []
     @State private var onlyCompleted: Bool = false
@@ -15,6 +16,14 @@ public struct ActivitiesView: View {
     private let activityTypes = ["Prova", "Trabalho", "Seminário"]
 
     public init() {}
+
+    private var isRegular: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var regularGridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 320), spacing: 14)]
+    }
 
     private var accent: Color {
         (appearance?.accentColor ?? .green).primary(for: colorScheme)
@@ -73,9 +82,10 @@ public struct ActivitiesView: View {
 
                         activitiesListSection
                     }
-                    .padding(.horizontal, 18)
+                    .padding(.horizontal, isRegular ? 24 : 18)
                     .padding(.top, 12)
                     .padding(.bottom, 32)
+                    .campusReadableWidth(isRegular ? 1040 : .infinity)
                 }
             }
             #if os(iOS)
@@ -313,6 +323,12 @@ public struct ActivitiesView: View {
             .padding(.vertical, 34)
             .padding(.horizontal, 18)
             .liquidGlassCard(highContrast: hc)
+        } else if isRegular {
+            LazyVGrid(columns: regularGridColumns, spacing: 14) {
+                ForEach(filteredActivities) { item in
+                    activityRow(item: item)
+                }
+            }
         } else {
             VStack(spacing: 12) {
                 ForEach(filteredActivities) { item in
@@ -388,6 +404,7 @@ public struct ActivitiesView: View {
             }
         }
         .buttonStyle(.plain)
+        .campusHoverLift()
     }
 }
 
