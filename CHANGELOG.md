@@ -10,14 +10,16 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
-<!-- versionCode: 29 -->
 ## v1.9.12 — Adaptação para Tablets, iPadOS & Dobráveis + Matriz 2024/1 Completa
 
 - **Android (`1.9.12` · Beta) & iOS (`1.9.12`):**
   - **Layouts adaptativos para tablets, iPadOS e dobráveis:** barra lateral adaptativa (`NavigationRail` / `TabView(.sidebarAdaptable)`), painéis mestre-detalhe lado a lado em **Agenda**, **Disciplinas** e **Perfil**, grade multi-colunas em **Atividades**, suporte a dobradiça (`FoldingFeature`) e múltiplas janelas / rotação livre em telas grandes.
   - **Matriz Curricular 2024/1 (Currículo 2) de Eng. de Controle e Automação completa no catálogo:** `49` disciplinas obrigatórias (`2670h` obrigatórias + `300h` eletivas + `640h` atividades = `3610h` totais), selecionada automaticamente pela matrícula ou histórico para ingressantes de `2024/1` a `2025/2` sem aviso falso de matriz legada, além de seletor de versão curricular no modal da Matriz.
 
-<!-- versionCode: 28 -->
+<!-- versionCode: 29 -->
+
+---
+
 ## v1.9.11 — Rotação da Grade Dinâmica, Matrizes por Ingresso & Aba Atualizações
 
 - **Android (`1.9.11` · Beta) & iOS (`1.9.11`):**
@@ -25,6 +27,10 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
   - **Controles simétricos e recolher por ícone:** o botão de recolher/expandir agora mostra apenas uma seta para dar mais espaço ao nome do curso; a pílula Horizontal/Vertical tem espaçamento uniforme em volta da opção selecionada e a mesma altura do botão Limpar.
   - **Versionamento curricular pelo semestre de ingresso:** a matriz de Eng. de Controle e Automação passa a identificar **2024/1 · Currículo 2** (ingressantes de 2024/1 a 2025/2, preservando seleções anteriores) e adiciona a **2026/1 · Currículo 3** (ingressantes a partir de 2026/1), detectada automaticamente pela matrícula/histórico.
   - **Perfil reorganizado:** **Atualizações & Histórico de Patches** ganhou aba própria fora de FAQ & Ajuda, e **Refazer Tour Guiado** foi movido para **Configurações / Ajustes**.
+
+<!-- versionCode: 28 -->
+
+---
 
 ## v1.9.10 — Mais Espaço na Grade Dinâmica (Cabeçalho Recolhível)
 

@@ -113,8 +113,12 @@ try {
         if (-not $ExtractedNotes) {
             $ExtractedNotes = "## Vida Acadêmica $Tag`n`nRelease publicada a partir de \`dist/\`."
         }
-        if ($VersionCode -and $ExtractedNotes -notmatch '<!--\s*versionCode\s*:') {
-            $ExtractedNotes = $ExtractedNotes.TrimEnd() + "`n`n<!-- versionCode: $VersionCode -->`n"
+        # Garante que nenhum comentário versionCode residual (ex.: de outra seção do CHANGELOG) sobrescreva o build atual
+        $ExtractedNotes = [regex]::Replace($ExtractedNotes, '(?im)^\s*<!--\s*versionCode\s*:\s*\d+\s*-->\s*\r?\n?', '').TrimEnd()
+        if ($VersionCode) {
+            $ExtractedNotes = "$ExtractedNotes`n`n<!-- versionCode: $VersionCode -->`n"
+        } else {
+            $ExtractedNotes = "$ExtractedNotes`n"
         }
         $ResolvedNotesPath = Join-Path $TempDir "release-notes.md"
         [IO.File]::WriteAllText($ResolvedNotesPath, $ExtractedNotes, [Text.UTF8Encoding]::new($false))
