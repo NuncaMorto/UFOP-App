@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.12"
+    public static let currentVersionString = "1.9.13"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.12",
-            title: "Adaptação iPadOS & Tablets + Matriz 2024/1 Completa",
+            version: "v1.9.13",
+            title: "Grade Dinâmica para 48 Cursos da UFOP & Modularização",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Grade Dinâmica Interativa liberada automaticamente para os 48 cursos com disciplinas detalhadas no catálogo UFOP (como Farmácia, entre outros), resolvida pelo curso real e semestre de ingresso.",
+                "Construção acíclica automática de pré-requisitos, carga horária mínima e slots optativos/eletivos, preservando as versões históricas curadas de Automação (2024/1 e 2026/1) e nota informativa para os 6 cursos pendentes.",
+                "Novo seletor pesquisável na Grade Dinâmica com busca por nome, código ou campus, exibindo versão curricular e carga horária total.",
+                "Modularização da ponte Swift (`CoreFFI/`) e sincronização completa de versão com o lançamento Android 1.9.13."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.12",
+            title: "Adaptação iPadOS & Tablets + Matriz 2024/1 Completa",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Experiência nativa para iPadOS, tablets e dobráveis seguindo o Apple HIG: barra lateral adaptativa, painéis mestre-detalhe lado a lado em Agenda, Disciplinas e Perfil, e grade multi-colunas em Atividades.",
                 "Suporte completo às 4 orientações no iPad, múltiplas janelas (Split View / Stage Manager), efeitos de ponteiro/trackpad (.hoverEffect) e atalhos de teclado (⌘1–⌘4).",

@@ -1,5 +1,6 @@
 package br.ufop.campus
 
+import br.ufop.campus.BuildConfig
 import br.ufop.campus.core.ffi.AcademicCalendarEvent
 import br.ufop.campus.core.ffi.CampusEngineBridgeRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
@@ -399,7 +400,9 @@ class CampusSprint13IhcAndCalendarTest {
 
     @Test
     fun releaseVersionAndSevenAccentColors_preserveSprint13Contract() {
-        assertEquals("1.9.12", CampusRepositoryHolder.CURRENT_APP_VERSION)
+        assertEquals(BuildConfig.VERSION_NAME, CampusRepositoryHolder.CURRENT_APP_VERSION)
+        assertTrue(Regex("""^\d+\.\d+\.\d+$""").matches(CampusRepositoryHolder.CURRENT_APP_VERSION))
+        assertTrue(BuildConfig.VERSION_CODE > 0)
         assertEquals(
             listOf("GREEN", "RED", "ORANGE", "PURPLE", "YELLOW", "CYAN", "BROWN"),
             CampusAccentColor.entries.map { it.storageKey }

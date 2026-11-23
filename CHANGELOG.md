@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.13 — Grade Dinâmica para Todos os Cursos da UFOP + Modularização
+
+- **Android (`1.9.13` · Beta) & iOS (`1.9.13`):**
+  - **Grade Dinâmica Interativa para 48 cursos da UFOP:** estudantes de cursos com grade detalhada no catálogo (ex.: **Farmácia (`FAR`)** com 62 disciplinas obrigatórias + slots optativos/eletivos, entre 48 cursos) agora abrem a Grade Dinâmica e o resumo no Perfil diretamente na matriz do próprio curso, com resolução acíclica de pré-requisitos e carga horária mínima por disciplina.
+  - **Versões históricas e desambiguação preservadas:** cursos com versões curadas (como Eng. de Controle e Automação `2024/1` e `2026/1`) mantêm detecção automática pelo semestre de ingresso e compatibilidade com salvamentos anteriores; cursos com homônimos entre campi usam `campusHint`, e os 6 cursos sem detalhamento de disciplinas exibem aviso informativo claro.
+  - **Seletor pesquisável escalável:** substituído o menu simples por modal/sheet com busca por nome, código ou campus, exibindo versão curricular, quantidade de disciplinas e carga horária total.
+  - **Refatoração estrutural e automação:** modularização de telas e núcleo em Android/iOS sem alterações na API ou persistência, adoção de `BuildConfig.VERSION_NAME` como fonte única de versão no Android e novos scripts `bump-version.ps1` e `check-swift-hygiene.ps1`.
+
+<!-- versionCode: 30 -->
+
+---
+
 ## v1.9.12 — Adaptação para Tablets, iPadOS & Dobráveis + Matriz 2024/1 Completa
 
 - **Android (`1.9.12` · Beta) & iOS (`1.9.12`):**

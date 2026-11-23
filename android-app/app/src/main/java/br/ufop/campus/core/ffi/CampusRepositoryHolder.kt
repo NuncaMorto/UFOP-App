@@ -2,6 +2,7 @@ package br.ufop.campus.core.ffi
 
 import android.content.Context
 import android.content.SharedPreferences
+import br.ufop.campus.BuildConfig
 import br.ufop.campus.core.curriculum.UfopRoomAllocationCatalog
 import br.ufop.campus.core.security.AppLockManager
 import br.ufop.campus.core.security.SecurePdfProcessor
@@ -19,7 +20,8 @@ import java.io.File
 object CampusRepositoryHolder {
 
     const val PREFS_NAME = "vida_academica_prefs"
-    const val CURRENT_APP_VERSION = "1.9.12"
+    val CURRENT_APP_VERSION: String
+        get() = BuildConfig.VERSION_NAME
     const val KEY_DARK_THEME_MODE = "dark_theme_mode"
     const val KEY_ACCENT_COLOR = "accent_color_key"
     const val KEY_GUIDED_TOUR_COMPLETED = "guided_tour_completed"

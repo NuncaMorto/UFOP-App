@@ -391,28 +391,199 @@ public enum UfopCurriculumCatalog {
     }
 
     public static func findCourse(matching query: String) -> UfopCourseCurriculum? {
-        let normQuery = normalizeToken(query)
-        guard !normQuery.isEmpty else { return allCourses.first }
+        findCourseExactOrBest(in: allCourses, query: query) ?? allCourses.first
+    }
 
-        if let exactCode = allCourses.first(where: { normalizeToken($0.code) == normQuery }) {
+    public static func findCourseExactOrBest(
+        in courses: [UfopCourseCurriculum],
+        query: String,
+        campusHint: String? = nil
+    ) -> UfopCourseCurriculum? {
+        guard !courses.isEmpty else { return nil }
+        let rawQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawQuery.isEmpty else { return nil }
+
+        // 1. Exact course code match (e.g. "AUT", "FAR", "COM", "PJM", "D04", "IA")
+        if let exactCode = courses.first(where: { $0.code.caseInsensitiveCompare(rawQuery) == .orderedSame }) {
             return exactCode
         }
-        if let exactName = allCourses.first(where: { normalizeToken($0.name) == normQuery }) {
-            return exactName
+
+        let normQuery = normalizeForCatalogMatch(expandEngAbbreviation(rawQuery))
+        let normQueryRaw = normalizeForCatalogMatch(rawQuery)
+        let effectiveQuery = normQuery.isEmpty ? normQueryRaw : normQuery
+        guard !effectiveQuery.isEmpty else { return nil }
+        let queryBase = normalizeForCatalogMatch(stripParentheses(rawQuery))
+
+        let effectiveCampusKey = resolveCampusKey(campusHint) ?? extractCampusKey(fromNormalized: effectiveQuery)
+        let queryWantsEad = effectiveQuery.contains("ead") || effectiveQuery.contains("distancia")
+        let queryWantsLic = effectiveQuery.contains("licenciatura")
+        let queryWantsBach = effectiveQuery.contains("bacharelado")
+
+        func tieBreakScore(for course: UfopCourseCurriculum) -> Int {
+            var score = 0
+            if let campusKey = effectiveCampusKey, campusMatches(course: course, campusKey: campusKey) {
+                score += 100
+            }
+            let courseIsEad = isEadCourse(course)
+            if queryWantsEad && courseIsEad { score += 45 }
+            if !queryWantsEad && !courseIsEad { score += 20 }
+            let normDegree = normalizeForCatalogMatch(course.degree)
+            if queryWantsLic && normDegree.contains("licenciatura") { score += 35 }
+            if queryWantsBach && normDegree.contains("bacharelado") { score += 35 }
+            if !course.subjects.isEmpty { score += 10 }
+            return score
         }
 
-        let tokens = normQuery.split(separator: " ").map(String.init).filter { $0.count >= 3 }
-        var best: UfopCourseCurriculum?
-        var bestScore = 0
-        for course in allCourses {
-            let normName = normalizeToken(course.name)
-            let score = tokens.filter { normName.contains($0) }.count
+        // 2. Exact full normalized name match
+        let exactFullMatches = courses.filter { course in
+            let normName = normalizeForCatalogMatch(course.name)
+            return normName == effectiveQuery || normName == normQueryRaw
+        }
+        if !exactFullMatches.isEmpty {
+            return exactFullMatches.max(by: { tieBreakScore(for: $0) < tieBreakScore(for: $1) })
+        }
+
+        // 3. Exact base-name match (ignoring parenthetical suffixes)
+        let exactBaseMatches = courses.filter { course in
+            let normBase = normalizeForCatalogMatch(stripParentheses(course.name))
+            return normBase == effectiveQuery || normBase == normQueryRaw ||
+                (!queryBase.isEmpty && normBase == queryBase)
+        }
+        if !exactBaseMatches.isEmpty {
+            return exactBaseMatches.max(by: { tieBreakScore(for: $0) < tieBreakScore(for: $1) })
+        }
+
+        // 4. Token-overlap & substring match with campus & degree disambiguation
+        let queryTokens = tokenizeForMatch(effectiveQuery)
+        guard !queryTokens.isEmpty else { return nil }
+
+        var bestCourse: UfopCourseCurriculum?
+        var bestScore = 0.0
+
+        for course in courses {
+            let normName = normalizeForCatalogMatch(course.name)
+            let normBase = normalizeForCatalogMatch(stripParentheses(course.name))
+            let normDegree = normalizeForCatalogMatch(course.degree)
+            let normCampus = normalizeForCatalogMatch(course.campus)
+            let nameTokens = tokenizeForMatch(normName)
+            let allCourseTokens = Set(nameTokens + tokenizeForMatch(normDegree) + tokenizeForMatch(normCampus) + [course.code.lowercased()])
+            let nameTokenSet = Set(nameTokens)
+
+            let matchedQueryTokens = queryTokens.filter { qt in
+                allCourseTokens.contains(qt) || allCourseTokens.contains { ct in
+                    (qt.count >= 4 && ct.hasPrefix(qt)) || (ct.count >= 4 && qt.hasPrefix(ct))
+                }
+            }.count
+
+            let matchedNameTokens = nameTokenSet.filter { nt in
+                queryTokens.contains(nt) || queryTokens.contains { qt in
+                    (qt.count >= 4 && nt.hasPrefix(qt)) || (nt.count >= 4 && qt.hasPrefix(nt))
+                }
+            }.count
+
+            let queryCoverage = Double(matchedQueryTokens) / Double(queryTokens.count)
+            let nameCoverage = nameTokenSet.isEmpty ? 0.0 : Double(matchedNameTokens) / Double(nameTokenSet.count)
+
+            let directSubstring = normName.contains(effectiveQuery) ||
+                effectiveQuery.contains(normName) ||
+                (normBase.count >= 4 && effectiveQuery.contains(normBase))
+
+            if !directSubstring && (matchedQueryTokens == 0 || queryCoverage < 0.6) {
+                continue
+            }
+            if !directSubstring && matchedNameTokens == 0 {
+                continue
+            }
+
+            var score = (queryCoverage * 100.0) + (nameCoverage * 65.0)
+            if directSubstring { score += 35.0 }
+            if effectiveQuery.contains(normBase) && normBase.count >= 4 { score += 20.0 }
+            if let campusKey = effectiveCampusKey, campusMatches(course: course, campusKey: campusKey) {
+                score += 60.0
+            }
+            if queryWantsLic && normDegree.contains("licenciatura") { score += 35.0 }
+            if queryWantsBach && normDegree.contains("bacharelado") { score += 35.0 }
+            let courseIsEad = isEadCourse(course)
+            if queryWantsEad && courseIsEad { score += 30.0 }
+            if !queryWantsEad && courseIsEad { score -= 18.0 }
+            if !course.subjects.isEmpty { score += 5.0 }
+
             if score > bestScore {
                 bestScore = score
-                best = course
+                bestCourse = course
             }
         }
-        return bestScore > 0 ? best : allCourses.first
+
+        return bestScore >= 65.0 ? bestCourse : nil
+    }
+
+    private static let matchStopWords: Set<String> = [
+        "de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos",
+        "para", "por", "com", "a", "o", "as", "os", "curso"
+    ]
+
+    private static func stripParentheses(_ text: String) -> String {
+        text.replacingOccurrences(of: #"\s*\([^)]*\)"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func expandEngAbbreviation(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: #"\beng\."#,
+            with: "engenharia",
+            options: [.regularExpression, .caseInsensitive]
+        )
+    }
+
+    private static func normalizeForCatalogMatch(_ raw: String) -> String {
+        let folded = raw
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "pt_BR"))
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression)
+        return folded
+            .split(separator: " ")
+            .joined(separator: " ")
+    }
+
+    private static func tokenizeForMatch(_ normText: String) -> [String] {
+        normText.split(separator: " ")
+            .map(String.init)
+            .filter { !$0.isEmpty && !matchStopWords.contains($0) }
+    }
+
+    private static func resolveCampusKey(_ campusHint: String?) -> String? {
+        guard let hint = campusHint?.trimmingCharacters(in: .whitespacesAndNewlines), !hint.isEmpty else {
+            return nil
+        }
+        return extractCampusKey(fromNormalized: normalizeForCatalogMatch(hint))
+    }
+
+    private static func extractCampusKey(fromNormalized normText: String) -> String? {
+        if normText.contains("monlevade") || normText.contains("icea") || normText == "jm" {
+            return "joao monlevade"
+        }
+        if normText.contains("mariana") || normText.contains("ichs") || normText.contains("icsa") {
+            return "mariana"
+        }
+        if normText.contains("ouro preto") || normText.contains("cruzeiro") || normText == "op" {
+            return "ouro preto"
+        }
+        if normText.contains("ead") || normText.contains("cead") {
+            return "ead"
+        }
+        return nil
+    }
+
+    private static func isEadCourse(_ course: UfopCourseCurriculum) -> Bool {
+        let combined = normalizeForCatalogMatch("\(course.name) \(course.degree) \(course.campus)")
+        return combined.contains("ead")
+    }
+
+    private static func campusMatches(course: UfopCourseCurriculum, campusKey: String) -> Bool {
+        if campusKey == "ead" { return isEadCourse(course) }
+        let normCampus = normalizeForCatalogMatch(course.campus)
+        let normName = normalizeForCatalogMatch(course.name)
+        return normCampus.contains(campusKey) || normName.contains(campusKey)
     }
 
     public static func parseEnrollmentYearSemester(_ registrationNumber: String) -> (year: Int, semester: Int)? {

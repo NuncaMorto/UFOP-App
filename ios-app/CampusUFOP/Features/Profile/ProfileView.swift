@@ -526,7 +526,8 @@ public struct ProfileView: View {
         return DynamicCurriculumCatalog.resolveMatrixForStudent(
             courseName: activeStore.studentProfile.courseName,
             registrationNumber: activeStore.studentProfile.registrationNumber,
-            earliestTranscriptSemester: earliestSemester
+            earliestTranscriptSemester: earliestSemester,
+            campusHint: activeStore.studentProfile.campusName
         )
     }
 
@@ -535,6 +536,16 @@ public struct ProfileView: View {
         let matrix = resolution.matrix
         let completed = activeStore.dynamicGridCompletedSet(for: matrix.id)
         let gridSummary = DynamicGridEngine.summarize(matrix: matrix, completedCodes: completed)
+        let trimmedCourseName = activeStore.studentProfile.courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let subtitleText: String = {
+            if resolution.isCourseMatched {
+                return "\(matrix.courseName) · \(matrix.curriculumLabel) · \(gridSummary.completedHours)/\(gridSummary.totalGridHours)h · \(gridSummary.completionPercent)%"
+            }
+            if !trimmedCourseName.isEmpty {
+                return "Detalhamento pendente para \(trimmedCourseName) · Toque para explorar cursos"
+            }
+            return "\(matrix.courseName) · \(gridSummary.completedHours)/\(gridSummary.totalGridHours)h · \(gridSummary.completionPercent)%"
+        }()
 
         return Button {
             if activeAppearance.accessibility.reduceMotion {
@@ -555,9 +566,10 @@ public struct ProfileView: View {
                         Text("Grade Dinâmica")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                        Text("\(matrix.curriculumLabel) · \(gridSummary.completedHours)/\(gridSummary.totalGridHours)h · \(gridSummary.completionPercent)%")
+                        Text(subtitleText)
                             .font(.system(size: 12))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(2)
                     }
 
                     Spacer()

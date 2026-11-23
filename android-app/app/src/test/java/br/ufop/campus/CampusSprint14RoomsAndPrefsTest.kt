@@ -1,6 +1,7 @@
 package br.ufop.campus
 
 import android.content.SharedPreferences
+import br.ufop.campus.BuildConfig
 import br.ufop.campus.core.curriculum.UfopRoomAllocationCatalog
 import br.ufop.campus.core.curriculum.UfopRoomAllocationIndex
 import br.ufop.campus.core.ffi.AssessmentItem
@@ -276,7 +277,9 @@ class CampusSprint14RoomsAndPrefsTest {
 
     @Test
     fun repositoryHolderPreferenceHelpers_persistTimetableOrientationAndDisciplinesLayoutMode() {
-        assertEquals("1.9.12", CampusRepositoryHolder.CURRENT_APP_VERSION)
+        assertEquals(BuildConfig.VERSION_NAME, CampusRepositoryHolder.CURRENT_APP_VERSION)
+        assertTrue(Regex("""^\d+\.\d+\.\d+$""").matches(CampusRepositoryHolder.CURRENT_APP_VERSION))
+        assertTrue(BuildConfig.VERSION_CODE > 0)
 
         val prefs = InMemorySharedPreferences()
 

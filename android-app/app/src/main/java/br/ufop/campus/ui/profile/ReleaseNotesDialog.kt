@@ -55,10 +55,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.12",
-            title = "Adaptação para Tablets, Dobráveis & Matriz 2024/1 Completa",
+            version = "v1.9.13",
+            title = "Grade Dinâmica para 48 Cursos da UFOP & Modularização",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Grade Dinâmica Interativa liberada automaticamente para os 48 cursos com disciplinas detalhadas no catálogo UFOP (como Farmácia, entre outros), resolvida pelo curso real e semestre de ingresso do estudante.",
+                "Geração acíclica automática de pré-requisitos, requisitos mínimos de carga horária e slots de optativas/eletivas, preservando as matrizes históricas curadas de Eng. de Controle e Automação (2024/1 e 2026/1) e exibindo aviso claro nos 6 cursos ainda sem detalhamento.",
+                "Novo seletor modal pesquisável na Grade Dinâmica com busca por curso, código ou campus, exibindo versão curricular, número de disciplinas e carga horária.",
+                "Modularização interna das telas de Perfil/Disciplinas e do núcleo em memória, com BuildConfig.VERSION_NAME como fonte única de versão."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.12",
+            title = "Adaptação para Tablets, Dobráveis & Matriz 2024/1 Completa",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Layout adaptativo nativo para tablets, dobráveis e modo multi-janela (Material 3 WindowSizeClass + Jetpack WindowManager): Navigation Rail lateral e painéis mestre-detalhe lado a lado em Agenda, Disciplinas e Perfil.",
                 "Suporte a todas as orientações em tablets e dobráveis abertos, com detecção de dobradiça (Book / Tabletop) e cards em múltiplas colunas na aba Atividades.",

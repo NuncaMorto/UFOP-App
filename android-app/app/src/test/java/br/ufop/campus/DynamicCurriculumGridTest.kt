@@ -6,7 +6,11 @@ import br.ufop.campus.core.curriculum.DynamicCourseStatus
 import br.ufop.campus.core.curriculum.DynamicCurriculumCatalog
 import br.ufop.campus.core.curriculum.DynamicCurriculumMatrix
 import br.ufop.campus.core.curriculum.DynamicGridEngine
+import br.ufop.campus.core.curriculum.DynamicGridSummary
 import br.ufop.campus.core.curriculum.DynamicGridToggleAction
+import br.ufop.campus.core.curriculum.UfopCourseCurriculum
+import br.ufop.campus.core.curriculum.UfopCurriculumCatalog
+import br.ufop.campus.core.curriculum.UfopCurriculumSubject
 import br.ufop.campus.core.ffi.CampusEngineBridgeRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.ffi.InMemoryCampusRepository
@@ -16,6 +20,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -427,6 +432,304 @@ class DynamicCurriculumGridTest {
 
         CampusRepositoryHolder.clearAllLocalPreferencesFromPrefs(prefs)
         assertTrue(CampusRepositoryHolder.loadDynamicGridIsHorizontalFromPrefs(prefs))
+    }
+
+    private fun locateCurriculumAssetJsonFile(): File {
+        val userDir = System.getProperty("user.dir").orEmpty()
+        val relativePaths = listOf(
+            "src/main/assets/ufop_matrizes_2026_2.json",
+            "app/src/main/assets/ufop_matrizes_2026_2.json",
+            "android-app/app/src/main/assets/ufop_matrizes_2026_2.json"
+        )
+        val candidates = buildList {
+            relativePaths.forEach { add(File(it)) }
+            if (userDir.isNotBlank()) {
+                val baseDir = File(userDir)
+                relativePaths.forEach { add(File(baseDir, it)) }
+            }
+        }
+        return candidates.firstOrNull { it.isFile }
+            ?: throw IllegalStateException(
+                "Could not locate ufop_matrizes_2026_2.json from user.dir='$userDir' / cwd='${File(".").absolutePath}'"
+            )
+    }
+
+    private fun loadAllCatalogCoursesFromAsset(): List<UfopCourseCurriculum> {
+        val jsonText = locateCurriculumAssetJsonFile().readText(Charsets.UTF_8)
+        return UfopCurriculumCatalog.loadFromJsonString(jsonText)
+    }
+
+    private fun hasCycleInMatrix(matrix: DynamicCurriculumMatrix): Boolean {
+        val byCode = matrix.courses.associateBy { it.code.uppercase() }
+        val visitState = HashMap<String, Int>(matrix.courses.size)
+        fun dfs(code: String): Boolean {
+            when (visitState[code]) {
+                1 -> return true
+                2 -> return false
+            }
+            visitState[code] = 1
+            val node = byCode[code] ?: return false
+            for (prereq in node.prerequisites) {
+                if (dfs(prereq.uppercase())) return true
+            }
+            visitState[code] = 2
+            return false
+        }
+        return matrix.courses.any { dfs(it.code.uppercase()) }
+    }
+
+    @Test
+    fun catalogJson_convertsAll48DetailedCoursesToValidAcyclicMatrices() {
+        val courses = loadAllCatalogCoursesFromAsset()
+        assertEquals(54, courses.size)
+
+        val detailedCourses = courses.filter { it.subjects.isNotEmpty() }
+        val pendingCourses = courses.filter { it.subjects.isEmpty() }
+        assertEquals(48, detailedCourses.size)
+        assertEquals(6, pendingCourses.size)
+
+        pendingCourses.forEach { pending ->
+            assertNull(
+                "Curso sem detalhamento ${pending.code} deveria retornar null",
+                DynamicCurriculumCatalog.fromCourseCurriculum(pending)
+            )
+        }
+
+        val converted = detailedCourses.map { course ->
+            val matrix = DynamicCurriculumCatalog.fromCourseCurriculum(course)
+            assertNotNull("Curso detalhado ${course.code} deveria converter", matrix)
+            matrix!!
+        }
+        assertEquals(48, converted.size)
+        assertEquals(48, converted.map { it.id }.distinct().size)
+
+        converted.forEach { matrix ->
+            assertTrue("Matriz ${matrix.id} deve ter totalPeriods >= 1", matrix.totalPeriods >= 1)
+            assertTrue("Matriz ${matrix.id} deve possuir disciplinas", matrix.courses.isNotEmpty())
+            val byCode = matrix.courses.associateBy { it.code.uppercase() }
+            assertEquals("Códigos únicos esperados em ${matrix.id}", matrix.courses.size, byCode.size)
+            assertTrue(
+                "Períodos inválidos em ${matrix.id}",
+                matrix.courses.all { it.period in 1..matrix.totalPeriods }
+            )
+            assertEquals(
+                "Fechamento de horas divergente em ${matrix.id}",
+                matrix.totalCourseHours,
+                matrix.totalGridHours + matrix.requiredActivitiesHours
+            )
+            matrix.courses.forEach { node ->
+                node.prerequisites.forEach { prereq ->
+                    assertTrue(
+                        "Pré-requisito inexistente '$prereq' em ${matrix.id}:${node.code}",
+                        byCode.containsKey(prereq.uppercase())
+                    )
+                    assertFalse(
+                        "Auto-referência proibida em ${matrix.id}:${node.code}",
+                        prereq.equals(node.code, ignoreCase = true)
+                    )
+                }
+            }
+            assertFalse("Ciclo detectado em ${matrix.id}", hasCycleInMatrix(matrix))
+        }
+
+        // buildAllMatrices preserva as 2 matrizes curadas de AUT e adiciona os outros 47 cursos sem duplicar AUT
+        val allMerged = DynamicCurriculumCatalog.buildAllMatrices(courses)
+        assertEquals(49, allMerged.size)
+        assertEquals(2, allMerged.count { it.courseCode.equals("AUT", ignoreCase = true) })
+        assertTrue(allMerged.all { !hasCycleInMatrix(it) })
+        assertNotNull(DynamicCurriculumCatalog.findById("ufop_far_2026_2", courses))
+        assertNotNull(DynamicCurriculumCatalog.findById("eng_controle_automacao_2023", courses))
+    }
+
+    @Test
+    fun fromCourseCurriculum_preventsCyclesHandlesPeriodZeroAndParsesMinHours() {
+        val syntheticCourse = UfopCourseCurriculum(
+            code = "TST",
+            name = "Curso Teste DAG",
+            degree = "Bacharelado",
+            campus = "Ouro Preto",
+            curriculumVersion = "2026/2 (currículo 1)",
+            chMandatory = 180,
+            chOptional = 90,
+            chElective = 60,
+            chExtension = 0,
+            chActivities = 100,
+            chTotal = 430,
+            status = "Coletada",
+            subjects = listOf(
+                UfopCurriculumSubject(
+                    code = "TST101",
+                    name = "Disciplina A",
+                    departmentId = "detst",
+                    departmentCode = "DETST",
+                    period = 1,
+                    type = "Obrigatória",
+                    chs = 60,
+                    che = 0,
+                    cha = 72,
+                    weeklyTheory = 4,
+                    weeklyPractice = 0,
+                    prerequisites = listOf("TST102", "TST101", "EXT999")
+                ),
+                UfopCurriculumSubject(
+                    code = "TST102",
+                    name = "Disciplina B",
+                    departmentId = "detst",
+                    departmentCode = "DETST",
+                    period = 2,
+                    type = "Obrigatória",
+                    chs = 60,
+                    che = 0,
+                    cha = 72,
+                    weeklyTheory = 4,
+                    weeklyPractice = 0,
+                    prerequisites = listOf("TST101", "2000h")
+                ),
+                UfopCurriculumSubject(
+                    code = "TST999",
+                    name = "Disciplina Obrigatória Sem Período",
+                    departmentId = "detst",
+                    departmentCode = "DETST",
+                    period = 0,
+                    type = "Obrigatória",
+                    chs = 60,
+                    che = 0,
+                    cha = 72,
+                    weeklyTheory = 4,
+                    weeklyPractice = 0,
+                    prerequisites = listOf("1500 horas")
+                ),
+                UfopCurriculumSubject(
+                    code = "ATV100",
+                    name = "Atividade Complementar",
+                    departmentId = "detst",
+                    departmentCode = "DETST",
+                    period = 2,
+                    type = "Atividade",
+                    chs = 100,
+                    che = 0,
+                    cha = 120,
+                    weeklyTheory = 0,
+                    weeklyPractice = 0,
+                    prerequisites = emptyList()
+                )
+            )
+        )
+
+        val matrix = DynamicCurriculumCatalog.fromCourseCurriculum(syntheticCourse)!!
+        assertEquals("ufop_tst_2026_2", matrix.id)
+        assertEquals("2026/2 · Currículo 1", matrix.curriculumLabel)
+        assertEquals(2, matrix.totalPeriods)
+        assertEquals(100, matrix.requiredActivitiesHours)
+        assertEquals(430, matrix.totalCourseHours)
+        assertEquals(330, matrix.totalGridHours)
+        assertFalse("Grafo convertido precisa ser acíclico", hasCycleInMatrix(matrix))
+
+        val byCode = matrix.courses.associateBy { it.code }
+        assertFalse(byCode.containsKey("ATV100"))
+        assertEquals(2, byCode.getValue("TST999").period)
+        assertEquals(1500, byCode.getValue("TST999").minHoursRequired)
+        assertEquals(2000, byCode.getValue("TST102").minHoursRequired)
+        assertFalse(byCode.getValue("TST101").prerequisites.contains("TST101"))
+        assertFalse(byCode.getValue("TST101").prerequisites.contains("EXT999"))
+
+        assertEquals(listOf("OPT001", "OPT002", "ELT001"), matrix.courses.filter { it.isElective }.map { it.code })
+        assertEquals(60, byCode.getValue("OPT001").workloadHours)
+        assertEquals(30, byCode.getValue("OPT002").workloadHours)
+        assertEquals(60, byCode.getValue("ELT001").workloadHours)
+    }
+
+    @Test
+    fun resolveMatrixForStudent_resolvesFarmaciaCampusDisambiguationAndPendingCourses() {
+        val courses = loadAllCatalogCoursesFromAsset()
+
+        // 1. Farmácia: com acento, sem acento e por código FAR
+        listOf("Farmácia", "Farmacia", "FAR").forEach { query ->
+            val res = DynamicCurriculumCatalog.resolveMatrixForStudent(
+                courseName = query,
+                registrationNumber = "25.1.1000",
+                earliestTranscriptSemester = null,
+                catalogCourses = courses,
+                campusHint = "Ouro Preto"
+            )
+            assertTrue("Query '$query' deveria resolver curso", res.isCourseMatched)
+            assertEquals("ufop_far_2026_2", res.matrix.id)
+            assertEquals("FAR", res.matrix.courseCode)
+            assertEquals("Farmácia", res.matrix.courseName)
+            assertEquals("2026/2 · Currículo 5", res.matrix.curriculumLabel)
+            assertEquals(9, res.matrix.totalPeriods)
+            assertEquals(3750, res.matrix.totalGridHours)
+            assertEquals(135, res.matrix.requiredActivitiesHours)
+            assertEquals(3885, res.matrix.totalCourseHours)
+            assertEquals(66, res.matrix.courses.size)
+            assertEquals(60, res.matrix.courses.count { !it.isElective })
+            assertEquals(6, res.matrix.courses.count { it.isElective })
+        }
+
+        // Simula progressão em Farmácia: CBI114 -> CBI107
+        val farMatrix = DynamicCurriculumCatalog.findById("ufop_far_2026_2", courses)!!
+        assertEquals(DynamicCourseStatus.AVAILABLE, DynamicGridEngine.statusOf(farMatrix, "CBI114", emptySet()))
+        val toggleCbi114 = DynamicGridEngine.toggleCourse(farMatrix, "CBI114", emptySet())
+        assertEquals(DynamicGridToggleAction.MARKED_COMPLETED, toggleCbi114.action)
+        val cbi107Node = farMatrix.courses.firstOrNull { "CBI114" in it.prerequisites }
+        if (cbi107Node != null) {
+            assertEquals(DynamicCourseStatus.LOCKED, DynamicGridEngine.statusOf(farMatrix, cbi107Node.code, emptySet()))
+        }
+
+        // 2. Desambiguação por campus: Engenharia de Produção (Ouro Preto vs João Monlevade)
+        val prodJm = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Engenharia de Produção",
+            registrationNumber = "25.1.2000",
+            catalogCourses = courses,
+            campusHint = "João Monlevade"
+        )
+        assertTrue(prodJm.isCourseMatched)
+        assertEquals("PJM", prodJm.matrix.courseCode)
+
+        val prodOp = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Engenharia de Produção",
+            registrationNumber = "25.1.2000",
+            catalogCourses = courses,
+            campusHint = "Ouro Preto"
+        )
+        assertTrue(prodOp.isCourseMatched)
+        assertEquals("PRO", prodOp.matrix.courseCode)
+
+        // 3. Automação continua selecionando 2024/1 vs 2026/1 e preservando legado mesmo com catalogCourses
+        val aut24 = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Eng. de Controle e Automação",
+            registrationNumber = "24.1.4001",
+            catalogCourses = courses
+        )
+        assertEquals("eng_controle_automacao_2024_1", aut24.matrix.id)
+        assertTrue(aut24.isCourseMatched)
+        assertTrue(aut24.isExactVersionMatch)
+
+        val aut26 = DynamicCurriculumCatalog.resolveMatrixForStudent(
+            courseName = "Engenharia de Controle e Automação",
+            registrationNumber = "26.1.4001",
+            catalogCourses = courses
+        )
+        assertEquals("eng_controle_automacao_2026_1", aut26.matrix.id)
+        assertTrue(aut26.isCourseMatched)
+        assertTrue(aut26.isExactVersionMatch)
+
+        assertEquals(
+            DynamicCurriculumCatalog.engControleAutomacao2024_1,
+            DynamicCurriculumCatalog.findById("eng_controle_automacao_2023", courses)
+        )
+
+        // 4. Cursos sem subjects no JSON retornam fallback com nota clara
+        listOf("Estatística", "Inteligência Artificial").forEach { pendingName ->
+            val pendingRes = DynamicCurriculumCatalog.resolveMatrixForStudent(
+                courseName = pendingName,
+                registrationNumber = "26.1.9999",
+                catalogCourses = courses
+            )
+            assertFalse(pendingRes.isCourseMatched)
+            assertNotNull(pendingRes.note)
+            assertTrue(pendingRes.note!!.contains("pendente", ignoreCase = true))
+        }
     }
 
     private class InMemorySharedPreferences : SharedPreferences {

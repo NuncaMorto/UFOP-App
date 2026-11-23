@@ -44,7 +44,8 @@ data class DynamicCurriculumMatrix(
     val courseAliases: List<String> = emptyList(),
     val effectiveFrom: DynamicSemesterTerm = DynamicSemesterTerm(2024, 1),
     val effectiveUntil: DynamicSemesterTerm? = null,
-    val legacyIds: List<String> = emptyList()
+    val legacyIds: List<String> = emptyList(),
+    val campus: String = ""
 ) {
     val totalGridHours: Int
         get() = courses.sumOf { it.workloadHours }
@@ -104,6 +105,11 @@ object DynamicCurriculumCatalog {
 
     private val DIACRITICS_REGEX = Regex("\\p{M}+")
     private val SEMESTER_TERM_REGEX = Regex("""(?:^|\D)(\d{4}|\d{2})\s*[./-]\s*([12])(?:\D|$)""")
+    private val PREREQ_CODE_REGEX = Regex("""\b([A-Z]{2,5}\d{3,4}[A-Z]?)\b""")
+    private val MIN_HOURS_REGEX = Regex("""\b(\d{1,5})\s*(?:h|hs|hora|horas)\b""", RegexOption.IGNORE_CASE)
+    private val CURRICULUM_PAREN_REGEX = Regex("""\(\s*curr[ií]culo\s+(\d+)\s*\)""", RegexOption.IGNORE_CASE)
+    private val PAREN_SUFFIX_REGEX = Regex("""\s*\([^)]*\)""")
+    private val NON_ALNUM_REGEX = Regex("""[^a-z0-9]+""")
 
     private val AUTOMACAO_ALIASES = listOf(
         "engenharia de controle e automacao",
@@ -124,6 +130,7 @@ object DynamicCurriculumCatalog {
         effectiveFrom = DynamicSemesterTerm(2024, 1),
         effectiveUntil = DynamicSemesterTerm(2025, 2),
         legacyIds = listOf("eng_controle_automacao_2023"),
+        campus = "Ouro Preto",
         courses = listOf(
             // Período 1
             DynamicCourseNode("BCC701", "Programação de Computadores I", 60, 1),
@@ -212,6 +219,7 @@ object DynamicCurriculumCatalog {
         courseAliases = AUTOMACAO_ALIASES,
         effectiveFrom = DynamicSemesterTerm(2026, 1),
         effectiveUntil = null,
+        campus = "Ouro Preto",
         courses = listOf(
             // Período 1
             DynamicCourseNode("ARQ700", "Expressão Gráfica", 60, 1),
@@ -293,19 +301,260 @@ object DynamicCurriculumCatalog {
     val engControleAutomacao2023: DynamicCurriculumMatrix
         get() = engControleAutomacao2024_1
 
-    val allMatrices: List<DynamicCurriculumMatrix> = listOf(
+    val curatedMatrices: List<DynamicCurriculumMatrix> = listOf(
         engControleAutomacao2024_1,
         engControleAutomacao2026_1
     )
 
+    val allMatrices: List<DynamicCurriculumMatrix> = curatedMatrices
+
     val defaultMatrix: DynamicCurriculumMatrix = engControleAutomacao2024_1
 
-    fun findById(id: String?): DynamicCurriculumMatrix? {
+    fun fromCourseCurriculum(course: UfopCourseCurriculum): DynamicCurriculumMatrix? {
+        if (course.subjects.isEmpty()) return null
+        val cleanCourseCode = course.code.trim().uppercase()
+        val cleanCourseName = course.name.trim()
+        if (cleanCourseCode.isEmpty() || cleanCourseName.isEmpty()) return null
+
+        // Exclui atividades curriculares (já contabilizadas em requiredActivitiesHours) e deduplica códigos
+        val seenSubjectCodes = HashSet<String>()
+        val curriculumSubjects = course.subjects.filter { subject ->
+            val typeNorm = subject.type.trim().lowercase()
+            if (typeNorm == "atividade" || typeNorm == "atv") return@filter false
+            val code = subject.code.trim().uppercase()
+            code.isNotEmpty() && seenSubjectCodes.add(code)
+        }
+        if (curriculumSubjects.isEmpty()) return null
+
+        val totalPeriods = curriculumSubjects.maxOfOrNull { it.period }?.takeIf { it > 0 } ?: 1
+        val validSubjectCodes = curriculumSubjects.mapTo(HashSet()) { it.code.trim().uppercase() }
+
+        // Constrói o grafo de pré-requisitos verificando alcançabilidade para impedir ciclos
+        val acceptedPrereqs = linkedMapOf<String, MutableList<String>>()
+        fun canReach(start: String, target: String): Boolean {
+            val stack = ArrayDeque<String>()
+            val visited = HashSet<String>()
+            stack.addLast(start)
+            while (stack.isNotEmpty()) {
+                val curr = stack.removeLast()
+                if (curr == target) return true
+                if (!visited.add(curr)) continue
+                acceptedPrereqs[curr]?.forEach { next ->
+                    if (next !in visited) stack.addLast(next)
+                }
+            }
+            return false
+        }
+
+        val orderedSubjects = curriculumSubjects
+            .mapIndexed { index, subject ->
+                val resolvedPeriod = if (subject.period > 0) subject.period.coerceAtMost(totalPeriods) else totalPeriods
+                Triple(resolvedPeriod, index, subject)
+            }
+            .sortedWith(compareBy<Triple<Int, Int, UfopCurriculumSubject>> { it.first }.thenBy { it.second })
+
+        val nodes = ArrayList<DynamicCourseNode>(orderedSubjects.size + 8)
+        for ((resolvedPeriod, _, subject) in orderedSubjects) {
+            val nodeCode = subject.code.trim().uppercase()
+            val workloadHours = (if (subject.chs > 0) subject.chs else subject.cha).coerceAtLeast(0)
+            var minHoursRequired = 0
+            val candidatePrereqs = LinkedHashSet<String>()
+
+            for (rawPrereq in subject.prerequisites) {
+                val upperPrereq = rawPrereq.uppercase()
+                PREREQ_CODE_REGEX.findAll(upperPrereq).forEach { match ->
+                    val code = match.groupValues[1]
+                    if (code != nodeCode && code in validSubjectCodes) {
+                        candidatePrereqs.add(code)
+                    }
+                }
+                MIN_HOURS_REGEX.findAll(rawPrereq).forEach { match ->
+                    val hours = match.groupValues[1].toIntOrNull() ?: 0
+                    if (hours > minHoursRequired) {
+                        minHoursRequired = hours
+                    }
+                }
+            }
+
+            val acceptedForNode = acceptedPrereqs.getOrPut(nodeCode) { mutableListOf() }
+            for (prereq in candidatePrereqs) {
+                if (!canReach(prereq, nodeCode)) {
+                    acceptedForNode.add(prereq)
+                }
+            }
+
+            nodes.add(
+                DynamicCourseNode(
+                    code = nodeCode,
+                    name = subject.name.trim(),
+                    workloadHours = workloadHours,
+                    period = resolvedPeriod,
+                    prerequisites = acceptedForNode.toList(),
+                    minHoursRequired = minHoursRequired,
+                    isElective = false
+                )
+            )
+        }
+
+        // Sintetiza blocos de optativas (OPT001..) e eletivas (ELT001..) distribuídos nos períodos finais
+        val usedNodeCodes = nodes.mapTo(HashSet()) { it.code }
+        val synthesizedSpecs = mutableListOf<Triple<String, String, Int>>()
+        if (course.chOptional > 0) {
+            val blocks = splitWorkloadIntoSlots(course.chOptional)
+            var nextNum = 1
+            blocks.forEachIndexed { idx, hours ->
+                var code: String
+                do {
+                    code = "OPT%03d".format(nextNum++)
+                } while (code in usedNodeCodes)
+                usedNodeCodes.add(code)
+                synthesizedSpecs.add(Triple(code, "Disciplina Optativa ${toRomanOrDecimal(idx + 1)}", hours))
+            }
+        }
+        if (course.chElective > 0) {
+            val blocks = splitWorkloadIntoSlots(course.chElective)
+            var nextNum = 1
+            blocks.forEachIndexed { idx, hours ->
+                var code: String
+                do {
+                    code = "ELT%03d".format(nextNum++)
+                } while (code in usedNodeCodes)
+                usedNodeCodes.add(code)
+                synthesizedSpecs.add(Triple(code, "Disciplina Eletiva ${toRomanOrDecimal(idx + 1)}", hours))
+            }
+        }
+
+        if (synthesizedSpecs.isNotEmpty()) {
+            val windowSize = when {
+                synthesizedSpecs.size <= 2 -> minOf(2, totalPeriods)
+                synthesizedSpecs.size <= 6 -> minOf(3, totalPeriods)
+                else -> minOf(4, totalPeriods)
+            }
+            val startPeriod = (totalPeriods - windowSize + 1).coerceAtLeast(1)
+            synthesizedSpecs.forEachIndexed { index, (code, title, hours) ->
+                val targetPeriod = (startPeriod + (index * windowSize) / synthesizedSpecs.size)
+                    .coerceIn(1, totalPeriods)
+                nodes.add(
+                    DynamicCourseNode(
+                        code = code,
+                        name = title,
+                        workloadHours = hours,
+                        period = targetPeriod,
+                        isElective = true
+                    )
+                )
+            }
+        }
+
+        val computedGridHours = nodes.sumOf { it.workloadHours }
+        val (requiredActivitiesHours, totalCourseHours) = if (course.chTotal > computedGridHours) {
+            val actHours = if (course.chActivities > 0 && computedGridHours + course.chActivities == course.chTotal) {
+                course.chActivities
+            } else {
+                course.chTotal - computedGridHours
+            }
+            actHours to (computedGridHours + actHours)
+        } else {
+            val actHours = course.chActivities.coerceAtLeast(0)
+            actHours to (computedGridHours + actHours)
+        }
+
+        val versionTerm = parseSemesterTerm(course.curriculumVersion)
+        val versionSlug = if (versionTerm != null) {
+            "${versionTerm.first}_${versionTerm.second}"
+        } else {
+            val rawSlug = normalizeLookupText(course.curriculumVersion).replace(' ', '_')
+            rawSlug.ifEmpty { "2026_2" }
+        }
+        val matrixId = "ufop_${cleanCourseCode.lowercase()}_$versionSlug"
+        val curriculumLabel = formatCurriculumLabel(course.curriculumVersion)
+        val effectiveFrom = if (versionTerm != null && versionTerm.first < course.effectiveFromYear) {
+            DynamicSemesterTerm(versionTerm.first, versionTerm.second)
+        } else {
+            DynamicSemesterTerm(course.effectiveFromYear, course.effectiveFromSemester)
+        }
+        val effectiveUntil = course.effectiveUntilYear?.let { untilYear ->
+            DynamicSemesterTerm(untilYear, course.effectiveUntilSemester ?: 2)
+        }
+
+        return DynamicCurriculumMatrix(
+            id = matrixId,
+            courseName = cleanCourseName,
+            curriculumLabel = curriculumLabel,
+            totalPeriods = totalPeriods,
+            requiredActivitiesHours = requiredActivitiesHours,
+            totalCourseHours = totalCourseHours,
+            courses = nodes,
+            courseCode = cleanCourseCode,
+            courseAliases = buildCourseAliases(cleanCourseCode, cleanCourseName),
+            effectiveFrom = effectiveFrom,
+            effectiveUntil = effectiveUntil,
+            campus = course.campus.trim()
+        )
+    }
+
+    fun buildAllMatrices(catalogCourses: List<UfopCourseCurriculum>): List<DynamicCurriculumMatrix> {
+        if (catalogCourses.isEmpty()) return curatedMatrices
+        val curatedCodes = curatedMatrices
+            .map { it.courseCode.trim().uppercase() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+
+        val generated = catalogCourses.mapNotNull { course ->
+            val code = course.code.trim().uppercase()
+            if (code in curatedCodes) null else fromCourseCurriculum(course)
+        }
+
+        return (curatedMatrices + generated).sortedWith(
+            compareBy<DynamicCurriculumMatrix> { normalizeLookupText(it.courseName) }
+                .thenBy { it.effectiveFrom }
+        )
+    }
+
+    fun findById(
+        id: String?,
+        catalogCourses: List<UfopCourseCurriculum> = emptyList()
+    ): DynamicCurriculumMatrix? {
         val cleanId = id?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        return allMatrices.firstOrNull { matrix ->
+        val matrices = buildAllMatrices(catalogCourses)
+        return matrices.firstOrNull { matrix ->
             matrix.id.equals(cleanId, ignoreCase = true) ||
                 matrix.legacyIds.any { it.equals(cleanId, ignoreCase = true) }
         }
+    }
+
+    fun searchMatrices(
+        matrices: List<DynamicCurriculumMatrix>,
+        query: String
+    ): List<DynamicCurriculumMatrix> {
+        val normQuery = normalizeLookupText(query)
+        if (normQuery.isEmpty()) return matrices
+        val tokens = normQuery.split(' ').filter { it.isNotEmpty() }
+        return matrices.mapNotNull { matrix ->
+            val normCode = normalizeLookupText(matrix.courseCode)
+            val normName = normalizeLookupText(matrix.courseName)
+            val normCampus = normalizeLookupText(matrix.campus)
+            val normLabel = normalizeLookupText(matrix.curriculumLabel)
+            val normAliases = matrix.courseAliases.joinToString(" ") { normalizeLookupText(it) }
+            val haystack = "$normName $normCode $normCampus $normLabel $normAliases"
+
+            val score = when {
+                normCode == normQuery -> 1000
+                normName.startsWith(normQuery) -> 800
+                normCode.startsWith(normQuery) -> 750
+                normName.contains(normQuery) -> 600
+                normCampus.contains(normQuery) -> 450
+                tokens.isNotEmpty() && tokens.all { tok -> haystack.contains(tok) } -> 350
+                else -> 0
+            }
+            if (score > 0) matrix to score else null
+        }
+            .sortedWith(
+                compareByDescending<Pair<DynamicCurriculumMatrix, Int>> { it.second }
+                    .thenBy { normalizeLookupText(it.first.courseName) }
+                    .thenBy { it.first.effectiveFrom }
+            )
+            .map { it.first }
     }
 
     fun loadCompletedCodesWithLegacyFallback(
@@ -324,7 +573,9 @@ object DynamicCurriculumCatalog {
     fun resolveMatrixForStudent(
         courseName: String,
         registrationNumber: String,
-        earliestTranscriptSemester: String? = null
+        earliestTranscriptSemester: String? = null,
+        catalogCourses: List<UfopCourseCurriculum> = emptyList(),
+        campusHint: String? = null
     ): DynamicMatrixResolution {
         val regPair = parseEnrollmentYearSemester(registrationNumber)
         val txPair = parseSemesterTerm(earliestTranscriptSemester)
@@ -332,7 +583,31 @@ object DynamicCurriculumCatalog {
             .minWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
         val entryTerm = entryPair?.let { (year, sem) -> DynamicSemesterTerm(year, sem) }
 
-        val courseMatrices = findMatricesForCourse(courseName)
+        val matrices = buildAllMatrices(catalogCourses)
+        val matchedCatalog = if (catalogCourses.isNotEmpty() && courseName.isNotBlank()) {
+            UfopCurriculumCatalog.findCourse(catalogCourses, courseName, campusHint)
+        } else {
+            null
+        }
+
+        val courseMatrices: List<DynamicCurriculumMatrix> = if (matchedCatalog != null) {
+            val byCatalogCode = matrices.filter {
+                it.courseCode.equals(matchedCatalog.code, ignoreCase = true)
+            }
+            if (byCatalogCode.isEmpty()) {
+                return DynamicMatrixResolution(
+                    matrix = defaultMatrix,
+                    studentEntryTerm = entryTerm,
+                    isCourseMatched = false,
+                    isExactVersionMatch = false,
+                    note = "O detalhamento curricular de ${matchedCatalog.name} ainda está pendente no catálogo. Escolha outro curso no seletor acima para explorar."
+                )
+            }
+            byCatalogCode
+        } else {
+            findMatricesForCourse(courseName, matrices)
+        }
+
         if (courseMatrices.isEmpty()) {
             val cleanCourse = courseName.trim()
             return DynamicMatrixResolution(
@@ -389,11 +664,14 @@ object DynamicCurriculumCatalog {
         )
     }
 
-    private fun findMatricesForCourse(courseName: String): List<DynamicCurriculumMatrix> {
+    private fun findMatricesForCourse(
+        courseName: String,
+        matrices: List<DynamicCurriculumMatrix>
+    ): List<DynamicCurriculumMatrix> {
         val normInput = normalizeLookupText(courseName)
         if (normInput.isEmpty()) return emptyList()
 
-        return allMatrices.filter { matrix ->
+        return matrices.filter { matrix ->
             val normCourse = normalizeLookupText(matrix.courseName)
             val normCode = normalizeLookupText(matrix.courseCode)
             val normAliases = matrix.courseAliases.map { normalizeLookupText(it) }
@@ -407,6 +685,67 @@ object DynamicCurriculumCatalog {
                         )
                 }
         }
+    }
+
+    private fun splitWorkloadIntoSlots(totalHours: Int): List<Int> {
+        if (totalHours <= 0) return emptyList()
+        val slots = mutableListOf<Int>()
+        var remaining = totalHours
+        while (remaining >= 60) {
+            slots.add(60)
+            remaining -= 60
+        }
+        if (remaining > 0) {
+            slots.add(remaining)
+        }
+        return slots
+    }
+
+    private fun toRomanOrDecimal(n: Int): String = when (n) {
+        1 -> "I"
+        2 -> "II"
+        3 -> "III"
+        4 -> "IV"
+        5 -> "V"
+        6 -> "VI"
+        7 -> "VII"
+        8 -> "VIII"
+        9 -> "IX"
+        10 -> "X"
+        11 -> "XI"
+        12 -> "XII"
+        13 -> "XIII"
+        14 -> "XIV"
+        15 -> "XV"
+        16 -> "XVI"
+        17 -> "XVII"
+        18 -> "XVIII"
+        19 -> "XIX"
+        20 -> "XX"
+        else -> n.toString()
+    }
+
+    private fun formatCurriculumLabel(rawVersion: String): String {
+        val trimmed = rawVersion.trim()
+        if (trimmed.isEmpty()) return "2026/2"
+        return CURRICULUM_PAREN_REGEX.replace(trimmed) { match ->
+            "· Currículo ${match.groupValues[1]}"
+        }.replace(Regex("""\s+"""), " ").trim()
+    }
+
+    private fun buildCourseAliases(courseCode: String, courseName: String): List<String> {
+        val aliases = LinkedHashSet<String>()
+        if (courseCode.isNotBlank()) aliases.add(courseCode.trim())
+        if (courseName.isNotBlank()) aliases.add(courseName.trim())
+        val baseName = PAREN_SUFFIX_REGEX.replace(courseName, " ").replace(Regex("""\s+"""), " ").trim()
+        if (baseName.isNotEmpty()) aliases.add(baseName)
+        if (courseName.startsWith("Engenharia ", ignoreCase = true)) {
+            aliases.add("eng. " + courseName.substring("Engenharia ".length).trim())
+        }
+        if (baseName.startsWith("Engenharia ", ignoreCase = true)) {
+            aliases.add("eng. " + baseName.substring("Engenharia ".length).trim())
+        }
+        return aliases.toList()
     }
 
     fun parseSemesterTerm(raw: String?): Pair<Int, Int>? {
@@ -427,7 +766,7 @@ object DynamicCurriculumCatalog {
         val nfd = Normalizer.normalize(raw.trim().lowercase(), Normalizer.Form.NFD)
         return DIACRITICS_REGEX.replace(nfd, "")
             .replace("eng.", "engenharia")
-            .replace(Regex("[^a-z0-9]+"), " ")
+            .replace(NON_ALNUM_REGEX, " ")
             .trim()
     }
 }
