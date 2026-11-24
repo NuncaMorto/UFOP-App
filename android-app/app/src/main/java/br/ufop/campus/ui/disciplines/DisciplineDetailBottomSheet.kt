@@ -91,6 +91,9 @@ import br.ufop.campus.core.ffi.AssessmentWithCourse
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
 import br.ufop.campus.core.ffi.DisciplineDetail
 import br.ufop.campus.core.ffi.SyllabusImportReport
+import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.core.map.extractCourseSectionFromNotes
+import br.ufop.campus.core.map.isEadMapLocation
 import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.ui.activities.AssessmentDetailBottomSheet
 import br.ufop.campus.ui.components.CampusDatePickerField
@@ -107,6 +110,8 @@ import br.ufop.campus.ui.theme.semanticAbsenceRiskColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLabel
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLevel
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -127,7 +132,8 @@ fun DisciplineDetailPaneContent(
     onImportSyllabusPdf: ((pdfBytes: ByteArray) -> Result<Int>)? = null,
     onUpdateAbsences: ((totalAbsences: Int) -> Unit)? = null,
     onUpdateCourseDetails: ((name: String, professor: String, departmentId: String, workloadHours: Int) -> Unit)? = null,
-    onUpdateAssessment: ((assessmentId: String, courseId: String, title: String, kind: String, dueDate: String, dueTime: String, completed: Boolean) -> Unit)? = null
+    onUpdateAssessment: ((assessmentId: String, courseId: String, title: String, kind: String, dueDate: String, dueTime: String, completed: Boolean) -> Unit)? = null,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     DisciplineDetailBottomSheet(
         detail = detail,
@@ -146,6 +152,7 @@ fun DisciplineDetailPaneContent(
         onUpdateAbsences = onUpdateAbsences,
         onUpdateCourseDetails = onUpdateCourseDetails,
         onUpdateAssessment = onUpdateAssessment,
+        onOpenLocationInMap = onOpenLocationInMap,
         asSidePane = true,
         modifier = modifier
     )
@@ -169,6 +176,7 @@ fun DisciplineDetailBottomSheet(
     onUpdateAbsences: ((totalAbsences: Int) -> Unit)? = null,
     onUpdateCourseDetails: ((name: String, professor: String, departmentId: String, workloadHours: Int) -> Unit)? = null,
     onUpdateAssessment: ((assessmentId: String, courseId: String, title: String, kind: String, dueDate: String, dueTime: String, completed: Boolean) -> Unit)? = null,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null,
     asSidePane: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -653,13 +661,50 @@ fun DisciplineDetailBottomSheet(
                         accentColor = accessibleAccent
                     )
 
+                    val locationDisplay = effectiveDetail.buildingAndRoom.ifBlank {
+                        effectiveDetail.shortLocation.ifBlank { "Campus" }
+                    }
+                    val nextMapSlot = remember(resolvedScheduleSlots) {
+                        selectNextWeeklySlotForMap(resolvedScheduleSlots)
+                    }
+                    val isEadCourse = isEadMapLocation(locationDisplay) ||
+                        (resolvedScheduleSlots.isNotEmpty() && nextMapSlot == null)
+                    val canOpenLocationInMap = onOpenLocationInMap != null &&
+                        !isEadCourse &&
+                        locationDisplay.isNotBlank()
+
                     DisciplineInfoDetailRow(
                         icon = Icons.Outlined.LocationOn,
                         label = "Prédio / Sala",
-                        value = effectiveDetail.buildingAndRoom.ifBlank {
-                            effectiveDetail.shortLocation.ifBlank { "Campus" }
-                        },
-                        accentColor = accessibleAccent
+                        value = locationDisplay,
+                        accentColor = accessibleAccent,
+                        trailingHint = if (canOpenLocationInMap) "Ver no mapa" else null,
+                        minTouchTarget = minTouchTarget,
+                        onClick = if (canOpenLocationInMap) {
+                            {
+                                val fallbackRaw = nextMapSlot?.let {
+                                    listOf(it.building.trim(), it.room.trim())
+                                        .filter { s -> s.isNotEmpty() }
+                                        .joinToString(" · ")
+                                }?.ifBlank { locationDisplay } ?: locationDisplay
+                                val weekday = nextMapSlot?.dayOfWeek
+                                    ?: ZonedDateTime.now(ZoneId.of("America/Sao_Paulo")).dayOfWeek.value
+                                val startTime = nextMapSlot?.startTime?.ifBlank { "08:00" } ?: "08:00"
+                                val section = extractCourseSectionFromNotes(effectiveDetail.notes)
+                                onDismiss()
+                                onOpenLocationInMap?.invoke(
+                                    MapMeetingFocusRequest(
+                                        courseCode = courseCode,
+                                        section = section,
+                                        weekday = weekday,
+                                        startTime = startTime,
+                                        fallbackBuildingRaw = fallbackRaw
+                                    )
+                                )
+                            }
+                        } else {
+                            null
+                        }
                     )
 
                     DisciplineInfoDetailRow(

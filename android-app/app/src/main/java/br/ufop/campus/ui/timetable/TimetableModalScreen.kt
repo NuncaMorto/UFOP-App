@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.ffi.FriendScheduleInfo
+import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
@@ -51,7 +52,8 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 fun TimetableModalScreen(
     repository: CampusCoreRepository,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
@@ -293,7 +295,14 @@ fun TimetableModalScreen(
                         detailInfo = detailInfo,
                         isDark = isDark,
                         minTouchTarget = minTouchTarget,
-                        onDismiss = { selectedCellDetail = null }
+                        onDismiss = { selectedCellDetail = null },
+                        onOpenLocationInMap = onOpenLocationInMap?.let { openInMap ->
+                            { request ->
+                                selectedCellDetail = null
+                                handleDismiss()
+                                openInMap(request)
+                            }
+                        }
                     )
                 }
 

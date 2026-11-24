@@ -51,12 +51,15 @@ import br.ufop.campus.core.map.CampusMapMath
 import br.ufop.campus.core.map.MapRect2D
 import br.ufop.campus.core.map.MapViewportTransform
 import br.ufop.campus.core.uniffi.MapLayer
+import br.ufop.campus.core.uniffi.PoiType
 import br.ufop.campus.core.uniffi.RenderBatch
 import br.ufop.campus.core.uniffi.RenderFeature
 import br.ufop.campus.core.uniffi.RenderGeomKind
 import br.ufop.campus.core.uniffi.RenderOccupancyKind
+import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.StatusAttendingGreen
 
 private data class CachedComposePathItem(
     val feature: RenderFeature,
@@ -70,7 +73,8 @@ private data class CachedComposePathItem(
 @Composable
 fun CampusMapCanvas(
     controller: CampusMapController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showBuiltInHud: Boolean = true
 ) {
     val uiState by controller.state.collectAsState()
     val isDark = LocalCampusThemeController.current.isDark
@@ -195,6 +199,9 @@ fun CampusMapCanvas(
             val zoomDpPerM = CampusMapMath.clampZoom(transform.zoomDpPerMeter)
             val pxPerMeter = zoomDpPerM * density
             val selectedId = uiState.selectedFeature?.id
+            val isFreeRoomsMode = uiState.isFreeRoomsModeEnabled
+            val activePoiFilter = uiState.activePoiFilter
+            val freeHighlightColor = if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen
 
             withTransform({
                 translate(left = transform.offsetX, top = transform.offsetY)
@@ -207,13 +214,39 @@ fun CampusMapCanvas(
 
                     when (item.geomKind) {
                         RenderGeomKind.POLYGON -> {
+                            val isHighlightedFreeRoom = isFreeRoomsMode &&
+                                item.layer == MapLayer.ROOM &&
+                                item.occupancy == RenderOccupancyKind.NO_REGULAR_CLASS
+                            val isDimmedRoom = isFreeRoomsMode &&
+                                item.layer == MapLayer.ROOM &&
+                                !isHighlightedFreeRoom &&
+                                !isSelected
+                            val isHighlightedPoiPolygon = activePoiFilter != null &&
+                                matchesRenderPoiFilter(item, activePoiFilter)
+
+                            val baseFill = fillColorFor(item, isSelected, palette)
+                            val finalFill = when {
+                                isHighlightedFreeRoom && !isSelected -> palette.roomFreeFill.copy(alpha = 0.96f)
+                                isDimmedRoom -> baseFill.copy(alpha = 0.30f)
+                                else -> baseFill
+                            }
                             drawPath(
                                 path = entry.path,
-                                color = fillColorFor(item, isSelected, palette),
+                                color = finalFill,
                                 style = Fill
                             )
-                            val strokePx = if (isSelected) 2.5f * density else 1.2f * density
-                            val strokeColor = if (isSelected) palette.selectedStroke else strokeColorFor(item, palette)
+                            val strokePx = when {
+                                isSelected -> 2.5f * density
+                                isHighlightedFreeRoom || isHighlightedPoiPolygon -> 2.2f * density
+                                else -> 1.2f * density
+                            }
+                            val strokeColor = when {
+                                isSelected -> palette.selectedStroke
+                                isHighlightedFreeRoom -> freeHighlightColor
+                                isHighlightedPoiPolygon -> palette.poiFill
+                                isDimmedRoom -> strokeColorFor(item, palette).copy(alpha = 0.35f)
+                                else -> strokeColorFor(item, palette)
+                            }
                             val dashEffect = if (item.isMock && item.layer == MapLayer.ROOM) {
                                 PathEffect.dashPathEffect(
                                     floatArrayOf(5f * density / pxPerMeter, 3.5f * density / pxPerMeter),
@@ -243,18 +276,34 @@ fun CampusMapCanvas(
                             )
                         }
                         RenderGeomKind.POINT -> {
-                            val radiusM = (if (isSelected) 7.5f else 5.5f) * density / pxPerMeter
+                            val matchesPoi = activePoiFilter != null &&
+                                matchesRenderPoiFilter(item, activePoiFilter)
+                            val dimmedPoi = activePoiFilter != null && item.layer == MapLayer.POI && !matchesPoi
+                            val baseRadius = when {
+                                isSelected -> 7.5f
+                                matchesPoi -> 7.0f
+                                dimmedPoi -> 4.5f
+                                else -> 5.5f
+                            }
+                            val radiusM = baseRadius * density / pxPerMeter
                             val center = Offset(item.pointX, item.pointY)
+                            if (matchesPoi) {
+                                drawCircle(
+                                    color = palette.poiFill.copy(alpha = 0.28f),
+                                    radius = radiusM * 1.75f,
+                                    center = center
+                                )
+                            }
                             drawCircle(
-                                color = palette.poiFill,
+                                color = if (dimmedPoi) palette.poiFill.copy(alpha = 0.30f) else palette.poiFill,
                                 radius = radiusM,
                                 center = center
                             )
                             drawCircle(
-                                color = Color.White,
+                                color = if (dimmedPoi) Color.White.copy(alpha = 0.35f) else Color.White,
                                 radius = radiusM,
                                 center = center,
-                                style = Stroke(width = 1.5f * density / pxPerMeter)
+                                style = Stroke(width = (if (matchesPoi) 2.0f else 1.5f) * density / pxPerMeter)
                             )
                         }
                     }
@@ -337,45 +386,47 @@ fun CampusMapCanvas(
             }
         }
 
-        val floorItems = remember(uiState.activeCampusId, uiState.activeFloor, uiState.selectedFeature, batch) {
-            controller.availableFloorsForUi()
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp)
-        ) {
-            if (floorItems.isNotEmpty()) {
-                FloorSelectorBar(
-                    floors = floorItems,
-                    activeFloor = uiState.activeFloor,
-                    onSelectFloor = controller::selectFloor
-                )
+        if (showBuiltInHud) {
+            val floorItems = remember(uiState.activeCampusId, uiState.activeFloor, uiState.selectedFeature, batch) {
+                controller.availableFloorsForUi()
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            val selected = uiState.selectedFeature
-            if (selected != null) {
-                SelectedFeatureSheetCard(
-                    feature = selected,
-                    occupancy = uiState.selectedOccupancy,
-                    isDark = isDark,
-                    onDismiss = controller::clearSelection
-                )
-            } else if (!uiState.isNativeAvailable) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
-                ) {
-                    Text(
-                        text = uiState.errorMessage ?: "Motor vetorial offline pronto para carga nativa.",
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+            ) {
+                if (floorItems.isNotEmpty()) {
+                    FloorSelectorBar(
+                        floors = floorItems,
+                        activeFloor = uiState.activeFloor,
+                        onSelectFloor = controller::selectFloor
                     )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                val selected = uiState.selectedFeature
+                if (selected != null) {
+                    SelectedFeatureSheetCard(
+                        feature = selected,
+                        occupancy = uiState.selectedOccupancy,
+                        isDark = isDark,
+                        onDismiss = controller::clearSelection
+                    )
+                } else if (!uiState.isNativeAvailable) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
+                    ) {
+                        Text(
+                            text = uiState.errorMessage ?: "Motor vetorial offline pronto para carga nativa.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -437,4 +488,18 @@ private fun strokeColorFor(item: RenderFeature, palette: MapCanvasPalette): Colo
     MapLayer.BUILDING -> palette.buildingStroke
     MapLayer.ROOM -> palette.roomStroke
     else -> palette.buildingStroke.copy(alpha = 0.45f)
+}
+
+private fun matchesRenderPoiFilter(item: RenderFeature, filter: PoiType): Boolean {
+    if (item.poiType == filter) return true
+    val cat = item.category.lowercase()
+    return when (filter) {
+        PoiType.LIBRARY -> cat == "library"
+        PoiType.DINING -> cat == "dining"
+        PoiType.PARKING -> item.layer == MapLayer.PARKING || cat == "parking"
+        PoiType.FACULTY_OFFICE -> cat == "faculty_office"
+        PoiType.ACADEMIC -> (item.layer == MapLayer.BUILDING || item.layer == MapLayer.CAMPUS_ZONE || item.layer == MapLayer.ROOM) &&
+            (cat == "academic" || cat == "academic_zone" || cat == "classroom" || cat == "lab")
+        PoiType.TOILET, PoiType.ENTRANCE -> false
+    }
 }

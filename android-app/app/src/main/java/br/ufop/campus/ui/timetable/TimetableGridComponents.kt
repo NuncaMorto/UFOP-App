@@ -22,7 +22,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.DepartmentColorOption
 import br.ufop.campus.core.ffi.TimetableCell
 import br.ufop.campus.core.ffi.TimetableRow
+import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.parseHexColor
 
@@ -289,11 +294,15 @@ internal fun TimetableCellDetailDialog(
     detailInfo: SelectedTimetableCellDetail,
     isDark: Boolean,
     minTouchTarget: Dp,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     // IHC-05: Diálogo de detalhes completos ao tocar em uma célula ocupada da grade
     val accentColor = parseHexColor(detailInfo.cell.colorHex)
     val readableAccent = accessibleTextColor(accentColor, isDark)
+    val canOpenInMap = onOpenLocationInMap != null &&
+        !detailInfo.isEad &&
+        detailInfo.fullLocation.isNotBlank()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -336,11 +345,67 @@ internal fun TimetableCellDetailDialog(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "Local: ${detailInfo.fullLocation}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (canOpenInMap) {
+                    Surface(
+                        onClick = {
+                            onOpenLocationInMap?.invoke(
+                                MapMeetingFocusRequest(
+                                    courseCode = detailInfo.cell.code,
+                                    section = detailInfo.section,
+                                    weekday = detailInfo.dayOfWeek,
+                                    startTime = detailInfo.startTime,
+                                    fallbackBuildingRaw = detailInfo.rawLocationForMap
+                                )
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = minTouchTarget),
+                        shape = RoundedCornerShape(12.dp),
+                        color = accentColor.copy(alpha = if (isDark) 0.14f else 0.08f),
+                        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                tint = readableAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Local: ${detailInfo.fullLocation}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "Ver no mapa",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = readableAccent,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = readableAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Local: ${detailInfo.fullLocation}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (detailInfo.professor.isNotBlank()) {
                     Text(
                         text = "Professor(a): ${detailInfo.professor}",

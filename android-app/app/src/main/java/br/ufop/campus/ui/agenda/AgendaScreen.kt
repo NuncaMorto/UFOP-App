@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.TimelineItemKind
+import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.core.map.extractCourseSectionFromNotes
 import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.CampusWindowWidthClass
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
@@ -41,6 +43,7 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 fun AgendaScreen(
     repository: CampusCoreRepository,
     modifier: Modifier = Modifier,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null,
     viewModel: AgendaViewModel = viewModel(factory = AgendaViewModel.provideFactory(repository))
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -475,14 +478,22 @@ fun AgendaScreen(
 
         // Bottom Sheet: Check-in e edição rápida da aula
         uiState.activeCheckIn?.let { checkInDetail ->
+            val checkInCourseDetail = androidx.compose.runtime.remember(checkInDetail.courseId) {
+                checkInDetail.courseId.takeIf { it.isNotBlank() }?.let { cid ->
+                    runCatching { repository.getDisciplineDetail(cid) }.getOrNull()
+                }
+            }
             ClassCheckInBottomSheet(
                 detail = checkInDetail,
                 slotItem = uiState.activeCheckInSlot,
                 workloadHours = uiState.activeCheckInWorkloadHours,
                 selectedIsoDate = uiState.selectedIsoDate,
+                courseCode = checkInCourseDetail?.code.orEmpty(),
+                courseSection = extractCourseSectionFromNotes(checkInCourseDetail?.notes.orEmpty()),
                 editError = uiState.checkInEditError,
                 onClearEditError = { viewModel.clearCheckInEditError() },
                 onDismiss = { viewModel.dismissClassCheckIn() },
+                onOpenLocationInMap = onOpenLocationInMap,
                 onSave = { slotId, status ->
                     viewModel.saveClassCheckIn(
                         slotId = slotId,

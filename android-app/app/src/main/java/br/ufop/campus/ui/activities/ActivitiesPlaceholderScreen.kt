@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.AssessmentWithCourse
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.DisciplineDetail
+import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.ui.disciplines.DisciplineDetailBottomSheet
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
 import br.ufop.campus.ui.theme.CampusWindowWidthClass
@@ -47,7 +48,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ActivitiesPlaceholderScreen(
     repository: CampusCoreRepository,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     SideEffect {
         DisciplinesViewModel.sharedRepository = repository
@@ -407,7 +409,8 @@ fun ActivitiesPlaceholderScreen(
                         dueTime = dueTime,
                         completed = completed
                     )
-                }
+                },
+                onOpenLocationInMap = onOpenLocationInMap
             )
         }
 

@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
@@ -59,7 +60,8 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 fun DisciplinesScreen(
     repository: CampusCoreRepository,
     onOpenTimetable: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     val viewModel: DisciplinesViewModel = viewModel(
         factory = DisciplinesViewModel.provideFactory(repository)
@@ -389,6 +391,7 @@ fun DisciplinesScreen(
                     scheduleSlots = uiState.activeDetailSlots,
                     absenceHistory = uiState.activeDetailHistory,
                     viewModel = viewModel,
+                    onOpenLocationInMap = onOpenLocationInMap,
                     modifier = Modifier
                         .weight(1f)
                         .widthIn(min = 340.dp, max = 480.dp)
@@ -403,7 +406,8 @@ fun DisciplinesScreen(
             adaptive = adaptive,
             showCurriculumMatrix = showCurriculumMatrix,
             onDismissCurriculumMatrix = { showCurriculumMatrix = false },
-            viewModel = viewModel
+            viewModel = viewModel,
+            onOpenLocationInMap = onOpenLocationInMap
         )
     }
 }

@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.uniffi.FeatureInfo
 import br.ufop.campus.core.uniffi.FloorLabel
-import br.ufop.campus.core.uniffi.IndoorStatus
 import br.ufop.campus.core.uniffi.OccupancyStatus
 import br.ufop.campus.ui.theme.DarkStatusAbsentRed
 import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
@@ -193,7 +192,7 @@ internal fun SelectedFeatureSheetCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val showSchematicBadge = feature.isMock || feature.indoorStatus == IndoorStatus.PROVISIONAL
+    val showSchematicBadge = feature.isMock
 
     Surface(
         modifier = modifier
@@ -218,7 +217,7 @@ internal fun SelectedFeatureSheetCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     feature.floor?.let { fl ->
-                        val floorText = if (fl == 0) "Térreo / 1º Pav" else "${fl}º Pav"
+                        val floorText = if (fl == 0) "Térreo / 1º Pav" else "${fl + 1}º Pav"
                         Text(
                             text = "Andar: $floorText",
                             style = MaterialTheme.typography.bodySmall,

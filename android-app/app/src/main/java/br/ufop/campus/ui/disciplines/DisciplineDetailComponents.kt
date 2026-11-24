@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -76,10 +77,22 @@ internal fun DisciplineInfoDetailRow(
     icon: ImageVector,
     label: String,
     value: String,
-    accentColor: Color
+    accentColor: Color,
+    trailingHint: String? = null,
+    minTouchTarget: Dp = 48.dp,
+    onClick: (() -> Unit)? = null
 ) {
+    val rowModifier = if (onClick != null) {
+        Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = minTouchTarget)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 4.dp)
+    } else {
+        Modifier.fillMaxWidth()
+    }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -108,6 +121,24 @@ internal fun DisciplineInfoDetailRow(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        if (onClick != null) {
+            if (!trailingHint.isNullOrBlank()) {
+                Text(
+                    text = trailingHint,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accentColor,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -552,4 +583,35 @@ internal fun normalizeAssessmentDateInput(rawDate: String): String {
         return "$year-$monthNum-$day"
     }
     return trimmed
+}
+
+internal fun selectNextWeeklySlotForMap(
+    slots: List<CourseScheduleSlotItem>,
+    now: java.time.ZonedDateTime = java.time.ZonedDateTime.now(java.time.ZoneId.of("America/Sao_Paulo"))
+): CourseScheduleSlotItem? {
+    val presentialSlots = slots.filter { slot ->
+        val loc = listOf(slot.building, slot.room, slot.shortLocation)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+        !br.ufop.campus.core.map.isEadMapLocation(loc)
+    }
+    if (presentialSlots.isEmpty()) return null
+
+    val currentWeekday = now.dayOfWeek.value
+    val currentMinutes = now.hour * 60 + now.minute
+
+    fun parseMinutes(hhmm: String): Int {
+        val parts = hhmm.trim().split(":")
+        val h = parts.getOrNull(0)?.toIntOrNull() ?: 8
+        val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        return h * 60 + m
+    }
+
+    return presentialSlots.minByOrNull { slot ->
+        val rawDaysAhead = (slot.dayOfWeek - currentWeekday + 7) % 7
+        val startMin = parseMinutes(slot.startTime)
+        val endMin = parseMinutes(slot.endTime).coerceAtLeast(startMin + 1)
+        val effectiveDaysAhead = if (rawDaysAhead == 0 && endMin <= currentMinutes) 7 else rawDaysAhead
+        effectiveDaysAhead * 1440 + startMin
+    }
 }

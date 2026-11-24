@@ -13,6 +13,8 @@ import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.FriendScheduleInfo
 import br.ufop.campus.core.ffi.TimetableCell
 import br.ufop.campus.core.ffi.TimetableRow
+import br.ufop.campus.core.map.extractCourseSectionFromNotes
+import br.ufop.campus.core.map.isEadMapLocation
 import java.io.File
 import kotlin.math.max
 
@@ -50,17 +52,13 @@ internal data class SelectedTimetableCellDetail(
     val startTime: String,
     val endTime: String,
     val fullLocation: String,
-    val professor: String
+    val professor: String,
+    val rawLocationForMap: String = fullLocation,
+    val section: String = "",
+    val isEad: Boolean = false
 )
 
-internal fun isEadLocation(raw: String): Boolean {
-    val lower = raw.lowercase()
-    return lower.contains("ead") ||
-        lower.contains("distância") ||
-        lower.contains("distancia") ||
-        lower.contains("remoto") ||
-        lower.contains("online")
-}
+internal fun isEadLocation(raw: String): Boolean = isEadMapLocation(raw)
 
 /**
  * Formata o local curto de forma limpa e legível nas células da grade
@@ -316,7 +314,8 @@ internal fun resolveSelectedTimetableCellDetail(
         !detail?.buildingAndRoom.isNullOrBlank() -> detail!!.buildingAndRoom.trim()
         else -> cell.shortLocation
     }
-    val resolvedLocation = if (isEadLocation(rawLocationCandidate) || isEadLocation(cell.shortLocation)) {
+    val isEad = isEadLocation(rawLocationCandidate) || isEadLocation(cell.shortLocation)
+    val resolvedLocation = if (isEad) {
         "Ensino a Distância (EAD)"
     } else {
         formatTimetableShortLocation(rawLocationCandidate)
@@ -326,6 +325,7 @@ internal fun resolveSelectedTimetableCellDetail(
         ?.takeIf { it.isNotEmpty() && !it.equals("Docente UFOP", ignoreCase = true) }
         .orEmpty()
     val resolvedCode = cell.code.ifBlank { detail?.code.orEmpty() }
+    val resolvedSection = extractCourseSectionFromNotes(detail?.notes.orEmpty())
 
     return SelectedTimetableCellDetail(
         cell = cell.copy(code = resolvedCode),
@@ -334,6 +334,9 @@ internal fun resolveSelectedTimetableCellDetail(
         startTime = slot?.startTime?.ifBlank { startTime } ?: startTime,
         endTime = slot?.endTime?.ifBlank { endTime } ?: endTime,
         fullLocation = resolvedLocation,
-        professor = resolvedProfessor
+        professor = resolvedProfessor,
+        rawLocationForMap = rawLocationCandidate.ifBlank { resolvedLocation },
+        section = resolvedSection,
+        isEad = isEad
     )
 }

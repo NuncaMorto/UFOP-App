@@ -8,8 +8,13 @@ import br.ufop.campus.core.uniffi.FloorLabel
 import br.ufop.campus.core.uniffi.MapHit
 import br.ufop.campus.core.uniffi.MapLayer
 import br.ufop.campus.core.uniffi.OccupancyStatus
+import br.ufop.campus.core.uniffi.PoiType
 import br.ufop.campus.core.uniffi.RenderBatch
+import br.ufop.campus.core.uniffi.RenderFeature
+import br.ufop.campus.core.uniffi.RenderOccupancyKind
 import br.ufop.campus.core.uniffi.Resolution
+import br.ufop.campus.core.uniffi.RoomOccupancyItem
+import br.ufop.campus.core.uniffi.SearchResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +22,35 @@ import kotlinx.coroutines.flow.update
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+
+data class MapMeetingFocusRequest(
+    val courseCode: String,
+    val section: String = "",
+    val weekday: Int,
+    val startTime: String,
+    val fallbackBuildingRaw: String
+)
+
+data class FloorOccupancySummary(
+    val freeCount: Int,
+    val occupiedCount: Int,
+    val noDataCount: Int,
+    val outOfTermCount: Int
+)
+
+fun isEadMapLocation(raw: String): Boolean {
+    val lower = raw.lowercase()
+    return lower.contains("ead") ||
+        lower.contains("distância") ||
+        lower.contains("distancia") ||
+        lower.contains("remoto") ||
+        lower.contains("online")
+}
+
+internal fun extractCourseSectionFromNotes(notes: String): String =
+    COURSE_TURMA_REGEX.find(notes)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+
+private val COURSE_TURMA_REGEX = Regex("""Turma\s+([0-9A-Za-z]+)""", RegexOption.IGNORE_CASE)
 
 data class CampusMapUiState(
     val campuses: List<CampusMapSummary> = emptyList(),
@@ -26,10 +60,45 @@ data class CampusMapUiState(
     val renderBatch: RenderBatch? = null,
     val selectedFeature: FeatureInfo? = null,
     val selectedOccupancy: OccupancyStatus? = null,
+    val selectedBuildingOccupancy: List<RoomOccupancyItem> = emptyList(),
+    val searchQuery: String = "",
+    val activePoiFilter: PoiType? = null,
+    val searchResults: List<SearchResult> = emptyList(),
+    val isFreeRoomsModeEnabled: Boolean = false,
+    val resolutionNotice: String? = null,
     val pendingFocus: CameraFocus? = null,
     val isNativeAvailable: Boolean = false,
     val errorMessage: String? = null
-)
+) {
+    val freeRoomsOnActiveFloor: List<RenderFeature>
+        get() = renderBatch?.items
+            ?.filter { it.layer == MapLayer.ROOM && it.occupancy == RenderOccupancyKind.NO_REGULAR_CLASS }
+            .orEmpty()
+
+    val floorOccupancySummary: FloorOccupancySummary
+        get() {
+            val rooms = renderBatch?.items?.filter { it.layer == MapLayer.ROOM }.orEmpty()
+            var free = 0
+            var occupied = 0
+            var noData = 0
+            var outOfTerm = 0
+            rooms.forEach { room ->
+                when (room.occupancy) {
+                    RenderOccupancyKind.NO_REGULAR_CLASS -> free += 1
+                    RenderOccupancyKind.OCCUPIED -> occupied += 1
+                    RenderOccupancyKind.NO_DATA -> noData += 1
+                    RenderOccupancyKind.OUT_OF_TERM -> outOfTerm += 1
+                    RenderOccupancyKind.NONE -> Unit
+                }
+            }
+            return FloorOccupancySummary(
+                freeCount = free,
+                occupiedCount = occupied,
+                noDataCount = noData,
+                outOfTermCount = outOfTerm
+            )
+        }
+}
 
 internal interface CampusMapEngineGateway : AutoCloseable {
     fun listCampuses(): List<CampusMapSummary>
@@ -39,7 +108,9 @@ internal interface CampusMapEngineGateway : AutoCloseable {
     fun hitTest(mapX: Float, mapY: Float, floor: Int, zoom: Float): MapHit?
     fun getCameraFocus(featureId: String): CameraFocus?
     fun getFeature(featureId: String): FeatureInfo?
+    fun search(query: String, poiTypeFilter: PoiType?, activeFloor: Int): List<SearchResult>
     fun getRoomOccupancy(roomId: String, timestampIso: String): OccupancyStatus
+    fun listBuildingOccupancy(buildingId: String, timestampIso: String): List<RoomOccupancyItem>
     fun resolveMeeting(
         courseCode: String,
         section: String,
@@ -70,8 +141,14 @@ private class NativeCampusMapEngineGateway(
 
     override fun getFeature(featureId: String): FeatureInfo? = delegate.getFeature(featureId)
 
+    override fun search(query: String, poiTypeFilter: PoiType?, activeFloor: Int): List<SearchResult> =
+        delegate.search(query, poiTypeFilter, activeFloor)
+
     override fun getRoomOccupancy(roomId: String, timestampIso: String): OccupancyStatus =
         delegate.getRoomOccupancy(roomId, timestampIso)
+
+    override fun listBuildingOccupancy(buildingId: String, timestampIso: String): List<RoomOccupancyItem> =
+        delegate.listBuildingOccupancy(buildingId, timestampIso)
 
     override fun resolveMeeting(
         courseCode: String,
@@ -136,7 +213,7 @@ class CampusMapController private constructor(
                 val campuses = engine.listCampuses()
                 val activeId = engine.getActiveCampusId()
                 val defaultFloor = campuses.firstOrNull { it.campusId == activeId }?.defaultFloor ?: 0
-                val batch = engine.getRenderBatch(defaultFloor, initialTimestampIso)
+                val batch = engine.getRenderBatch(defaultFloor, effectiveTimestampIso(initialTimestampIso))
                 _state.value = CampusMapUiState(
                     campuses = campuses,
                     activeCampusId = activeId,
@@ -161,8 +238,15 @@ class CampusMapController private constructor(
             val engine = nativeEngine ?: return
             try {
                 val summary = engine.setActiveCampus(campusId)
-                val ts = _state.value.timestampIso
-                val batch = engine.getRenderBatch(summary.defaultFloor, ts)
+                val current = _state.value
+                val effectiveTs = effectiveTimestampIso(current.timestampIso)
+                val batch = engine.getRenderBatch(summary.defaultFloor, effectiveTs)
+                val refreshedResults = runSearchIfActiveLocked(
+                    engine = engine,
+                    query = current.searchQuery,
+                    poiFilter = current.activePoiFilter,
+                    activeFloor = summary.defaultFloor
+                )
                 _state.update {
                     it.copy(
                         activeCampusId = summary.campusId,
@@ -170,6 +254,8 @@ class CampusMapController private constructor(
                         renderBatch = batch,
                         selectedFeature = null,
                         selectedOccupancy = null,
+                        selectedBuildingOccupancy = emptyList(),
+                        searchResults = refreshedResults,
                         pendingFocus = CameraFocus(
                             campusId = summary.campusId,
                             featureId = summary.campusId,
@@ -187,14 +273,23 @@ class CampusMapController private constructor(
 
     fun selectFloor(floor: Int) {
         synchronized(engineLock) {
-            if (_state.value.activeFloor == floor) return
+            val current = _state.value
+            if (current.activeFloor == floor) return
             val engine = nativeEngine ?: return
             try {
-                val batch = engine.getRenderBatch(floor, _state.value.timestampIso)
+                val effectiveTs = effectiveTimestampIso(current.timestampIso)
+                val batch = engine.getRenderBatch(floor, effectiveTs)
+                val refreshedResults = runSearchIfActiveLocked(
+                    engine = engine,
+                    query = current.searchQuery,
+                    poiFilter = current.activePoiFilter,
+                    activeFloor = floor
+                )
                 _state.update {
                     it.copy(
                         activeFloor = floor,
                         renderBatch = batch,
+                        searchResults = refreshedResults,
                         errorMessage = null
                     )
                 }
@@ -209,14 +304,17 @@ class CampusMapController private constructor(
             val engine = nativeEngine ?: return
             try {
                 val floor = _state.value.activeFloor
-                val batch = engine.getRenderBatch(floor, timestampIso)
+                val effectiveTs = effectiveTimestampIso(timestampIso)
+                val batch = engine.getRenderBatch(floor, effectiveTs)
                 val selected = _state.value.selectedFeature
-                val occ = resolveOccupancyLocked(engine, selected, timestampIso)
+                val occ = resolveOccupancyLocked(engine, selected, effectiveTs)
+                val buildingOcc = resolveBuildingOccupancyLocked(engine, selected, effectiveTs)
                 _state.update {
                     it.copy(
                         timestampIso = timestampIso,
                         renderBatch = batch,
                         selectedOccupancy = occ,
+                        selectedBuildingOccupancy = buildingOcc,
                         errorMessage = null
                     )
                 }
@@ -226,20 +324,132 @@ class CampusMapController private constructor(
         }
     }
 
+    fun updateSearchQuery(query: String) {
+        synchronized(engineLock) {
+            val engine = nativeEngine
+            if (engine == null) {
+                _state.update { it.copy(searchQuery = query, searchResults = emptyList()) }
+                return
+            }
+            val current = _state.value
+            val results = runSearchIfActiveLocked(
+                engine = engine,
+                query = query,
+                poiFilter = current.activePoiFilter,
+                activeFloor = current.activeFloor
+            )
+            _state.update {
+                it.copy(
+                    searchQuery = query,
+                    searchResults = results
+                )
+            }
+        }
+    }
+
+    fun togglePoiFilter(poiType: PoiType) {
+        synchronized(engineLock) {
+            val current = _state.value
+            val nextFilter = if (current.activePoiFilter == poiType) null else poiType
+            val engine = nativeEngine
+            if (engine == null) {
+                _state.update { it.copy(activePoiFilter = nextFilter, searchResults = emptyList()) }
+                return
+            }
+            val results = runSearchIfActiveLocked(
+                engine = engine,
+                query = current.searchQuery,
+                poiFilter = nextFilter,
+                activeFloor = current.activeFloor
+            )
+            _state.update {
+                it.copy(
+                    activePoiFilter = nextFilter,
+                    searchResults = results
+                )
+            }
+        }
+    }
+
+    fun clearSearchAndFilters() {
+        synchronized(engineLock) {
+            _state.update {
+                it.copy(
+                    searchQuery = "",
+                    activePoiFilter = null,
+                    searchResults = emptyList()
+                )
+            }
+        }
+    }
+
+    fun selectSearchResult(result: SearchResult) {
+        synchronized(engineLock) {
+            focusFeature(result.feature.id)
+            _state.update {
+                it.copy(
+                    searchQuery = "",
+                    searchResults = emptyList()
+                )
+            }
+        }
+    }
+
+    fun toggleFreeRoomsMode() {
+        setFreeRoomsMode(!_state.value.isFreeRoomsModeEnabled)
+    }
+
+    fun setFreeRoomsMode(enabled: Boolean) {
+        synchronized(engineLock) {
+            val engine = nativeEngine
+            if (engine == null) {
+                _state.update { it.copy(isFreeRoomsModeEnabled = enabled) }
+                return
+            }
+            val current = _state.value
+            val refreshedBatch = if (enabled && current.timestampIso == null) {
+                runCatching {
+                    engine.getRenderBatch(current.activeFloor, effectiveTimestampIso(null))
+                }.getOrNull()
+            } else {
+                null
+            }
+            _state.update {
+                it.copy(
+                    isFreeRoomsModeEnabled = enabled,
+                    renderBatch = refreshedBatch ?: it.renderBatch
+                )
+            }
+        }
+    }
+
+    fun clearResolutionNotice() {
+        _state.update { it.copy(resolutionNotice = null) }
+    }
+
     fun handleTap(mapX: Float, mapY: Float, zoom: Float): MapHit? {
         synchronized(engineLock) {
             val engine = nativeEngine ?: return null
             val current = _state.value
             val hit = engine.hitTest(mapX, mapY, current.activeFloor, zoom)
             if (hit == null) {
-                _state.update { it.copy(selectedFeature = null, selectedOccupancy = null) }
+                _state.update {
+                    it.copy(
+                        selectedFeature = null,
+                        selectedOccupancy = null,
+                        selectedBuildingOccupancy = emptyList()
+                    )
+                }
                 return null
             }
-            val occ = resolveOccupancyLocked(engine, hit.feature, current.timestampIso)
+            val effectiveTs = effectiveTimestampIso(current.timestampIso)
+            val occ = resolveOccupancyLocked(engine, hit.feature, effectiveTs)
+            val buildingOcc = resolveBuildingOccupancyLocked(engine, hit.feature, effectiveTs)
             _state.update {
                 it.copy(
                     selectedFeature = hit.feature,
                     selectedOccupancy = occ,
+                    selectedBuildingOccupancy = buildingOcc,
                     errorMessage = null
                 )
             }
@@ -253,9 +463,15 @@ class CampusMapController private constructor(
             val focus = engine.getCameraFocus(featureId) ?: return
             applyCameraFocusLocked(engine, focus)
             val feat = engine.getFeature(focus.featureId)
-            val occ = resolveOccupancyLocked(engine, feat, _state.value.timestampIso)
+            val effectiveTs = effectiveTimestampIso(_state.value.timestampIso)
+            val occ = resolveOccupancyLocked(engine, feat, effectiveTs)
+            val buildingOcc = resolveBuildingOccupancyLocked(engine, feat, effectiveTs)
             _state.update {
-                it.copy(selectedFeature = feat, selectedOccupancy = occ)
+                it.copy(
+                    selectedFeature = feat,
+                    selectedOccupancy = occ,
+                    selectedBuildingOccupancy = buildingOcc
+                )
             }
         }
     }
@@ -276,19 +492,48 @@ class CampusMapController private constructor(
                 startTime = startTime,
                 fallbackBuildingRaw = fallbackBuildingRaw
             )
+            val effectiveTs = effectiveTimestampIso(_state.value.timestampIso)
             when (res) {
                 is Resolution.ExactRoom -> {
                     applyCameraFocusLocked(engine, res.cameraFocus)
                     val feat = engine.getFeature(res.roomId)
-                    val occ = resolveOccupancyLocked(engine, feat, _state.value.timestampIso)
-                    _state.update { it.copy(selectedFeature = feat, selectedOccupancy = occ) }
+                    val occ = resolveOccupancyLocked(engine, feat, effectiveTs)
+                    _state.update {
+                        it.copy(
+                            selectedFeature = feat,
+                            selectedOccupancy = occ,
+                            selectedBuildingOccupancy = emptyList(),
+                            resolutionNotice = null,
+                            errorMessage = null
+                        )
+                    }
                 }
                 is Resolution.BuildingFallback -> {
                     applyCameraFocusLocked(engine, res.cameraFocus)
                     val feat = engine.getFeature(res.buildingId)
-                    _state.update { it.copy(selectedFeature = feat, selectedOccupancy = null) }
+                    val buildingOcc = if (feat != null) {
+                        resolveBuildingOccupancyLocked(engine, feat, effectiveTs)
+                    } else {
+                        runCatching { engine.listBuildingOccupancy(res.buildingId, effectiveTs) }
+                            .getOrDefault(emptyList())
+                    }
+                    _state.update {
+                        it.copy(
+                            selectedFeature = feat,
+                            selectedOccupancy = null,
+                            selectedBuildingOccupancy = buildingOcc,
+                            resolutionNotice = "Sala específica sem mapa interno — exibindo o prédio.",
+                            errorMessage = null
+                        )
+                    }
                 }
-                Resolution.Unmapped -> Unit
+                Resolution.Unmapped -> {
+                    _state.update {
+                        it.copy(
+                            resolutionNotice = "Local não mapeado neste campus. Use a busca para encontrar o prédio."
+                        )
+                    }
+                }
             }
             return res
         }
@@ -299,7 +544,13 @@ class CampusMapController private constructor(
     }
 
     fun clearSelection() {
-        _state.update { it.copy(selectedFeature = null, selectedOccupancy = null) }
+        _state.update {
+            it.copy(
+                selectedFeature = null,
+                selectedOccupancy = null,
+                selectedBuildingOccupancy = emptyList()
+            )
+        }
     }
 
     fun availableFloorsForUi(): List<FloorLabel> {
@@ -325,7 +576,7 @@ class CampusMapController private constructor(
             runCatching { engine.setActiveCampus(focus.campusId) }
         }
         val batch = runCatching {
-            engine.getRenderBatch(focus.targetFloor, _state.value.timestampIso)
+            engine.getRenderBatch(focus.targetFloor, effectiveTimestampIso(_state.value.timestampIso))
         }.getOrNull()
         _state.update {
             it.copy(
@@ -337,16 +588,43 @@ class CampusMapController private constructor(
         }
     }
 
+    private fun runSearchIfActiveLocked(
+        engine: CampusMapEngineGateway,
+        query: String,
+        poiFilter: PoiType?,
+        activeFloor: Int
+    ): List<SearchResult> {
+        if (query.isBlank() && poiFilter == null) return emptyList()
+        return runCatching {
+            engine.search(query.trim(), poiFilter, activeFloor)
+        }.getOrDefault(emptyList())
+    }
+
     private fun resolveOccupancyLocked(
         engine: CampusMapEngineGateway,
         feature: FeatureInfo?,
-        timestampIso: String?
+        effectiveTs: String
     ): OccupancyStatus? {
         if (feature == null || feature.layer != MapLayer.ROOM) return null
-        val ts = timestampIso ?: ZonedDateTime.now(SAO_PAULO_ZONE)
-            .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-        return runCatching { engine.getRoomOccupancy(feature.id, ts) }.getOrNull()
+        return runCatching { engine.getRoomOccupancy(feature.id, effectiveTs) }.getOrNull()
     }
+
+    private fun resolveBuildingOccupancyLocked(
+        engine: CampusMapEngineGateway,
+        feature: FeatureInfo?,
+        effectiveTs: String
+    ): List<RoomOccupancyItem> {
+        if (feature == null) return emptyList()
+        if (feature.layer != MapLayer.BUILDING && feature.layer != MapLayer.CAMPUS_ZONE) {
+            return emptyList()
+        }
+        return runCatching { engine.listBuildingOccupancy(feature.id, effectiveTs) }
+            .getOrDefault(emptyList())
+    }
+
+    private fun effectiveTimestampIso(timestampIso: String?): String =
+        timestampIso ?: ZonedDateTime.now(SAO_PAULO_ZONE)
+            .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 
     override fun close() {
         synchronized(engineLock) {

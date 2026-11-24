@@ -9,6 +9,7 @@ import br.ufop.campus.core.ffi.AbsenceHistoryEntry
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
 import br.ufop.campus.core.ffi.DisciplineDetail
+import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
 import br.ufop.campus.ui.theme.CampusAdaptiveLayoutInfo
 
@@ -118,6 +119,7 @@ internal fun DisciplineDetailSidePane(
     scheduleSlots: List<CourseScheduleSlotItem>,
     absenceHistory: List<AbsenceHistoryEntry>,
     viewModel: DisciplinesViewModel,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val callbacks = rememberDisciplineDetailCallbacks(
@@ -140,7 +142,8 @@ internal fun DisciplineDetailSidePane(
         onDeleteCourse = callbacks.onDeleteCourse,
         onUpdateAbsences = callbacks.onUpdateAbsences,
         onUpdateCourseDetails = callbacks.onUpdateCourseDetails,
-        onUpdateAssessment = callbacks.onUpdateAssessment
+        onUpdateAssessment = callbacks.onUpdateAssessment,
+        onOpenLocationInMap = onOpenLocationInMap
     )
 }
 
@@ -151,7 +154,8 @@ internal fun DisciplinesModalOverlays(
     adaptive: CampusAdaptiveLayoutInfo,
     showCurriculumMatrix: Boolean,
     onDismissCurriculumMatrix: () -> Unit,
-    viewModel: DisciplinesViewModel
+    viewModel: DisciplinesViewModel,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     val activeDetail = uiState.activeDetail
 
@@ -161,7 +165,8 @@ internal fun DisciplinesModalOverlays(
             detail = activeDetail,
             scheduleSlots = uiState.activeDetailSlots,
             absenceHistory = uiState.activeDetailHistory,
-            viewModel = viewModel
+            viewModel = viewModel,
+            onOpenLocationInMap = onOpenLocationInMap
         )
     }
 
@@ -186,7 +191,8 @@ private fun DisciplineDetailModalSheetHost(
     detail: DisciplineDetail,
     scheduleSlots: List<CourseScheduleSlotItem>,
     absenceHistory: List<AbsenceHistoryEntry>,
-    viewModel: DisciplinesViewModel
+    viewModel: DisciplinesViewModel,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
 ) {
     val callbacks = rememberDisciplineDetailCallbacks(
         courseId = detail.summary.courseId,
@@ -207,7 +213,8 @@ private fun DisciplineDetailModalSheetHost(
         onDeleteCourse = callbacks.onDeleteCourse,
         onUpdateAbsences = callbacks.onUpdateAbsences,
         onUpdateCourseDetails = callbacks.onUpdateCourseDetails,
-        onUpdateAssessment = callbacks.onUpdateAssessment
+        onUpdateAssessment = callbacks.onUpdateAssessment,
+        onOpenLocationInMap = onOpenLocationInMap
     )
 }
 

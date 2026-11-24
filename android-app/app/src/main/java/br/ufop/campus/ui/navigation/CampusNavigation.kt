@@ -30,13 +30,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -76,8 +79,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.core.map.CampusMapController
+import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.agenda.AgendaScreen
+import br.ufop.campus.ui.map.CampusMapScreen
 import br.ufop.campus.ui.profile.ReleaseNotesDialog
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
@@ -108,7 +114,15 @@ enum class CampusTab(
     PROFILE(
         label = "Perfil",
         icon = Icons.Default.Person
-    )
+    ),
+    MAP(
+        label = "Mapa",
+        icon = Icons.Outlined.Map
+    );
+
+    companion object {
+        val primaryTabs: List<CampusTab> = listOf(AGENDA, DISCIPLINES, ACTIVITIES, PROFILE)
+    }
 }
 
 @Composable
@@ -135,6 +149,19 @@ fun CampusNavigation(
     var tourReplayTrigger by remember { mutableIntStateOf(0) }
     var tourDismissTick by remember { mutableIntStateOf(0) }
 
+    var mapController by remember { mutableStateOf<CampusMapController?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mapController?.close()
+            mapController = null
+        }
+    }
+
+    val ensureMapController: () -> CampusMapController = {
+        mapController ?: CampusMapController().also { mapController = it }
+    }
+
     val studentProfile = remember(mutationVersion, onboardingRefreshTick) {
         repository.getStudentProfile()
     }
@@ -153,23 +180,45 @@ fun CampusNavigation(
     val handleSelectTab: (CampusTab) -> Unit = { tab ->
         showTimetableModal = false
         showDynamicGridModal = false
+        if (tab == CampusTab.MAP) {
+            ensureMapController()
+        }
         selectedTab = tab
+    }
+
+    val openMeetingInMap: (MapMeetingFocusRequest) -> Unit = { request ->
+        showTimetableModal = false
+        showDynamicGridModal = false
+        val controller = ensureMapController()
+        controller.resolveMeeting(
+            courseCode = request.courseCode,
+            section = request.section,
+            weekday = request.weekday,
+            startTime = request.startTime,
+            fallbackBuildingRaw = request.fallbackBuildingRaw
+        )
+        selectedTab = CampusTab.MAP
     }
 
     val renderActiveTabContent: @Composable () -> Unit = {
         when (selectedTab) {
             CampusTab.AGENDA -> {
-                AgendaScreen(repository = repository)
+                AgendaScreen(
+                    repository = repository,
+                    onOpenLocationInMap = openMeetingInMap
+                )
             }
             CampusTab.DISCIPLINES -> {
                 br.ufop.campus.ui.disciplines.DisciplinesScreen(
                     repository = repository,
-                    onOpenTimetable = { showTimetableModal = true }
+                    onOpenTimetable = { showTimetableModal = true },
+                    onOpenLocationInMap = openMeetingInMap
                 )
             }
             CampusTab.ACTIVITIES -> {
                 br.ufop.campus.ui.activities.ActivitiesPlaceholderScreen(
-                    repository = repository
+                    repository = repository,
+                    onOpenLocationInMap = openMeetingInMap
                 )
             }
             CampusTab.PROFILE -> {
@@ -190,10 +239,29 @@ fun CampusNavigation(
                     onExitApp = onExitApp
                 )
             }
+            CampusTab.MAP -> {
+                val activeMapController = mapController
+                if (activeMapController != null) {
+                    CampusMapScreen(
+                        controller = activeMapController,
+                        bottomBarClearanceDp = if (adaptive.useNavigationRail) 16.dp else 88.dp,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                    )
+                }
+            }
         }
     }
 
     LaunchedEffect(selectedTab) {
+        if (selectedTab == CampusTab.MAP && mapController == null) {
+            ensureMapController()
+        }
         if (selectedTab != CampusTab.DISCIPLINES && showTimetableModal) {
             showTimetableModal = false
         }
@@ -222,6 +290,7 @@ fun CampusNavigation(
                             Key.Two, Key.NumPad2 -> CampusTab.DISCIPLINES
                             Key.Three, Key.NumPad3 -> CampusTab.ACTIVITIES
                             Key.Four, Key.NumPad4 -> CampusTab.PROFILE
+                            Key.Five, Key.NumPad5 -> CampusTab.MAP
                             else -> null
                         }
                         if (targetTab != null) {
@@ -262,7 +331,9 @@ fun CampusNavigation(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .statusBarsPadding()
+                            .then(
+                                if (selectedTab == CampusTab.MAP) Modifier else Modifier.statusBarsPadding()
+                            )
                     ) {
                         renderActiveTabContent()
                     }
@@ -271,27 +342,31 @@ fun CampusNavigation(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .statusBarsPadding()
+                        .then(
+                            if (selectedTab == CampusTab.MAP) Modifier else Modifier.statusBarsPadding()
+                        )
                 ) {
                     renderActiveTabContent()
                 }
 
-                // IHC-03 Scrim Inferior sob a Barra Flutuante para transição suave de rolagem
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(108.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
-                                    MaterialTheme.colorScheme.background
+                if (selectedTab != CampusTab.MAP) {
+                    // IHC-03 Scrim Inferior sob a Barra Flutuante para transição suave de rolagem
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(108.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
+                                        MaterialTheme.colorScheme.background
+                                    )
                                 )
                             )
-                        )
-                )
+                    )
+                }
 
                 FloatingCampusNavigationBar(
                     selectedTab = selectedTab,
@@ -307,14 +382,15 @@ fun CampusNavigation(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
                 )
             }
 
             if (showTimetableModal) {
                 br.ufop.campus.ui.timetable.TimetableModalScreen(
                     repository = repository,
-                    onDismiss = { showTimetableModal = false }
+                    onDismiss = { showTimetableModal = false },
+                    onOpenLocationInMap = openMeetingInMap
                 )
             }
 
@@ -446,7 +522,7 @@ private fun CampusNavigationRail(
                 }
             }
 
-            CampusTab.values().forEach { tab ->
+            CampusTab.entries.forEach { tab ->
                 val isSelected = selectedTab == tab
                 val pillColor by animateColorAsState(
                     targetValue = if (isSelected) {
@@ -597,98 +673,161 @@ private fun FloatingCampusNavigationBar(
         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
     }
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(68.dp),
-        shape = RoundedCornerShape(999.dp),
-        color = capsuleBg,
-        shadowElevation = 12.dp,
-        tonalElevation = 3.dp,
-        border = BorderStroke(1.dp, capsuleBorder)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 6.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .weight(1f)
+                .height(64.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = capsuleBg,
+            shadowElevation = 12.dp,
+            tonalElevation = 3.dp,
+            border = BorderStroke(1.dp, capsuleBorder)
         ) {
-            CampusTab.values().forEach { tab ->
-                val isSelected = selectedTab == tab
-                val pillColor by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
-                    } else {
-                        Color.Transparent
-                    },
-                    animationSpec = if (reduceMotion) snap() else spring(),
-                    label = "FloatingNavPillBg_${tab.name}"
-                )
-                val itemColor by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    animationSpec = if (reduceMotion) snap() else spring(),
-                    label = "FloatingNavContent_${tab.name}"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .onGloballyPositioned { coords ->
-                            onTabPositioned(tab, coords.boundsInRoot())
-                        }
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(pillColor)
-                        .semantics {
-                            selected = isSelected
-                            contentDescription = "Aba ${tab.label}"
-                        }
-                        .clickable(
-                            role = Role.Tab,
-                            onClick = { onSelectTab(tab) }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        if (tab == CampusTab.PROFILE) {
-                            ProfileTabAvatarIcon(
-                                avatarBitmap = avatarBitmap,
-                                studentName = studentName,
-                                isSelected = isSelected,
-                                contentColor = itemColor
-                            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CampusTab.primaryTabs.forEach { tab ->
+                    val isSelected = selectedTab == tab
+                    val pillColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
                         } else {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.label,
-                                tint = itemColor,
-                                modifier = Modifier.size(22.dp)
+                            Color.Transparent
+                        },
+                        animationSpec = if (reduceMotion) snap() else spring(),
+                        label = "FloatingNavPillBg_${tab.name}"
+                    )
+                    val itemColor by animateColorAsState(
+                        targetValue = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        animationSpec = if (reduceMotion) snap() else spring(),
+                        label = "FloatingNavContent_${tab.name}"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .onGloballyPositioned { coords ->
+                                onTabPositioned(tab, coords.boundsInRoot())
+                            }
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(pillColor)
+                            .semantics {
+                                selected = isSelected
+                                contentDescription = "Aba ${tab.label}"
+                            }
+                            .clickable(
+                                role = Role.Tab,
+                                onClick = { onSelectTab(tab) }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (tab == CampusTab.PROFILE) {
+                                ProfileTabAvatarIcon(
+                                    avatarBitmap = avatarBitmap,
+                                    studentName = studentName,
+                                    isSelected = isSelected,
+                                    contentColor = itemColor
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = itemColor,
+                                    modifier = Modifier.size(21.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = tab.label,
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp,
+                                letterSpacing = (-0.2).sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = itemColor,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        Text(
-                            text = tab.label,
-                            fontSize = 11.sp,
-                            lineHeight = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = itemColor,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
                 }
+            }
+        }
+
+        val isMapSelected = selectedTab == CampusTab.MAP
+        val mapPillColor by animateColorAsState(
+            targetValue = if (isMapSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+            } else {
+                Color.Transparent
+            },
+            animationSpec = if (reduceMotion) snap() else spring(),
+            label = "FloatingMapBtnBg"
+        )
+        val mapIconColor by animateColorAsState(
+            targetValue = if (isMapSelected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            animationSpec = if (reduceMotion) snap() else spring(),
+            label = "FloatingMapBtnIcon"
+        )
+
+        Surface(
+            modifier = Modifier.size(64.dp),
+            shape = CircleShape,
+            color = capsuleBg,
+            shadowElevation = 12.dp,
+            tonalElevation = 3.dp,
+            border = BorderStroke(1.dp, capsuleBorder)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(5.dp)
+                    .onGloballyPositioned { coords ->
+                        onTabPositioned(CampusTab.MAP, coords.boundsInRoot())
+                    }
+                    .clip(CircleShape)
+                    .background(mapPillColor)
+                    .semantics {
+                        selected = isMapSelected
+                        contentDescription = "Aba Mapa"
+                    }
+                    .clickable(
+                        role = Role.Tab,
+                        onClick = { onSelectTab(CampusTab.MAP) }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isMapSelected) Icons.Filled.Map else CampusTab.MAP.icon,
+                    contentDescription = "Mapa",
+                    tint = mapIconColor,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }

@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +27,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -60,6 +63,8 @@ import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.AttendanceStatus
 import br.ufop.campus.core.ffi.ClassCheckInDetail
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
+import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.core.map.isEadMapLocation
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.components.isEndTimeAfterStart
 import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
@@ -80,9 +85,12 @@ fun ClassCheckInBottomSheet(
     slotItem: CourseScheduleSlotItem? = null,
     workloadHours: Int = 60,
     selectedIsoDate: String = "",
+    courseCode: String = "",
+    courseSection: String = "",
     editError: String? = null,
     onClearEditError: () -> Unit = {},
     onDismiss: () -> Unit,
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null,
     onSave: (slotId: String, status: AttendanceStatus) -> Unit,
     onSaveEdit: (
         courseId: String,
@@ -460,11 +468,83 @@ fun ClassCheckInBottomSheet(
                                     thickness = 1.dp
                                 )
 
-                                Text(
-                                    text = detail.buildingAndRoom,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                val canOpenInMap = onOpenLocationInMap != null &&
+                                    detail.buildingAndRoom.isNotBlank() &&
+                                    !isEadMapLocation(detail.buildingAndRoom)
+                                if (canOpenInMap) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .defaultMinSize(minHeight = minTouchTarget)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable(role = Role.Button) {
+                                                val fallbackLoc = slotItem?.let {
+                                                    listOf(it.building.trim(), it.room.trim())
+                                                        .filter { s -> s.isNotEmpty() }
+                                                        .joinToString(" · ")
+                                                }?.ifBlank { detail.buildingAndRoom } ?: detail.buildingAndRoom
+                                                val targetWeekday = slotItem?.dayOfWeek ?: resolvedDayOfWeek
+                                                val targetStart = slotItem?.startTime?.ifBlank { detail.startTime }
+                                                    ?: detail.startTime
+                                                onDismiss()
+                                                onOpenLocationInMap?.invoke(
+                                                    MapMeetingFocusRequest(
+                                                        courseCode = courseCode,
+                                                        section = courseSection,
+                                                        weekday = targetWeekday,
+                                                        startTime = targetStart,
+                                                        fallbackBuildingRaw = fallbackLoc
+                                                    )
+                                                )
+                                            }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.LocationOn,
+                                            contentDescription = null,
+                                            tint = readableAccentText,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = detail.buildingAndRoom,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = "Ver no mapa",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = readableAccentText,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = readableAccentText,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                } else {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.LocationOn,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = detail.buildingAndRoom,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                                 if (detail.professor.isNotBlank()) {
                                     Text(
                                         text = detail.professor,
