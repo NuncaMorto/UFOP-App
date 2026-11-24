@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use super::occupancy::{IndexedSlot, OccupancyIndex, expand_section_tokens, parse_hhmm_to_minutes};
-use super::overlay::LoadedCampus;
+use super::overlay::{LoadedCampus, LoadedFeature};
 use super::types::{CameraFocus, MapLayer, Rect2D, Resolution};
 
 #[derive(Debug, Deserialize)]
@@ -135,24 +135,62 @@ impl MeetingResolver {
         }
 
         // Fallback pelo nome/alias do prédio no Atestado.
-        let norm_building = normalize_lookup_key(fallback_building_raw);
-        if !norm_building.is_empty() {
-            let resolved_id = self
-                .atestado_aliases
-                .get(&norm_building)
-                .cloned()
-                .unwrap_or_else(|| norm_building.replace(' ', "_"));
-
-            if let Some(focus) = find_building_focus(campuses, &resolved_id) {
-                return Resolution::BuildingFallback {
-                    campus_id: focus.campus_id.clone(),
-                    building_id: focus.feature_id.clone(),
-                    camera_focus: focus,
-                };
-            }
+        if let Some(focus) = self.resolve_building_fallback(campuses, fallback_building_raw) {
+            return Resolution::BuildingFallback {
+                campus_id: focus.campus_id.clone(),
+                building_id: focus.feature_id.clone(),
+                camera_focus: focus,
+            };
         }
 
         Resolution::Unmapped
+    }
+
+    fn resolve_building_candidate(
+        &self,
+        campuses: &[LoadedCampus],
+        raw_candidate: &str,
+    ) -> Option<CameraFocus> {
+        let norm_building = normalize_lookup_key(raw_candidate);
+        if norm_building.is_empty() {
+            return None;
+        }
+        let resolved_id = self
+            .atestado_aliases
+            .get(&norm_building)
+            .cloned()
+            .unwrap_or_else(|| norm_building.replace(' ', "_"));
+
+        find_building_focus(campuses, &resolved_id)
+    }
+
+    fn resolve_building_fallback(
+        &self,
+        campuses: &[LoadedCampus],
+        fallback_building_raw: &str,
+    ) -> Option<CameraFocus> {
+        let trimmed = fallback_building_raw.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        if let Some(focus) = self.resolve_building_candidate(campuses, trimmed) {
+            return Some(focus);
+        }
+
+        // Tentar prefixos derivados antes de separadores compostos ('·', '•', '-', ',', '(').
+        for (idx, ch) in trimmed.char_indices().rev() {
+            if matches!(ch, '·' | '•' | '-' | ',' | '(') {
+                let prefix = trimmed[..idx].trim();
+                if !prefix.is_empty()
+                    && let Some(focus) = self.resolve_building_candidate(campuses, prefix)
+                {
+                    return Some(focus);
+                }
+            }
+        }
+
+        None
     }
 }
 
@@ -211,6 +249,20 @@ fn pick_matching_slot<'a>(
     None
 }
 
+fn focus_from_campus_feature(campus: &LoadedCampus, feat: &LoadedFeature) -> CameraFocus {
+    let target_floor = feat
+        .info
+        .floor
+        .or(feat.info.default_floor)
+        .unwrap_or(campus.summary.default_floor);
+    focus_for_bounds(
+        &campus.summary.campus_id,
+        &feat.info.id,
+        target_floor,
+        feat.info.bounds,
+    )
+}
+
 pub fn find_feature_focus(campuses: &[LoadedCampus], feature_id: &str) -> Option<CameraFocus> {
     for campus in campuses {
         if let Some(feat) = campus
@@ -218,24 +270,20 @@ pub fn find_feature_focus(campuses: &[LoadedCampus], feature_id: &str) -> Option
             .iter()
             .find(|f| f.info.id.eq_ignore_ascii_case(feature_id))
         {
-            let target_floor = feat
-                .info
-                .floor
-                .or(feat.info.default_floor)
-                .unwrap_or(campus.summary.default_floor);
-            return Some(focus_for_bounds(
-                &campus.summary.campus_id,
-                &feat.info.id,
-                target_floor,
-                feat.info.bounds,
-            ));
+            return Some(focus_from_campus_feature(campus, feat));
         }
     }
     None
 }
 
-fn find_building_focus(campuses: &[LoadedCampus], building_id: &str) -> Option<CameraFocus> {
-    // Priorizar Building -> CampusZone -> CampusGround -> match por código/alias.
+pub fn find_building_focus(campuses: &[LoadedCampus], building_id: &str) -> Option<CameraFocus> {
+    let clean_id = building_id.trim();
+    let norm_target = normalize_lookup_key(clean_id);
+    if clean_id.is_empty() && norm_target.is_empty() {
+        return None;
+    }
+
+    // Priorizar Building -> CampusZone -> CampusGround -> match por id, código, nome ou alias.
     for target_layer in [
         MapLayer::Building,
         MapLayer::CampusZone,
@@ -243,49 +291,38 @@ fn find_building_focus(campuses: &[LoadedCampus], building_id: &str) -> Option<C
     ] {
         for campus in campuses {
             if let Some(feat) = campus.features.iter().find(|f| {
-                f.info.layer == target_layer && f.info.id.eq_ignore_ascii_case(building_id)
+                f.info.layer == target_layer
+                    && (f.info.id.eq_ignore_ascii_case(clean_id)
+                        || (!norm_target.is_empty()
+                            && normalize_lookup_key(&f.info.id) == norm_target))
             }) {
-                let target_floor = feat
-                    .info
-                    .floor
-                    .or(feat.info.default_floor)
-                    .unwrap_or(campus.summary.default_floor);
-                return Some(focus_for_bounds(
-                    &campus.summary.campus_id,
-                    &feat.info.id,
-                    target_floor,
-                    feat.info.bounds,
-                ));
+                return Some(focus_from_campus_feature(campus, feat));
             }
         }
     }
 
-    for campus in campuses {
-        if let Some(feat) = campus.features.iter().find(|f| {
-            matches!(
-                f.info.layer,
-                MapLayer::Building | MapLayer::CampusZone | MapLayer::CampusGround
-            ) && (f
-                .info
-                .code
-                .as_deref()
-                .is_some_and(|c| c.eq_ignore_ascii_case(building_id))
-                || f.info
-                    .aliases
-                    .iter()
-                    .any(|a| normalize_lookup_key(a) == building_id))
-        }) {
-            let target_floor = feat
-                .info
-                .floor
-                .or(feat.info.default_floor)
-                .unwrap_or(campus.summary.default_floor);
-            return Some(focus_for_bounds(
-                &campus.summary.campus_id,
-                &feat.info.id,
-                target_floor,
-                feat.info.bounds,
-            ));
+    if norm_target.is_empty() {
+        return None;
+    }
+
+    for target_layer in [
+        MapLayer::Building,
+        MapLayer::CampusZone,
+        MapLayer::CampusGround,
+    ] {
+        for campus in campuses {
+            if let Some(feat) = campus.features.iter().find(|f| {
+                f.info.layer == target_layer
+                    && (f.info.code.as_deref().is_some_and(|c| {
+                        c.eq_ignore_ascii_case(clean_id) || normalize_lookup_key(c) == norm_target
+                    }) || normalize_lookup_key(&f.info.name) == norm_target
+                        || f.info
+                            .aliases
+                            .iter()
+                            .any(|a| normalize_lookup_key(a) == norm_target))
+            }) {
+                return Some(focus_from_campus_feature(campus, feat));
+            }
         }
     }
 

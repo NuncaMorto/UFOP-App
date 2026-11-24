@@ -34,6 +34,9 @@ pub fn search_features(
     active_floor: i32,
 ) -> Vec<SearchResult> {
     let norm_query = normalize_lookup_key(query);
+    if norm_query.is_empty() && poi_type_filter.is_none() {
+        return Vec::new();
+    }
     let mut results: Vec<SearchResult> = Vec::new();
 
     for feat in features {
@@ -51,10 +54,10 @@ pub fn search_features(
         }
 
         if norm_query.is_empty() {
-            let floor_bonus = if feat.info.floor == Some(active_floor) {
-                20
-            } else {
-                0
+            let floor_bonus = match feat.info.floor {
+                Some(floor) if floor == active_floor => 30,
+                None => 20,
+                Some(_) => 0,
             };
             results.push(SearchResult {
                 feature: feat.info.clone(),

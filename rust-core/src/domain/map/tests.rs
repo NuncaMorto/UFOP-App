@@ -606,3 +606,156 @@ fn validate_overlay_accepts_official_overlays_and_rejects_broken_ones() {
     .expect_err("invalid floor must be rejected");
     assert!(floor_err.to_string().contains("Andar inválido"));
 }
+
+#[test]
+fn resolve_meeting_handles_composite_building_fallbacks() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+
+    for (raw_building, expected_campus, expected_building) in [
+        ("Bloco de Salas · Sala 205", "OP_MC", "BSA"),
+        ("ICEB (III) · Sala 105", "OP_MC", "ICEB"),
+        ("Escola de Minas - Sala 11", "OP_MC", "EM"),
+        ("Pavilhão de Aulas, Sala 101", "OP_MC", "BSA"),
+        ("CEDUFOP • Quadra", "OP_MC", "EEF"),
+    ] {
+        match engine.resolve_meeting(
+            "ZZZ999".to_string(),
+            "11".to_string(),
+            2,
+            "08:20".to_string(),
+            raw_building.to_string(),
+        ) {
+            Resolution::BuildingFallback {
+                campus_id,
+                building_id,
+                camera_focus,
+            } => {
+                assert_eq!(
+                    campus_id, expected_campus,
+                    "campus mismatch for '{raw_building}'"
+                );
+                assert_eq!(
+                    building_id, expected_building,
+                    "building mismatch for '{raw_building}'"
+                );
+                assert_eq!(camera_focus.feature_id, expected_building);
+            }
+            other => panic!(
+                "Expected BuildingFallback {expected_building} for '{raw_building}', got {other:?}"
+            ),
+        }
+    }
+
+    // Garante que find_building_focus normaliza underscores/espaços ao casar id, code, name e aliases.
+    let bsa = engine.get_feature("BSA".to_string()).expect("BSA feature");
+    let norm_name_with_underscore = bsa.name.to_ascii_uppercase().replace(' ', "_");
+    let by_name =
+        super::resolver::find_building_focus(&engine.campuses, &norm_name_with_underscore)
+            .expect("find_building_focus by underscore-normalized name");
+    assert_eq!(by_name.feature_id, "BSA");
+
+    if let Some(spaced_alias) = bsa.aliases.iter().find(|a| a.contains(' ')) {
+        let alias_with_underscore = spaced_alias.to_ascii_uppercase().replace(' ', "_");
+        let by_alias =
+            super::resolver::find_building_focus(&engine.campuses, &alias_with_underscore)
+                .expect("find_building_focus by underscore-normalized spaced alias");
+        assert_eq!(by_alias.feature_id, "BSA");
+    }
+}
+
+#[test]
+fn search_empty_query_behavior_and_poi_floor_ranking() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+
+    // Busca vazia sem filtro não deve despejar resultados arbitrários.
+    assert!(engine.search("".to_string(), None, 0).is_empty());
+    assert!(engine.search("   ".to_string(), None, 1).is_empty());
+
+    let floor_tier = |floor: Option<i32>, active: i32| match floor {
+        Some(f) if f == active => 0u8,
+        None => 1,
+        Some(_) => 2,
+    };
+
+    for filter in [PoiType::Toilet, PoiType::Library] {
+        let results = engine.search("".to_string(), Some(filter), 1);
+        assert!(
+            !results.is_empty(),
+            "search(\"\", Some({filter:?}), 1) should return results"
+        );
+        for item in &results {
+            let expected_score = match item.feature.floor {
+                Some(1) => 80,
+                None => 70,
+                Some(_) => 50,
+            };
+            assert_eq!(
+                item.score, expected_score,
+                "unexpected score for {:?} ({}) on floor {:?}",
+                filter, item.feature.id, item.feature.floor
+            );
+        }
+        for pair in results.windows(2) {
+            assert!(pair[0].score >= pair[1].score);
+            assert!(
+                floor_tier(pair[0].feature.floor, 1) <= floor_tier(pair[1].feature.floor, 1),
+                "ranking order violated for {filter:?}: {:?} ({:?}) before {:?} ({:?})",
+                pair[0].feature.id,
+                pair[0].feature.floor,
+                pair[1].feature.id,
+                pair[1].feature.floor
+            );
+        }
+    }
+
+    // Valida que bibliotecas do andar ativo (1) ficam à frente das demais.
+    let libs_floor1 = engine.search("".to_string(), Some(PoiType::Library), 1);
+    assert_eq!(libs_floor1[0].feature.floor, Some(1));
+}
+
+#[test]
+fn list_building_occupancy_distinguishes_all_occupancy_statuses() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+
+    // Dia letivo com salas ocupadas e salas sem aula regular no mesmo prédio.
+    let bsa_tue = engine
+        .list_building_occupancy("BSA".to_string(), "2026-11-17T15:30:00-03:00".to_string())
+        .expect("BSA tuesday occupancy");
+    assert_eq!(bsa_tue.len(), 20);
+    assert!(
+        bsa_tue
+            .iter()
+            .any(|i| matches!(i.status, OccupancyStatus::Occupied { .. })),
+        "BSA tuesday 15:30 should have at least one Occupied room"
+    );
+    assert!(
+        bsa_tue
+            .iter()
+            .any(|i| matches!(i.status, OccupancyStatus::NoRegularClass)),
+        "BSA tuesday 15:30 should have at least one NoRegularClass room"
+    );
+
+    // Sábado no BSA (cobertura apenas seg-sex) -> todas NoData.
+    let bsa_sat = engine
+        .list_building_occupancy("BSA".to_string(), "2026-11-21T10:00:00-03:00".to_string())
+        .expect("BSA saturday occupancy");
+    assert_eq!(bsa_sat.len(), 20);
+    assert!(
+        bsa_sat
+            .iter()
+            .all(|i| matches!(i.status, OccupancyStatus::NoData)),
+        "BSA saturday should report NoData for all rooms"
+    );
+
+    // Feriado oficial (2026-11-20 Consciência Negra) -> todas OutOfTerm.
+    let bsa_holiday = engine
+        .list_building_occupancy("BSA".to_string(), "2026-11-20T14:00:00-03:00".to_string())
+        .expect("BSA holiday occupancy");
+    assert_eq!(bsa_holiday.len(), 20);
+    assert!(
+        bsa_holiday
+            .iter()
+            .all(|i| matches!(i.status, OccupancyStatus::OutOfTerm)),
+        "BSA holiday should report OutOfTerm for all rooms"
+    );
+}
