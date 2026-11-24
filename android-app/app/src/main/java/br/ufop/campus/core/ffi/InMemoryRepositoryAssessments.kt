@@ -506,17 +506,47 @@ internal fun InMemoryCampusRepository.updateTranscriptOrCourseGradeImpl(
 }
 
 internal fun InMemoryCampusRepository.getAcademicCreReportLocked(): AcademicCreReport {
-    val merged = mutableListOf<TranscriptCourseEntry>()
+    val merged = ArrayList<TranscriptCourseEntry>(transcriptEntries.size + courses.size)
+
+    // Pré-indexa disciplinas em O(C) para evitar varredura O(T × C) com normalizeDedupKey repetido
+    val courseCount = courses.size
+    val coursesBySemesterAndId = HashMap<Pair<String, String>, CourseSeed>(courseCount * 2)
+    val coursesBySemesterAndCode = HashMap<Pair<String, String>, CourseSeed>(courseCount * 2)
+    val coursesBySemesterAndName = HashMap<Pair<String, String>, CourseSeed>(courseCount * 2)
+    val resolvedCodeByCourseId = HashMap<String, String>(courseCount * 2)
+    val normalizedNameByCourseId = HashMap<String, String>(courseCount * 2)
+
+    for (course in courses.values) {
+        val resolvedCode = resolveCourseCode(course)
+        val normName = normalizeDedupKey(course.name)
+        resolvedCodeByCourseId[course.courseId] = resolvedCode
+        normalizedNameByCourseId[course.courseId] = normName
+
+        coursesBySemesterAndId.putIfAbsent(course.semester to course.courseId.lowercase(), course)
+        if (resolvedCode.isNotEmpty()) {
+            coursesBySemesterAndCode.putIfAbsent(course.semester to resolvedCode.uppercase(), course)
+        }
+        if (normName.isNotEmpty()) {
+            coursesBySemesterAndName.putIfAbsent(course.semester to normName, course)
+        }
+    }
+
+    val mergedIds = HashSet<Pair<String, String>>(transcriptEntries.size * 2)
+    val mergedCodes = HashSet<Pair<String, String>>(transcriptEntries.size * 2)
+    val mergedNames = HashSet<Pair<String, String>>(transcriptEntries.size * 2)
 
     for (entry in transcriptEntries) {
-        val matchedCourse = courses.values.firstOrNull { c ->
-            c.semester == entry.semester && (
-                c.courseId.equals(entry.id, ignoreCase = true) ||
-                    resolveCourseCode(c).equals(entry.code, ignoreCase = true) ||
-                    normalizeDedupKey(c.name) == normalizeDedupKey(entry.name)
-                )
-        }
-        if (matchedCourse != null) {
+        val entryIdKey = entry.semester to entry.id.lowercase()
+        val entryCodeUpper = entry.code.uppercase()
+        val entryCodeKey = entry.semester to entryCodeUpper
+        val entryNormName = normalizeDedupKey(entry.name)
+        val entryNameKey = entry.semester to entryNormName
+
+        val matchedCourse = coursesBySemesterAndId[entryIdKey]
+            ?: (if (entryCodeUpper.isNotEmpty()) coursesBySemesterAndCode[entryCodeKey] else null)
+            ?: (if (entryNormName.isNotEmpty()) coursesBySemesterAndName[entryNameKey] else null)
+
+        val resolvedEntry = if (matchedCourse != null) {
             val liveAbsences = if (entry.status == "CS") {
                 buildDisciplineSummaryLocked(matchedCourse).currentAbsences
             } else {
@@ -527,26 +557,31 @@ internal fun InMemoryCampusRepository.getAcademicCreReportLocked(): AcademicCreR
                 matchedCourse.professor.isNotBlank() && !matchedCourse.professor.startsWith("Turma ") -> matchedCourse.professor
                 else -> entry.professor
             }
-            merged.add(
-                entry.copy(
-                    absences = liveAbsences,
-                    professor = liveProfessor
-                )
+            entry.copy(
+                absences = liveAbsences,
+                professor = liveProfessor
             )
         } else {
-            merged.add(entry)
+            entry
         }
+
+        merged.add(resolvedEntry)
+        mergedIds.add(entryIdKey)
+        if (entryCodeUpper.isNotEmpty()) mergedCodes.add(entryCodeKey)
+        if (entryNormName.isNotEmpty()) mergedNames.add(entryNameKey)
     }
 
     for (course in courses.values) {
-        val courseCode = resolveCourseCode(course)
-        val alreadyPresent = merged.any { entry ->
-            entry.semester == course.semester && (
-                entry.id.equals(course.courseId, ignoreCase = true) ||
-                    entry.code.equals(courseCode, ignoreCase = true) ||
-                    normalizeDedupKey(entry.name) == normalizeDedupKey(course.name)
-                )
-        }
+        val courseCode = resolvedCodeByCourseId[course.courseId] ?: resolveCourseCode(course)
+        val courseNormName = normalizedNameByCourseId[course.courseId] ?: normalizeDedupKey(course.name)
+        val idKey = course.semester to course.courseId.lowercase()
+        val codeKey = course.semester to courseCode.uppercase()
+        val nameKey = course.semester to courseNormName
+
+        val alreadyPresent = idKey in mergedIds ||
+            (courseCode.isNotEmpty() && codeKey in mergedCodes) ||
+            (courseNormName.isNotEmpty() && nameKey in mergedNames)
+
         if (!alreadyPresent) {
             merged.add(
                 TranscriptCourseEntry(
@@ -562,6 +597,9 @@ internal fun InMemoryCampusRepository.getAcademicCreReportLocked(): AcademicCreR
                     professor = course.professor
                 )
             )
+            mergedIds.add(idKey)
+            if (courseCode.isNotEmpty()) mergedCodes.add(codeKey)
+            if (courseNormName.isNotEmpty()) mergedNames.add(nameKey)
         }
     }
 

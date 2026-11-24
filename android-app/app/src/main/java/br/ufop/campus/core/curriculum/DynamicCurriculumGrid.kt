@@ -110,6 +110,7 @@ object DynamicCurriculumCatalog {
     private val CURRICULUM_PAREN_REGEX = Regex("""\(\s*curr[ií]culo\s+(\d+)\s*\)""", RegexOption.IGNORE_CASE)
     private val PAREN_SUFFIX_REGEX = Regex("""\s*\([^)]*\)""")
     private val NON_ALNUM_REGEX = Regex("""[^a-z0-9]+""")
+    private val WHITESPACE_REGEX = Regex("""\s+""")
 
     private val AUTOMACAO_ALIASES = listOf(
         "engenharia de controle e automacao",
@@ -306,6 +307,43 @@ object DynamicCurriculumCatalog {
         engControleAutomacao2026_1
     )
 
+    private val curatedByCode: Map<String, List<DynamicCurriculumMatrix>> = curatedMatrices
+        .groupBy { it.courseCode.trim().uppercase() }
+        .filterKeys { it.isNotEmpty() }
+
+    private val curatedCodes: Set<String> = curatedByCode.keys
+
+    private data class CachedAllMatricesEntry(
+        val sourceRef: List<UfopCourseCurriculum>,
+        val courseRefs: List<UfopCourseCurriculum>,
+        val matrices: List<DynamicCurriculumMatrix>
+    )
+
+    private data class SingleCourseCacheEntry(
+        val courseRef: UfopCourseCurriculum,
+        val matrix: DynamicCurriculumMatrix?
+    )
+
+    private val matricesCacheLock = Any()
+
+    @Volatile
+    private var lastAllMatricesEntry: CachedAllMatricesEntry? = null
+
+    private val allMatricesCache = ArrayDeque<CachedAllMatricesEntry>()
+    private val singleCourseCache = HashMap<Int, MutableList<SingleCourseCacheEntry>>()
+
+    @Volatile
+    internal var buildAllMatricesBuildCountForTest: Int = 0
+
+    internal fun clearCachesForTesting() {
+        synchronized(matricesCacheLock) {
+            lastAllMatricesEntry = null
+            allMatricesCache.clear()
+            singleCourseCache.clear()
+            buildAllMatricesBuildCountForTest = 0
+        }
+    }
+
     val allMatrices: List<DynamicCurriculumMatrix> = curatedMatrices
 
     val defaultMatrix: DynamicCurriculumMatrix = engControleAutomacao2024_1
@@ -493,22 +531,81 @@ object DynamicCurriculumCatalog {
         )
     }
 
+    private fun matchesCatalogList(
+        entry: CachedAllMatricesEntry,
+        catalogCourses: List<UfopCourseCurriculum>
+    ): Boolean {
+        if (entry.sourceRef === catalogCourses) return true
+        val refs = entry.courseRefs
+        if (refs.size != catalogCourses.size) return false
+        for (i in refs.indices) {
+            if (refs[i] !== catalogCourses[i]) return false
+        }
+        return true
+    }
+
+    private fun fromCourseCurriculumCached(course: UfopCourseCurriculum): DynamicCurriculumMatrix? {
+        val identity = System.identityHashCode(course)
+        synchronized(matricesCacheLock) {
+            singleCourseCache[identity]?.firstOrNull { it.courseRef === course }?.let { return it.matrix }
+        }
+        val built = fromCourseCurriculum(course)
+        synchronized(matricesCacheLock) {
+            if (singleCourseCache.size > 128) {
+                singleCourseCache.clear()
+            }
+            val bucket = singleCourseCache.getOrPut(identity) { mutableListOf() }
+            if (bucket.none { it.courseRef === course }) {
+                bucket.add(SingleCourseCacheEntry(course, built))
+            }
+        }
+        return built
+    }
+
+    fun peekBuiltMatrices(catalogCourses: List<UfopCourseCurriculum>): List<DynamicCurriculumMatrix>? {
+        if (catalogCourses.isEmpty()) return curatedMatrices
+        val fast = lastAllMatricesEntry
+        if (fast != null && matchesCatalogList(fast, catalogCourses)) return fast.matrices
+        return synchronized(matricesCacheLock) {
+            allMatricesCache.firstOrNull { matchesCatalogList(it, catalogCourses) }?.matrices
+        }
+    }
+
     fun buildAllMatrices(catalogCourses: List<UfopCourseCurriculum>): List<DynamicCurriculumMatrix> {
         if (catalogCourses.isEmpty()) return curatedMatrices
-        val curatedCodes = curatedMatrices
-            .map { it.courseCode.trim().uppercase() }
-            .filter { it.isNotEmpty() }
-            .toSet()
-
-        val generated = catalogCourses.mapNotNull { course ->
-            val code = course.code.trim().uppercase()
-            if (code in curatedCodes) null else fromCourseCurriculum(course)
+        val fast = lastAllMatricesEntry
+        if (fast != null && matchesCatalogList(fast, catalogCourses)) {
+            return fast.matrices
         }
+        return synchronized(matricesCacheLock) {
+            val cached = allMatricesCache.firstOrNull { matchesCatalogList(it, catalogCourses) }
+            if (cached != null) {
+                lastAllMatricesEntry = cached
+                return@synchronized cached.matrices
+            }
 
-        return (curatedMatrices + generated).sortedWith(
-            compareBy<DynamicCurriculumMatrix> { normalizeLookupText(it.courseName) }
-                .thenBy { it.effectiveFrom }
-        )
+            val generated = catalogCourses.mapNotNull { course ->
+                val code = course.code.trim().uppercase()
+                if (code in curatedCodes) null else fromCourseCurriculumCached(course)
+            }
+
+            val sorted = (curatedMatrices + generated).sortedWith(
+                compareBy<DynamicCurriculumMatrix> { normalizeLookupText(it.courseName) }
+                    .thenBy { it.effectiveFrom }
+            )
+            val entry = CachedAllMatricesEntry(
+                sourceRef = catalogCourses,
+                courseRefs = catalogCourses.toList(),
+                matrices = sorted
+            )
+            if (allMatricesCache.size >= 8) {
+                allMatricesCache.removeFirst()
+            }
+            allMatricesCache.addLast(entry)
+            lastAllMatricesEntry = entry
+            buildAllMatricesBuildCountForTest += 1
+            sorted
+        }
     }
 
     fun findById(
@@ -516,6 +613,11 @@ object DynamicCurriculumCatalog {
         catalogCourses: List<UfopCourseCurriculum> = emptyList()
     ): DynamicCurriculumMatrix? {
         val cleanId = id?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        curatedMatrices.firstOrNull { matrix ->
+            matrix.id.equals(cleanId, ignoreCase = true) ||
+                matrix.legacyIds.any { it.equals(cleanId, ignoreCase = true) }
+        }?.let { return it }
+        if (catalogCourses.isEmpty()) return null
         val matrices = buildAllMatrices(catalogCourses)
         return matrices.firstOrNull { matrix ->
             matrix.id.equals(cleanId, ignoreCase = true) ||
@@ -583,16 +685,26 @@ object DynamicCurriculumCatalog {
             .minWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
         val entryTerm = entryPair?.let { (year, sem) -> DynamicSemesterTerm(year, sem) }
 
-        val matrices = buildAllMatrices(catalogCourses)
-        val matchedCatalog = if (catalogCourses.isNotEmpty() && courseName.isNotBlank()) {
-            UfopCurriculumCatalog.findCourse(catalogCourses, courseName, campusHint)
+        val cleanCourse = courseName.trim()
+        val matchedCatalog = if (catalogCourses.isNotEmpty() && cleanCourse.isNotEmpty()) {
+            UfopCurriculumCatalog.findCourse(catalogCourses, cleanCourse, campusHint)
         } else {
             null
         }
 
         val courseMatrices: List<DynamicCurriculumMatrix> = if (matchedCatalog != null) {
-            val byCatalogCode = matrices.filter {
-                it.courseCode.equals(matchedCatalog.code, ignoreCase = true)
+            val matchedCodeUpper = matchedCatalog.code.trim().uppercase()
+            val curatedMatches = curatedByCode[matchedCodeUpper]
+            val byCatalogCode = if (!curatedMatches.isNullOrEmpty()) {
+                curatedMatches
+            } else {
+                catalogCourses.mapNotNull { course ->
+                    if (course.code.trim().equals(matchedCodeUpper, ignoreCase = true)) {
+                        fromCourseCurriculumCached(course)
+                    } else {
+                        null
+                    }
+                }
             }
             if (byCatalogCode.isEmpty()) {
                 return DynamicMatrixResolution(
@@ -604,12 +716,18 @@ object DynamicCurriculumCatalog {
                 )
             }
             byCatalogCode
+        } else if (cleanCourse.isEmpty()) {
+            emptyList()
         } else {
-            findMatricesForCourse(courseName, matrices)
+            val curatedMatches = findMatricesForCourse(cleanCourse, curatedMatrices)
+            if (curatedMatches.isNotEmpty() || catalogCourses.isEmpty()) {
+                curatedMatches
+            } else {
+                findMatricesForCourse(cleanCourse, buildAllMatrices(catalogCourses))
+            }
         }
 
         if (courseMatrices.isEmpty()) {
-            val cleanCourse = courseName.trim()
             return DynamicMatrixResolution(
                 matrix = defaultMatrix,
                 studentEntryTerm = entryTerm,
@@ -730,14 +848,14 @@ object DynamicCurriculumCatalog {
         if (trimmed.isEmpty()) return "2026/2"
         return CURRICULUM_PAREN_REGEX.replace(trimmed) { match ->
             "· Currículo ${match.groupValues[1]}"
-        }.replace(Regex("""\s+"""), " ").trim()
+        }.replace(WHITESPACE_REGEX, " ").trim()
     }
 
     private fun buildCourseAliases(courseCode: String, courseName: String): List<String> {
         val aliases = LinkedHashSet<String>()
         if (courseCode.isNotBlank()) aliases.add(courseCode.trim())
         if (courseName.isNotBlank()) aliases.add(courseName.trim())
-        val baseName = PAREN_SUFFIX_REGEX.replace(courseName, " ").replace(Regex("""\s+"""), " ").trim()
+        val baseName = PAREN_SUFFIX_REGEX.replace(courseName, " ").replace(WHITESPACE_REGEX, " ").trim()
         if (baseName.isNotEmpty()) aliases.add(baseName)
         if (courseName.startsWith("Engenharia ", ignoreCase = true)) {
             aliases.add("eng. " + courseName.substring("Engenharia ".length).trim())
@@ -927,9 +1045,14 @@ object DynamicGridEngine {
 
     fun summarize(
         matrix: DynamicCurriculumMatrix,
-        completedCodes: Set<String>
+        completedCodes: Set<String>,
+        alreadySanitized: Boolean = false
     ): DynamicGridSummary {
-        val validCompleted = sanitizeCompleted(matrix, completedCodes)
+        val validCompleted = if (alreadySanitized) {
+            completedCodes
+        } else {
+            sanitizeCompleted(matrix, completedCodes)
+        }
         val completedNodes = matrix.courses.filter { normalizeCode(it.code) in validCompleted }
         val doneHours = completedNodes.sumOf { it.workloadHours }
         val totalHours = matrix.totalGridHours

@@ -299,6 +299,14 @@ object UfopCurriculumCatalog {
         return baseCourse
     }
 
+    fun peekCachedCourses(): List<UfopCourseCurriculum>? = cachedCourses
+
+    internal fun setCachedCoursesForTesting(courses: List<UfopCourseCurriculum>?) {
+        synchronized(loadLock) {
+            cachedCourses = courses
+        }
+    }
+
     fun getAllCourses(context: Context): List<UfopCourseCurriculum> {
         cachedCourses?.let { return it }
         return synchronized(loadLock) {

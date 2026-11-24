@@ -95,6 +95,15 @@ internal fun ProfileMetricsAndCreTab(
     onSelectTranscriptEntry: (TranscriptCourseEntry) -> Unit
 ) {
     val expandedSemesters = remember { mutableStateMapOf<String, Boolean>() }
+    val defaultExpandedSemesters = remember(creReport.semesters, profileSummary.semester) {
+        buildSet {
+            creReport.semesters.firstOrNull()?.semester?.let { add(it) }
+            creReport.semesters
+                .firstOrNull { it.semester == profileSummary.semester || it.inProgressCount > 0 }
+                ?.semester
+                ?.let { add(it) }
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -144,9 +153,9 @@ internal fun ProfileMetricsAndCreTab(
                 }
             }
         } else {
-            creReport.semesters.forEachIndexed { idx, semesterSummary ->
+            creReport.semesters.forEach { semesterSummary ->
                 val isExpanded = expandedSemesters[semesterSummary.semester]
-                    ?: (idx < 2 || semesterSummary.semester == profileSummary.semester)
+                    ?: (semesterSummary.semester in defaultExpandedSemesters)
                 SemesterCreCard(
                     summary = semesterSummary,
                     isExpanded = isExpanded,
@@ -169,8 +178,13 @@ private fun CurrentSemesterAbsencesCard(
 ) {
     val isDark = LocalCampusThemeController.current.isDark
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val absenceRatio = (profileSummary.totalAbsences.toFloat() /
-        profileSummary.totalMaxAbsences.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    val absenceRatio = remember(profileSummary.totalAbsences, profileSummary.totalMaxAbsences) {
+        (profileSummary.totalAbsences.toFloat() /
+            profileSummary.totalMaxAbsences.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    }
+    val normalizedDisciplineNames = remember(currentDisciplines) {
+        currentDisciplines.associate { it.courseId to normalizeUfopPortugueseText(it.name) }
+    }
     val hasCourseAtRisk = profileSummary.coursesAtRisk > 0
     val overallBarColor = if (hasCourseAtRisk) {
         semanticAbsenceRiskColor(1, 1, isDark)
@@ -360,7 +374,7 @@ private fun CurrentSemesterAbsencesCard(
                                         }
                                     }
                                     Text(
-                                        text = normalizeUfopPortugueseText(discipline.name),
+                                        text = normalizedDisciplineNames[discipline.courseId] ?: discipline.name,
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -436,8 +450,19 @@ private fun CreHeroAndImportCard(
     val a11y = LocalCampusAccessibility.current.settings
     val minTouchTarget = campusMinTouchTarget()
     val accessibleBlue = accessibleTextColor(DepartmentMathBlue, isDark, surfaceColor)
-    val requiredHours = creReport.totalRequiredHours.coerceAtLeast(1)
-    val completionRatio = (creReport.completedHours.toFloat() / requiredHours.toFloat()).coerceIn(0f, 1f)
+    val completionRatio = remember(creReport.completedHours, creReport.totalRequiredHours) {
+        val requiredHours = creReport.totalRequiredHours.coerceAtLeast(1)
+        (creReport.completedHours.toFloat() / requiredHours.toFloat()).coerceIn(0f, 1f)
+    }
+    val formattedOverallCre = remember(creReport.overallCre) {
+        formatScore(creReport.overallCre, 2)
+    }
+    val hoursSummaryText = remember(creReport.completedHours, creReport.totalRequiredHours) {
+        "${creReport.completedHours} / ${creReport.totalRequiredHours} h"
+    }
+    val approvalCountsText = remember(creReport.totalApproved, creReport.totalFailedByGrade) {
+        "${creReport.totalApproved} aprovadas · ${creReport.totalFailedByGrade} reprovadas"
+    }
     var showCreFormulaDialog by remember { mutableStateOf(false) }
 
     Surface(
@@ -511,7 +536,7 @@ private fun CreHeroAndImportCard(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = formatScore(creReport.overallCre, 2),
+                            text = formattedOverallCre,
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -529,7 +554,7 @@ private fun CreHeroAndImportCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${creReport.completedHours} / ${creReport.totalRequiredHours} h",
+                        text = hoursSummaryText,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -544,7 +569,7 @@ private fun CreHeroAndImportCard(
                         trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
                     Text(
-                        text = "${creReport.totalApproved} aprovadas · ${creReport.totalFailedByGrade} reprovadas",
+                        text = approvalCountsText,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -721,6 +746,18 @@ private fun SemesterCreCard(
     val a11y = LocalCampusAccessibility.current.settings
     val minTouchTarget = campusMinTouchTarget()
     val accessibleBlue = accessibleTextColor(DepartmentMathBlue, isDark, surfaceColor)
+    val semesterStatsLabel = remember(
+        summary.courses.size,
+        summary.totalWorkloadHours,
+        summary.approvedCount,
+        summary.failedCount,
+        summary.inProgressCount
+    ) {
+        "${summary.courses.size} disciplinas · ${summary.totalWorkloadHours}h · ${summary.approvedCount} AP · ${summary.failedCount} REP · ${summary.inProgressCount} CS"
+    }
+    val formattedSemesterCre = remember(summary.cre) {
+        formatScore(summary.cre, 2)
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -752,7 +789,7 @@ private fun SemesterCreCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${summary.courses.size} disciplinas · ${summary.totalWorkloadHours}h · ${summary.approvedCount} AP · ${summary.failedCount} REP · ${summary.inProgressCount} CS",
+                        text = semesterStatsLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -771,7 +808,7 @@ private fun SemesterCreCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = formatScore(summary.cre, 2),
+                            text = formattedSemesterCre,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = accessibleBlue

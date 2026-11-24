@@ -2,6 +2,36 @@ import Foundation
 
 // MARK: - Dynamic Curriculum Matrix Builder
 
+private enum DynamicGridBuilderRegex {
+    static let prereqCode: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"\b([A-Z]{2,5}\d{3,4}[A-Z]?)\b"#
+    )
+    static let minHours: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"\b(\d{1,5})\s*(?:h|hs|hora|horas)\b"#,
+        options: [.caseInsensitive]
+    )
+    static let curriculumParen: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"\(\s*curr[ií]culo\s+(\d+)\s*\)"#,
+        options: [.caseInsensitive]
+    )
+    static let whitespace: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"\s+"#
+    )
+    static let parenSuffix: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"\s*\([^)]*\)"#
+    )
+
+    static func replacingMatches(
+        in text: String,
+        regex: NSRegularExpression?,
+        withTemplate template: String
+    ) -> String {
+        guard let regex else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: template)
+    }
+}
+
 public extension DynamicCurriculumCatalog {
 
     static func fromCourseCurriculum(_ course: UfopCourseCurriculum) -> DynamicCurriculumMatrix? {
@@ -51,8 +81,8 @@ public extension DynamicCurriculumCatalog {
                 return lhs.index < rhs.index
             }
 
-        let prereqCodeRegex = try? NSRegularExpression(pattern: #"\b([A-Z]{2,5}\d{3,4}[A-Z]?)\b"#)
-        let minHoursRegex = try? NSRegularExpression(pattern: #"\b(\d{1,5})\s*(?:h|hs|hora|horas)\b"#, options: [.caseInsensitive])
+        let prereqCodeRegex = DynamicGridBuilderRegex.prereqCode
+        let minHoursRegex = DynamicGridBuilderRegex.minHours
 
         var nodes: [DynamicCourseNode] = []
         nodes.reserveCapacity(orderedSubjects.count + 8)
@@ -280,14 +310,16 @@ public extension DynamicCurriculumCatalog {
     private static func formatCurriculumLabel(_ rawVersion: String) -> String {
         let trimmed = rawVersion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "2026/2" }
-        let formatted = trimmed.replacingOccurrences(
-            of: #"\(\s*curr[ií]culo\s+(\d+)\s*\)"#,
-            with: "· Currículo $1",
-            options: [.regularExpression, .caseInsensitive]
+        let formatted = DynamicGridBuilderRegex.replacingMatches(
+            in: trimmed,
+            regex: DynamicGridBuilderRegex.curriculumParen,
+            withTemplate: "· Currículo $1"
         )
-        return formatted
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return DynamicGridBuilderRegex.replacingMatches(
+            in: formatted,
+            regex: DynamicGridBuilderRegex.whitespace,
+            withTemplate: " "
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func buildCourseAliases(courseCode: String, courseName: String) -> [String] {
@@ -302,10 +334,16 @@ public extension DynamicCurriculumCatalog {
         }
         appendUnique(courseCode)
         appendUnique(courseName)
-        let baseName = courseName
-            .replacingOccurrences(of: #"\s*\([^)]*\)"#, with: " ", options: .regularExpression)
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutParens = DynamicGridBuilderRegex.replacingMatches(
+            in: courseName,
+            regex: DynamicGridBuilderRegex.parenSuffix,
+            withTemplate: " "
+        )
+        let baseName = DynamicGridBuilderRegex.replacingMatches(
+            in: withoutParens,
+            regex: DynamicGridBuilderRegex.whitespace,
+            withTemplate: " "
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
         appendUnique(baseName)
         if courseName.lowercased().hasPrefix("engenharia ") {
             let suffix = String(courseName.dropFirst("engenharia ".count)).trimmingCharacters(in: .whitespacesAndNewlines)

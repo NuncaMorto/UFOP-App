@@ -73,6 +73,11 @@ private struct CampusRootCoordinatorView: View {
         }
         .tint(accent)
         .modifier(AccessibilityRootModifier(accessibility: appearance.accessibility))
+        .task {
+            Task.detached(priority: .utility) {
+                _ = UfopCurriculumCatalog.allCourses
+            }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 store.persistEncryptedState()

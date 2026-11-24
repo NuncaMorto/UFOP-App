@@ -32,6 +32,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,8 +50,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import br.ufop.campus.core.curriculum.DynamicCurriculumCatalog
-import br.ufop.campus.core.curriculum.DynamicGridEngine
 import br.ufop.campus.core.curriculum.UfopCurriculumCatalog
 import br.ufop.campus.core.ffi.AcademicCalendarUpdatePackage
 import br.ufop.campus.core.ffi.CampusCoreRepository
@@ -94,76 +93,51 @@ fun ProfilePlaceholderScreen(
     onReplayGuidedTour: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     onAppSecurityChanged: () -> Unit = {},
-    onExitApp: () -> Unit = {}
+    onExitApp: () -> Unit = {},
+    viewModel: ProfileViewModel? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val themeController = LocalCampusThemeController.current
     val adaptive = LocalCampusAdaptiveLayout.current
     val accessibilityController = LocalCampusAccessibility.current
-    val mutationVersion by repository.mutationVersion.collectAsState()
 
-    val studentProfile = remember(mutationVersion) {
-        repository.getStudentProfile()
+    val fallbackViewModel = if (viewModel == null) {
+        remember(repository) { ProfileViewModel(repository = repository) }
+    } else {
+        null
     }
-    val activeSemester = studentProfile.activeSemester.ifBlank { "2026.2" }
-    val profileSummary = remember(mutationVersion, activeSemester) {
-        repository.getAcademicProfileSummary(activeSemester)
+    DisposableEffect(fallbackViewModel) {
+        onDispose {
+            fallbackViewModel?.close()
+        }
     }
-    val currentDisciplines = remember(mutationVersion, activeSemester) {
-        repository.listDisciplines(activeSemester, null)
+    val activeViewModel = viewModel ?: fallbackViewModel!!
+    val uiState by activeViewModel.uiState.collectAsState()
+
+    LaunchedEffect(activeViewModel, context) {
+        activeViewModel.ensureCatalogLoaded(context)
     }
-    val creReport = remember(mutationVersion) {
-        repository.getAcademicCreReport()
-    }
-    val exportFolderConfig = remember(mutationVersion) {
-        repository.getExportFolderConfig()
-    }
-    val catalogCourses = remember(context) {
-        UfopCurriculumCatalog.getAllCourses(context)
-    }
-    val dynamicGridResolution = remember(
-        mutationVersion,
-        studentProfile.courseName,
-        studentProfile.registrationNumber,
-        studentProfile.campusName,
-        creReport.semesters,
-        catalogCourses
-    ) {
-        val earliestSemester = creReport.semesters
-            .map { it.semester.trim() }
-            .filter { it.isNotEmpty() }
-            .minByOrNull { raw ->
-                DynamicCurriculumCatalog.parseSemesterTerm(raw)
-                    ?.let { (year, sem) -> year * 10 + sem }
-                    ?: Int.MAX_VALUE
-            }
-        DynamicCurriculumCatalog.resolveMatrixForStudent(
-            courseName = studentProfile.courseName,
-            registrationNumber = studentProfile.registrationNumber,
-            earliestTranscriptSemester = earliestSemester,
-            catalogCourses = catalogCourses,
-            campusHint = studentProfile.campusName
-        )
-    }
+
+    val mutationVersion = uiState.mutationVersion
+    val studentProfile = uiState.studentProfile
+    val activeSemester = uiState.activeSemester
+    val profileSummary = uiState.profileSummary
+    val currentDisciplines = uiState.currentDisciplines
+    val creReport = uiState.creReport
+    val exportFolderConfig = uiState.exportFolderConfig
+    val dynamicGridResolution = uiState.dynamicGridResolution
     val activeDynamicMatrix = dynamicGridResolution.matrix
-    val dynamicGridSummary = remember(mutationVersion, activeDynamicMatrix.id) {
-        val completed = DynamicGridEngine.sanitizeCompleted(
-            matrix = activeDynamicMatrix,
-            completedCodes = DynamicCurriculumCatalog.loadCompletedCodesWithLegacyFallback(
-                matrix = activeDynamicMatrix,
-                reader = repository::getDynamicGridCompletedCodes
-            )
-        )
-        DynamicGridEngine.summarize(activeDynamicMatrix, completed)
-    }
-    val dynamicGridSubtitle = when {
-        dynamicGridResolution.isCourseMatched ->
-            "${activeDynamicMatrix.courseName} · ${activeDynamicMatrix.curriculumLabel} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
-        studentProfile.courseName.isNotBlank() ->
-            "Detalhamento pendente para ${studentProfile.courseName.trim()} · Toque para explorar cursos"
-        else ->
-            "${activeDynamicMatrix.courseName} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
+    val dynamicGridSummary = uiState.dynamicGridSummary
+    val dynamicGridSubtitle = remember(dynamicGridResolution, dynamicGridSummary, studentProfile.courseName) {
+        when {
+            dynamicGridResolution.isCourseMatched ->
+                "${activeDynamicMatrix.courseName} · ${activeDynamicMatrix.curriculumLabel} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
+            studentProfile.courseName.isNotBlank() ->
+                "Detalhamento pendente para ${studentProfile.courseName.trim()} · Toque para explorar cursos"
+            else ->
+                "${activeDynamicMatrix.courseName} · ${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h (${dynamicGridSummary.completionPercent}%)"
+        }
     }
 
     var avatarRevision by remember { mutableIntStateOf(0) }
@@ -175,6 +149,10 @@ fun ProfilePlaceholderScreen(
     var showEditProfileSheet by remember { mutableStateOf(false) }
     var showShareScheduleSheet by remember { mutableStateOf(false) }
     var editingTranscriptEntry by remember { mutableStateOf<TranscriptCourseEntry?>(null) }
+
+    LaunchedEffect(activeViewModel, activeDestination, adaptive.useTwoPaneLayout) {
+        activeViewModel.setVisibleDestination(activeDestination, adaptive.useTwoPaneLayout)
+    }
 
     LaunchedEffect(activeDestination) {
         if (activeDestination != ProfileDestination.SETTINGS) {
@@ -202,12 +180,8 @@ fun ProfilePlaceholderScreen(
     var weatherFeedback by remember { mutableStateOf<String?>(null) }
     var backupStatusMessage by remember { mutableStateOf<String?>(null) }
 
-    val pendingCalendarUpdate = remember(mutationVersion) {
-        repository.getPendingCalendarUpdate()
-    }
-    val isAdminUnlocked = remember(mutationVersion) {
-        repository.isAdminUnlocked()
-    }
+    val pendingCalendarUpdate = uiState.pendingCalendarUpdate
+    val isAdminUnlocked = uiState.isAdminUnlocked
     var calendarUpdateAppliedMessage by remember { mutableStateOf<String?>(null) }
     var adminTargetSemester by rememberSaveable(activeSemester) { mutableStateOf(activeSemester) }
     var adminPinInput by remember { mutableStateOf("") }

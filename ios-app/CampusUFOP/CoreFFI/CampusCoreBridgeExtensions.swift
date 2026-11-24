@@ -723,22 +723,30 @@ public extension CampusStore {
 
     // MARK: Calendar & Date Helpers
 
+    private static let isoDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let portugueseMonthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter
+    }()
+
     static func todayIsoDateString() -> String {
         isoString(from: Date())
     }
 
     static func isoString(from date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
+        isoDateFormatter.string(from: date)
     }
 
     static func parseIsoDate(_ iso: String) -> Date? {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.date(from: iso.trimmingCharacters(in: .whitespacesAndNewlines))
+        isoDateFormatter.date(from: iso.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     static func mondayToSundayDates(containing date: Date) -> [Date] {
@@ -761,10 +769,7 @@ public extension CampusStore {
     }
 
     static func portugueseMonthYearLabel(from date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "pt_BR")
-        f.dateFormat = "MMMM yyyy"
-        let raw = f.string(from: date)
+        let raw = portugueseMonthYearFormatter.string(from: date)
         return raw.prefix(1).uppercased() + raw.dropFirst()
     }
 

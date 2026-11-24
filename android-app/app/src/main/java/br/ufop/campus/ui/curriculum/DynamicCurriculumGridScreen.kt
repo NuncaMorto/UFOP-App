@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,6 +37,8 @@ import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal data class DynamicGridFeedbackState(
     val message: String,
@@ -62,9 +65,25 @@ fun DynamicCurriculumGridScreen(
 
     val studentProfile = remember(mutationVersion) { repository.getStudentProfile() }
     val creReport = remember(mutationVersion) { repository.getAcademicCreReport() }
-    val catalogCourses = remember(context) { UfopCurriculumCatalog.getAllCourses(context) }
-    val availableMatrices = remember(catalogCourses) {
-        DynamicCurriculumCatalog.buildAllMatrices(catalogCourses)
+    val catalogCourses by produceState(
+        initialValue = UfopCurriculumCatalog.peekCachedCourses().orEmpty(),
+        key1 = context
+    ) {
+        if (value.isEmpty()) {
+            value = withContext(Dispatchers.IO) {
+                UfopCurriculumCatalog.getAllCourses(context)
+            }
+        }
+    }
+    val availableMatrices by produceState(
+        initialValue = DynamicCurriculumCatalog.peekBuiltMatrices(catalogCourses)
+            ?: DynamicCurriculumCatalog.curatedMatrices,
+        key1 = catalogCourses
+    ) {
+        val cached = DynamicCurriculumCatalog.peekBuiltMatrices(catalogCourses)
+        value = cached ?: withContext(Dispatchers.Default) {
+            DynamicCurriculumCatalog.buildAllMatrices(catalogCourses)
+        }
     }
     val autoResolution = remember(
         studentProfile.courseName,
@@ -92,10 +111,18 @@ fun DynamicCurriculumGridScreen(
     var selectedMatrixId by rememberSaveable(autoResolution.matrix.id) {
         mutableStateOf(autoResolution.matrix.id)
     }
-    val activeMatrix = remember(selectedMatrixId, catalogCourses, availableMatrices) {
-        DynamicCurriculumCatalog.findById(selectedMatrixId, catalogCourses)
-            ?: availableMatrices.firstOrNull()
-            ?: DynamicCurriculumCatalog.defaultMatrix
+    val activeMatrix = remember(selectedMatrixId, autoResolution, availableMatrices) {
+        if (selectedMatrixId.equals(autoResolution.matrix.id, ignoreCase = true)) {
+            autoResolution.matrix
+        } else {
+            availableMatrices.firstOrNull { matrix ->
+                matrix.id.equals(selectedMatrixId, ignoreCase = true) ||
+                    matrix.legacyIds.any { it.equals(selectedMatrixId, ignoreCase = true) }
+            }
+                ?: DynamicCurriculumCatalog.findById(selectedMatrixId, catalogCourses)
+                ?: availableMatrices.firstOrNull()
+                ?: DynamicCurriculumCatalog.defaultMatrix
+        }
     }
 
     var isHorizontal by rememberSaveable {
@@ -149,7 +176,7 @@ fun DynamicCurriculumGridScreen(
         )
     }
     val summary = remember(activeMatrix, completedCodes) {
-        DynamicGridEngine.summarize(activeMatrix, completedCodes)
+        DynamicGridEngine.summarize(activeMatrix, completedCodes, alreadySanitized = true)
     }
     val coursesByPeriod = remember(activeMatrix) {
         activeMatrix.courses.groupBy { it.period }

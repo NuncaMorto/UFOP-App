@@ -24,15 +24,11 @@ internal enum ProfileSubtab: String, CaseIterable, Identifiable {
 }
 
 public struct ProfileView: View {
-    @Environment(CampusStore.self) private var environmentStore: CampusStore?
-    @Environment(CampusAppearanceController.self) private var environmentAppearance: CampusAppearanceController?
-    @Environment(AppLockManager.self) private var environmentLockManager: AppLockManager?
+    @Environment(CampusStore.self) private var store
+    @Environment(CampusAppearanceController.self) private var appearance
+    @Environment(AppLockManager.self) private var lockManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
-    @State private var fallbackStore = CampusStore()
-    @State private var fallbackAppearance = CampusAppearanceController()
-    @State private var fallbackLockManager = AppLockManager()
 
     @State private var selectedSubtab: ProfileSubtab = .summary
     @State private var selectedCalendarSemester: String = "2026.2"
@@ -65,19 +61,17 @@ public struct ProfileView: View {
 
     public init() {}
 
-    private var activeStore: CampusStore { environmentStore ?? fallbackStore }
-    private var activeAppearance: CampusAppearanceController { environmentAppearance ?? fallbackAppearance }
-    private var activeLock: AppLockManager { environmentLockManager ?? fallbackLockManager }
-
-    private var hc: Bool { activeAppearance.accessibility.highContrastMode }
-    private var minTouch: CGFloat { activeAppearance.accessibility.minTouchHeight }
-    private var primaryAccent: Color { activeAppearance.accentColor.primary(for: colorScheme) }
-    private var onPrimaryAccent: Color { activeAppearance.accentColor.onPrimary(for: colorScheme) }
+    private var hc: Bool { appearance.accessibility.highContrastMode }
+    private var minTouch: CGFloat { appearance.accessibility.minTouchHeight }
+    private var primaryAccent: Color { appearance.accentColor.primary(for: colorScheme) }
+    private var onPrimaryAccent: Color { appearance.accentColor.onPrimary(for: colorScheme) }
     private var isRegular: Bool { horizontalSizeClass == .regular }
 
     public var body: some View {
+        let summary = store.academicProfileSummary
+
         ZStack {
-            LiquidGlassBackdrop(accent: activeAppearance.accentColor, highContrast: hc)
+            LiquidGlassBackdrop(accent: appearance.accentColor, highContrast: hc)
 
             if isRegular {
                 HStack(alignment: .top, spacing: 20) {
@@ -85,16 +79,16 @@ public struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             headerSection
                             ProfileStudentIdentityCard(
-                                profile: activeStore.studentProfile,
-                                summary: activeStore.academicProfileSummary,
+                                profile: store.studentProfile,
+                                summary: summary,
                                 primaryAccent: primaryAccent,
                                 onPrimaryAccent: onPrimaryAccent,
                                 highContrast: hc
                             )
                             verticalSubtabPickerSection
                             ProfileCampusSelectorCard(
-                                store: activeStore,
-                                summary: activeStore.academicProfileSummary,
+                                store: store,
+                                summary: summary,
                                 primaryAccent: primaryAccent,
                                 onPrimaryAccent: onPrimaryAccent,
                                 highContrast: hc,
@@ -109,13 +103,13 @@ public struct ProfileView: View {
 
                     Group {
                         if selectedSubtab == .dynamicGrid {
-                            DynamicCurriculumGridView(store: activeStore)
+                            DynamicCurriculumGridView(store: store)
                                 .padding(.top, 18)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         } else {
                             ScrollView(.vertical, showsIndicators: false) {
                                 VStack(alignment: .leading, spacing: 18) {
-                                    activeSubtabContent
+                                    activeSubtabContent(summary: summary)
                                 }
                                 .padding(.trailing, 20)
                                 .padding(.top, 18)
@@ -135,7 +129,7 @@ public struct ProfileView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
 
-                    DynamicCurriculumGridView(store: activeStore)
+                    DynamicCurriculumGridView(store: store)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -144,7 +138,7 @@ public struct ProfileView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         headerSection
                         subtabPickerSection
-                        activeSubtabContent
+                        activeSubtabContent(summary: summary)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
@@ -153,12 +147,12 @@ public struct ProfileView: View {
             }
         }
         .sheet(isPresented: $isMatrixPresented) {
-            CurriculumMatrixView(store: activeStore) {
+            CurriculumMatrixView(store: store) {
                 isMatrixPresented = false
             }
         }
         .sheet(isPresented: $isSharePresented) {
-            ScheduleShareImportSheetView(store: activeStore) {
+            ScheduleShareImportSheetView(store: store) {
                 isSharePresented = false
             }
         }
@@ -201,7 +195,7 @@ public struct ProfileView: View {
             titleVisibility: .visible
         ) {
             Button("Restaurar disciplinas padrão", role: .destructive) {
-                _ = activeStore.resetSemesterToDefaultSeed(semester: activeStore.selectedSemesterFilter)
+                _ = store.resetSemesterToDefaultSeed(semester: store.selectedSemesterFilter)
             }
             Button("Cancelar", role: .cancel) {}
         } message: {
@@ -223,7 +217,7 @@ public struct ProfileView: View {
         }
         .alert("Confirmar saída da conta?", isPresented: $showSignOutSecondAlert) {
             Button("Apagar dados locais e sair", role: .destructive) {
-                activeStore.signOutAndResetAllData(lockManager: activeLock, appearance: activeAppearance)
+                store.signOutAndResetAllData(lockManager: lockManager, appearance: appearance)
             }
             Button("Cancelar", role: .cancel) {}
         } message: {
@@ -273,12 +267,13 @@ public struct ProfileView: View {
     }
 
     @ViewBuilder
-    private var activeSubtabContent: some View {
+    private func activeSubtabContent(summary: AcademicProfileSummary) -> some View {
         switch selectedSubtab {
         case .summary:
             ProfileSummarySectionView(
-                store: activeStore,
-                appearance: activeAppearance,
+                store: store,
+                appearance: appearance,
+                summary: summary,
                 isRegular: isRegular,
                 primaryAccent: primaryAccent,
                 onPrimaryAccent: onPrimaryAccent,
@@ -294,7 +289,7 @@ public struct ProfileView: View {
                     isMatrixPresented = true
                 },
                 onOpenDynamicGrid: {
-                    if activeAppearance.accessibility.reduceMotion {
+                    if appearance.accessibility.reduceMotion {
                         selectedSubtab = .dynamicGrid
                     } else {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
@@ -310,8 +305,8 @@ public struct ProfileView: View {
             EmptyView()
         case .calendar:
             ProfileCalendarSectionView(
-                calendarEvents: activeStore.calendarEvents,
-                accentColor: activeAppearance.accentColor,
+                calendarEvents: store.calendarEvents,
+                accentColor: appearance.accentColor,
                 primaryAccent: primaryAccent,
                 onPrimaryAccent: onPrimaryAccent,
                 highContrast: hc,
@@ -321,9 +316,9 @@ public struct ProfileView: View {
             )
         case .settings:
             ProfileSettingsSectionView(
-                store: activeStore,
-                appearance: activeAppearance,
-                lockManager: activeLock,
+                store: store,
+                appearance: appearance,
+                lockManager: lockManager,
                 primaryAccent: primaryAccent,
                 onPrimaryAccent: onPrimaryAccent,
                 highContrast: hc,
@@ -405,7 +400,7 @@ public struct ProfileView: View {
             do {
                 let text = try SecurePdfProcessor.extractTextAndDeleteTemp(from: url)
                 let parsed = try UfopPdfParsers.parseTranscript(text: text)
-                let report = activeStore.applyTranscriptImport(parsed)
+                let report = store.applyTranscriptImport(parsed)
                 transcriptMessage = "Histórico processado! CRE: \(String(format: "%.2f", report.overallCre)) · \(report.totalApproved) aprovadas."
                 transcriptError = nil
             } catch {
@@ -424,7 +419,7 @@ public struct ProfileView: View {
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
             do {
                 let text = try String(contentsOf: url, encoding: .utf8)
-                _ = try activeStore.importEncryptedBackup(text, password: backupPassword)
+                _ = try store.importEncryptedBackup(text, password: backupPassword)
                 backupFeedback = "Backup restaurado com sucesso!"
                 backupError = nil
             } catch {
@@ -437,10 +432,16 @@ public struct ProfileView: View {
 
 #Preview("ProfileView - Light") {
     ProfileView()
+        .environment(CampusStore())
+        .environment(CampusAppearanceController())
+        .environment(AppLockManager())
         .preferredColorScheme(.light)
 }
 
 #Preview("ProfileView - Dark") {
     ProfileView()
+        .environment(CampusStore())
+        .environment(CampusAppearanceController())
+        .environment(AppLockManager())
         .preferredColorScheme(.dark)
 }

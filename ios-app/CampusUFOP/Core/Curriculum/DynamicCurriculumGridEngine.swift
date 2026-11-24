@@ -2,6 +2,39 @@ import Foundation
 
 // MARK: - Dynamic Curriculum Matrix Resolution & Engine
 
+private enum DynamicGridEngineRegex {
+    static let semesterTerm: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"(?:^|\D)(\d{4}|\d{2})\s*[./-]\s*([12])(?:\D|$)"#
+    )
+}
+
+private enum DynamicGridSingleMatrixCache {
+    private static let lock = NSLock()
+    private static var cache: [String: DynamicCurriculumMatrix] = [:]
+
+    static func matrix(for course: UfopCourseCurriculum) -> DynamicCurriculumMatrix? {
+        let key = "\(course.code.uppercased())|\(course.curriculumVersion)|\(course.subjects.count)|\(course.chTotal)"
+        lock.lock()
+        if let hit = cache[key] {
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+
+        guard let built = DynamicCurriculumCatalog.fromCourseCurriculum(course) else {
+            return nil
+        }
+
+        lock.lock()
+        if cache.count > 128 {
+            cache.removeAll(keepingCapacity: true)
+        }
+        cache[key] = built
+        lock.unlock()
+        return built
+    }
+}
+
 public extension DynamicCurriculumCatalog {
 
     static func find(
@@ -91,7 +124,6 @@ public extension DynamicCurriculumCatalog {
         }()
         let entryTerm = entryTuple.map { DynamicSemesterTerm(year: $0.year, semester: $0.semester) }
 
-        let matrices = buildAllMatrices(from: catalogCourses)
         let trimmedCourseName = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
         let matchedCatalog: UfopCourseCurriculum? = (!catalogCourses.isEmpty && !trimmedCourseName.isEmpty)
             ? UfopCurriculumCatalog.findCourseExactOrBest(in: catalogCourses, query: trimmedCourseName, campusHint: campusHint)
@@ -99,8 +131,16 @@ public extension DynamicCurriculumCatalog {
 
         let courseMatrices: [DynamicCurriculumMatrix]
         if let matchedCatalog {
-            let byCatalogCode = matrices.filter {
+            let curatedMatches = curatedMatrices.filter {
                 $0.courseCode.caseInsensitiveCompare(matchedCatalog.code) == .orderedSame
+            }
+            let byCatalogCode: [DynamicCurriculumMatrix]
+            if !curatedMatches.isEmpty {
+                byCatalogCode = curatedMatches
+            } else {
+                byCatalogCode = catalogCourses
+                    .filter { $0.code.caseInsensitiveCompare(matchedCatalog.code) == .orderedSame }
+                    .compactMap { DynamicGridSingleMatrixCache.matrix(for: $0) }
             }
             if byCatalogCode.isEmpty {
                 return DynamicMatrixResolution(
@@ -112,8 +152,20 @@ public extension DynamicCurriculumCatalog {
                 )
             }
             courseMatrices = byCatalogCode
+        } else if trimmedCourseName.isEmpty {
+            courseMatrices = []
         } else {
-            courseMatrices = findMatrices(forCourseName: courseName, in: matrices)
+            let curatedMatches = findMatrices(forCourseName: trimmedCourseName, in: curatedMatrices)
+            if !curatedMatches.isEmpty || catalogCourses.isEmpty {
+                courseMatrices = curatedMatches
+            } else {
+                let defaultCatalog = UfopCurriculumCatalog.allCourses
+                let usesDefaultCatalog = catalogCourses.count == defaultCatalog.count
+                    && catalogCourses.first?.code == defaultCatalog.first?.code
+                    && catalogCourses.last?.code == defaultCatalog.last?.code
+                let matrices = usesDefaultCatalog ? Self.allMatrices : buildAllMatrices(from: catalogCourses)
+                courseMatrices = findMatrices(forCourseName: trimmedCourseName, in: matrices)
+            }
         }
 
         guard !courseMatrices.isEmpty else {
@@ -193,8 +245,7 @@ public extension DynamicCurriculumCatalog {
     static func parseSemesterTerm(_ raw: String) -> (year: Int, semester: Int)? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let pattern = #"(?:^|\D)(\d{4}|\d{2})\s*[./-]\s*([12])(?:\D|$)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
+        guard let regex = DynamicGridEngineRegex.semesterTerm,
               let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
               let r1 = Range(match.range(at: 1), in: trimmed),
               let r2 = Range(match.range(at: 2), in: trimmed),
@@ -378,9 +429,12 @@ public enum DynamicGridEngine {
 
     public static func summarize(
         matrix: DynamicCurriculumMatrix,
-        completedCodes: Set<String>
+        completedCodes: Set<String>,
+        alreadySanitized: Bool = false
     ) -> DynamicGridSummary {
-        let sanitized = sanitizeCompleted(matrix: matrix, completedCodes: completedCodes)
+        let sanitized = alreadySanitized
+            ? completedCodes
+            : sanitizeCompleted(matrix: matrix, completedCodes: completedCodes)
         let completedHrs = completedHours(matrix: matrix, completedCodes: sanitized)
         let totalHrs = matrix.totalGridHours
         let percent: Int = {

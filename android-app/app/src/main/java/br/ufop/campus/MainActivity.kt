@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import br.ufop.campus.core.curriculum.UfopCurriculumCatalog
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.security.AppLockManager
@@ -37,6 +38,7 @@ import br.ufop.campus.widget.VidaAcademicaWidgetProvider
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -88,6 +90,15 @@ class MainActivity : ComponentActivity() {
                 CampusRepositoryHolder.getOrCreate(applicationContext)
             }
             val mutationVersion by repository.mutationVersion.collectAsState()
+
+            // Pré-aquece o catálogo de cursos UFOP (~595 KB) em background antes da 1ª abertura da aba Perfil.
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        UfopCurriculumCatalog.getAllCourses(applicationContext)
+                    }
+                }
+            }
 
             var isDarkTheme by rememberSaveable {
                 mutableStateOf(

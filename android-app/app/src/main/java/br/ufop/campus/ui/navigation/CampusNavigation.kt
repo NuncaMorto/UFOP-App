@@ -84,6 +84,7 @@ import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.agenda.AgendaScreen
 import br.ufop.campus.ui.map.CampusMapScreen
+import br.ufop.campus.ui.profile.ProfileViewModel
 import br.ufop.campus.ui.profile.ReleaseNotesDialog
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
@@ -150,6 +151,15 @@ fun CampusNavigation(
     var tourDismissTick by remember { mutableIntStateOf(0) }
 
     var mapController by remember { mutableStateOf<CampusMapController?>(null) }
+    val profileViewModel = remember(repository) {
+        ProfileViewModel(repository = repository)
+    }
+
+    DisposableEffect(profileViewModel) {
+        onDispose {
+            profileViewModel.close()
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -236,7 +246,8 @@ fun CampusNavigation(
                         AppUpdateManager.openUpdateDialog()
                     },
                     onAppSecurityChanged = onAppSecurityChanged,
-                    onExitApp = onExitApp
+                    onExitApp = onExitApp,
+                    viewModel = profileViewModel
                 )
             }
             CampusTab.MAP -> {

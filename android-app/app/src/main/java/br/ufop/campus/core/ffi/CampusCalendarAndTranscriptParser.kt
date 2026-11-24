@@ -8,9 +8,12 @@ import java.security.MessageDigest
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
+private val COMBINING_MARKS_REGEX = Regex("\\p{M}+")
+private val NON_ALNUM_REGEX = Regex("""[^a-z0-9]+""")
+
 internal fun normalizeSearchText(value: String): String =
     java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "")
+        .replace(COMBINING_MARKS_REGEX, "")
         .lowercase()
         .trim()
 
@@ -273,7 +276,7 @@ internal fun normalizeYear(rawYear: String?, defaultYear: Int): Int {
 
 internal fun normalizeDedupKey(raw: String): String =
     normalizeSearchText(raw)
-        .replace(Regex("""[^a-z0-9]+"""), " ")
+        .replace(NON_ALNUM_REGEX, " ")
         .trim()
 
 internal fun extractDateFromSegment(

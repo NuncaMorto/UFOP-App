@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.LruCache
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -432,15 +433,39 @@ internal fun decodeSampledBitmapFromUri(context: Context, uri: Uri, maxSidePx: I
         null
     }
 }
-/** Decodifica o avatar em background (<= 384px) sem bloquear a thread principal. */
+private val WHITESPACE_REGEX = Regex("\\s+")
+private val avatarBitmapCache: LruCache<String, ImageBitmap> by lazy {
+    LruCache<String, ImageBitmap>(8)
+}
+
+/** Decodifica o avatar em background (<= 384px) com cache em memória (LruCache) para evitar flash de iniciais. */
 @Composable
 internal fun rememberAvatarBitmap(avatarPath: String?, revision: Int = 0): ImageBitmap? {
-    val state = produceState<ImageBitmap?>(initialValue = null, avatarPath, revision) {
-        value = if (avatarPath.isNullOrBlank()) {
+    val cacheKey = remember(avatarPath, revision) {
+        if (avatarPath.isNullOrBlank()) {
             null
         } else {
-            withContext(Dispatchers.IO) { decodeSampledBitmapFromFile(avatarPath, 384) }
+            val lastModified = runCatching { File(avatarPath).lastModified() }.getOrDefault(0L)
+            "$avatarPath:$lastModified:$revision"
         }
+    }
+    val cachedBitmap = remember(cacheKey) {
+        cacheKey?.let { avatarBitmapCache.get(it) }
+    }
+    val state = produceState<ImageBitmap?>(initialValue = cachedBitmap, key1 = cacheKey) {
+        if (cacheKey == null || avatarPath.isNullOrBlank()) {
+            value = null
+            return@produceState
+        }
+        avatarBitmapCache.get(cacheKey)?.let { hit ->
+            value = hit
+            return@produceState
+        }
+        val decoded = withContext(Dispatchers.IO) { decodeSampledBitmapFromFile(avatarPath, 384) }
+        if (decoded != null) {
+            avatarBitmapCache.put(cacheKey, decoded)
+        }
+        value = decoded
     }
     return state.value
 }
@@ -454,7 +479,7 @@ internal fun rememberUriThumbnail(uri: Uri, maxSidePx: Int = 160): ImageBitmap? 
     return state.value
 }
 internal fun extractInitials(fullName: String): String {
-    val parts = fullName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    val parts = fullName.trim().split(WHITESPACE_REGEX).filter { it.isNotBlank() }
     return when {
         parts.isEmpty() -> ""
         parts.size == 1 -> parts.first().take(2).uppercase()

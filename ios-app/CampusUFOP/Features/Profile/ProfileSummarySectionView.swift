@@ -113,9 +113,18 @@ internal struct ProfileCampusSelectorCard: View {
     }
 }
 
+private struct ProfileSummaryCacheKey: Equatable {
+    let courseName: String
+    let registrationNumber: String
+    let campusName: String
+    let transcriptEntries: [TranscriptCourseEntry]
+    let dynamicGridCompletedByMatrix: [String: [String]]
+}
+
 internal struct ProfileSummarySectionView: View {
     @Bindable var store: CampusStore
     @Bindable var appearance: CampusAppearanceController
+    let summary: AcademicProfileSummary
     let isRegular: Bool
     let primaryAccent: Color
     let onPrimaryAccent: Color
@@ -130,33 +139,85 @@ internal struct ProfileSummarySectionView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    @State private var cachedCreReport: AcademicCreReport = AcademicCreReport(
+        overallCre: 0,
+        totalRequiredHours: 3610,
+        completedHours: 0,
+        totalApproved: 0,
+        totalFailedByGrade: 0,
+        totalFailedByAbsence: 0,
+        semesters: []
+    )
+    @State private var cachedResolution: DynamicMatrixResolution = DynamicMatrixResolution(
+        matrix: DynamicCurriculumCatalog.defaultMatrix,
+        studentEntryTerm: nil,
+        isCourseMatched: false,
+        isExactVersionMatch: false,
+        note: nil
+    )
+    @State private var cachedGridSummary: DynamicGridSummary = DynamicGridSummary(
+        completedHours: 0,
+        totalGridHours: DynamicCurriculumCatalog.defaultMatrix.totalGridHours,
+        completionPercent: 0,
+        completedCount: 0,
+        totalCount: DynamicCurriculumCatalog.defaultMatrix.courses.count
+    )
+
+    private var summaryCacheKey: ProfileSummaryCacheKey {
+        ProfileSummaryCacheKey(
+            courseName: store.studentProfile.courseName,
+            registrationNumber: store.studentProfile.registrationNumber,
+            campusName: store.studentProfile.campusName,
+            transcriptEntries: store.transcriptEntries,
+            dynamicGridCompletedByMatrix: store.dynamicGridCompletedByMatrix
+        )
+    }
+
     var body: some View {
-        let summary = store.academicProfileSummary
         let profile = store.studentProfile
-        let creReport = store.getAcademicCreReport()
 
-        if !isRegular {
-            ProfileStudentIdentityCard(
-                profile: profile,
-                summary: summary,
-                primaryAccent: primaryAccent,
-                onPrimaryAccent: onPrimaryAccent,
-                highContrast: highContrast
+        Group {
+            if !isRegular {
+                ProfileStudentIdentityCard(
+                    profile: profile,
+                    summary: summary,
+                    primaryAccent: primaryAccent,
+                    onPrimaryAccent: onPrimaryAccent,
+                    highContrast: highContrast
+                )
+                ProfileCampusSelectorCard(
+                    store: store,
+                    summary: summary,
+                    primaryAccent: primaryAccent,
+                    onPrimaryAccent: onPrimaryAccent,
+                    highContrast: highContrast,
+                    minTouch: minTouch
+                )
+            }
+
+            metricsGrid(summary: summary)
+            creAndTranscriptCard(creReport: cachedCreReport)
+            dynamicGridShortcutCard(
+                resolution: cachedResolution,
+                gridSummary: cachedGridSummary
             )
-            ProfileCampusSelectorCard(
-                store: store,
-                summary: summary,
-                primaryAccent: primaryAccent,
-                onPrimaryAccent: onPrimaryAccent,
-                highContrast: highContrast,
-                minTouch: minTouch
-            )
+            shareScheduleCard
         }
+        .task(id: summaryCacheKey) {
+            recomputeCachedMetrics()
+        }
+    }
 
-        metricsGrid(summary: summary)
-        creAndTranscriptCard(creReport: creReport)
-        dynamicGridShortcutCard
-        shareScheduleCard
+    private func recomputeCachedMetrics() {
+        cachedCreReport = store.getAcademicCreReport()
+        let resolution = computeDynamicMatrixResolution()
+        let completed = store.dynamicGridCompletedSet(for: resolution.matrix.id)
+        cachedResolution = resolution
+        cachedGridSummary = DynamicGridEngine.summarize(
+            matrix: resolution.matrix,
+            completedCodes: completed,
+            alreadySanitized: true
+        )
     }
 
     private func metricsGrid(summary: AcademicProfileSummary) -> some View {
@@ -244,7 +305,7 @@ internal struct ProfileSummarySectionView: View {
         .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: highContrast)
     }
 
-    private var resolvedDynamicMatrixResolution: DynamicMatrixResolution {
+    private func computeDynamicMatrixResolution() -> DynamicMatrixResolution {
         let earliestSemester = store.transcriptEntries
             .map { $0.semester.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -266,11 +327,11 @@ internal struct ProfileSummarySectionView: View {
         )
     }
 
-    private var dynamicGridShortcutCard: some View {
-        let resolution = resolvedDynamicMatrixResolution
+    private func dynamicGridShortcutCard(
+        resolution: DynamicMatrixResolution,
+        gridSummary: DynamicGridSummary
+    ) -> some View {
         let matrix = resolution.matrix
-        let completed = store.dynamicGridCompletedSet(for: matrix.id)
-        let gridSummary = DynamicGridEngine.summarize(matrix: matrix, completedCodes: completed)
         let trimmedCourseName = store.studentProfile.courseName.trimmingCharacters(in: .whitespacesAndNewlines)
         let subtitleText: String = {
             if resolution.isCourseMatched {
