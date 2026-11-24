@@ -84,7 +84,7 @@ public struct ActivitiesView: View {
                     }
                     .padding(.horizontal, isRegular ? 24 : 18)
                     .padding(.top, 12)
-                    .padding(.bottom, 32)
+                    .padding(.bottom, isRegular ? 32 : 108)
                     .campusReadableWidth(isRegular ? 1040 : .infinity)
                 }
             }

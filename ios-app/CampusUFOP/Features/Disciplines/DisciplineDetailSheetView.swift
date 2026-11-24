@@ -6,6 +6,7 @@ public struct DisciplineDetailSheetView: View {
     public let store: CampusStore?
     public let onUpdateNotes: (String) -> Void
     public let onDeleteCourse: (() -> Void)?
+    public let onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)?
     public let onClose: () -> Void
 
     @Environment(CampusStore.self) private var environmentStore: CampusStore?
@@ -43,12 +44,14 @@ public struct DisciplineDetailSheetView: View {
         store: CampusStore? = nil,
         onUpdateNotes: @escaping (String) -> Void,
         onDeleteCourse: (() -> Void)? = nil,
+        onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)? = nil,
         onClose: @escaping () -> Void
     ) {
         self.detail = detail
         self.store = store
         self.onUpdateNotes = onUpdateNotes
         self.onDeleteCourse = onDeleteCourse
+        self.onOpenLocationInMap = onOpenLocationInMap
         self.onClose = onClose
         self._notesText = State(initialValue: detail.notes)
         self._localAssessments = State(initialValue: detail.assessments)
@@ -119,6 +122,22 @@ public struct DisciplineDetailSheetView: View {
                             summary: currentDetail.summary,
                             highContrast: hc
                         )
+
+                        if let onOpenLocationInMap, let target = nextLocationTarget(for: currentDetail) {
+                            DisciplineDetailLocationShortcutRow(
+                                locationText: target.location,
+                                scheduleLabel: target.schedule,
+                                deptColor: deptColor,
+                                primaryAccent: primaryAccent,
+                                highContrast: hc,
+                                minTouch: minTouch,
+                                onTap: {
+                                    onUpdateNotes(notesText)
+                                    onClose()
+                                    onOpenLocationInMap(target.request)
+                                }
+                            )
+                        }
 
                         DisciplineAbsenceReportCard(
                             summary: currentDetail.summary,
@@ -389,6 +408,65 @@ public struct DisciplineDetailSheetView: View {
             activeStore?.deleteCourse(courseId: courseId)
         }
         onClose()
+    }
+
+    private func nextLocationTarget(
+        for currentDetail: DisciplineDetail
+    ) -> (location: String, schedule: String?, request: CampusMapMeetingRequest)? {
+        guard !isEadCourse else { return nil }
+        let section = activeStore?.turmaByCourseId[currentDetail.summary.id] ?? ""
+        let nonEadSlots = resolvedSlots.filter {
+            !CampusStore.isEadText($0.building) && !CampusStore.isEadText($0.shortLocation)
+        }
+
+        if !nonEadSlots.isEmpty {
+            let now = Date()
+            let todayWd = CampusStore.isoWeekdayIndex(from: now)
+            let comps = Calendar(identifier: .gregorian).dateComponents([.hour, .minute], from: now)
+            let nowMinutes = (comps.hour ?? 8) * 60 + (comps.minute ?? 0)
+
+            let chosen = nonEadSlots.first { slot in
+                if slot.dayOfWeek > todayWd { return true }
+                if slot.dayOfWeek == todayWd {
+                    let endMin = CampusStore.minutesFromTime(slot.endTime)
+                        ?? (CampusStore.minutesFromTime(slot.startTime) ?? 0)
+                    return endMin >= nowMinutes
+                }
+                return false
+            } ?? nonEadSlots[0]
+
+            let cleanBuilding = chosen.building.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanRoom = chosen.room.trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayLoc: String = {
+                if !cleanBuilding.isEmpty && !cleanRoom.isEmpty {
+                    return "\(cleanBuilding) · \(cleanRoom)"
+                }
+                if !cleanBuilding.isEmpty { return cleanBuilding }
+                if !cleanRoom.isEmpty { return cleanRoom }
+                return currentDetail.summary.location
+            }()
+            let request = CampusMapMeetingRequest(
+                courseCode: currentDetail.summary.code,
+                section: section,
+                weekday: UInt32(chosen.dayOfWeek),
+                startTime: chosen.startTime,
+                fallbackBuildingRaw: displayLoc
+            )
+            return (displayLoc, "\(chosen.dayLabel) \(chosen.startTime)", request)
+        }
+
+        let cleanSummaryLoc = currentDetail.summary.location.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanSummaryLoc.isEmpty, !CampusStore.isEadText(cleanSummaryLoc) else {
+            return nil
+        }
+        let request = CampusMapMeetingRequest(
+            courseCode: currentDetail.summary.code,
+            section: section,
+            weekday: 1,
+            startTime: "",
+            fallbackBuildingRaw: cleanSummaryLoc
+        )
+        return (cleanSummaryLoc, nil, request)
     }
 }
 

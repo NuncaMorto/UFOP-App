@@ -202,13 +202,13 @@ internal struct MapSelectedFeatureCard: View {
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     if let floor = feature.floor {
-                        Text("Andar: \(floor == 0 ? "Térreo / 1º Pav" : "\(floor)º Pav")")
+                        Text("Andar: \(floor == 0 ? "Térreo / 1º Pav" : "\(floor + 1)º Pav")")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                     }
                 }
                 Spacer()
-                if feature.isMock || feature.indoorStatus == .provisional {
+                if feature.isMock {
                     MapSchematicBadge()
                 }
                 Button {

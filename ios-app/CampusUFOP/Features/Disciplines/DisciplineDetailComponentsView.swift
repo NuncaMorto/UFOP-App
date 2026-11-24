@@ -140,6 +140,72 @@ internal struct DisciplineDetailHeaderSection: View {
     }
 }
 
+internal struct DisciplineDetailLocationShortcutRow: View {
+    let locationText: String
+    let scheduleLabel: String?
+    let deptColor: Color
+    let primaryAccent: Color
+    let highContrast: Bool
+    let minTouch: CGFloat
+    let onTap: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button {
+            onTap()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(primaryAccent)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(primaryAccent.opacity(colorScheme == .dark ? 0.20 : 0.12))
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Prédio / Sala")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+
+                        if let scheduleLabel, !scheduleLabel.isEmpty {
+                            Text("· \(scheduleLabel)")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                        }
+                    }
+
+                    Text(locationText)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 6)
+
+                HStack(spacing: 4) {
+                    Text("Ver no mapa")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(primaryAccent)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .liquidGlassCard(cornerRadius: 18, tint: primaryAccent, interactive: true, highContrast: highContrast)
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget(minTouch)
+        .campusHoverLift()
+        .accessibilityLabel("Prédio / Sala: \(locationText). Ver no mapa")
+    }
+}
+
 // MARK: - Absence Report Card
 
 internal struct DisciplineAbsenceReportCard: View {

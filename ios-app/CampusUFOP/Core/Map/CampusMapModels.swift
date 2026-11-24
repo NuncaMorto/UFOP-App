@@ -26,7 +26,7 @@ public enum CampusIndoorStatus: String, Sendable, Equatable {
     case exteriorOnly
 }
 
-public enum CampusPoiType: String, Sendable, Equatable, CaseIterable {
+public enum CampusPoiType: String, Sendable, Equatable, CaseIterable, Identifiable {
     case toilet
     case facultyOffice
     case entrance
@@ -34,6 +34,40 @@ public enum CampusPoiType: String, Sendable, Equatable, CaseIterable {
     case library
     case parking
     case academic
+
+    public var id: String { rawValue }
+
+    public static let quickFilterCases: [CampusPoiType] = [
+        .toilet,
+        .facultyOffice,
+        .entrance,
+        .dining,
+        .library
+    ]
+
+    public var title: String {
+        switch self {
+        case .toilet: return "Banheiros"
+        case .facultyOffice: return "Professores/Secretarias"
+        case .entrance: return "Acessos"
+        case .dining: return "Alimentação"
+        case .library: return "Biblioteca"
+        case .parking: return "Estacionamento"
+        case .academic: return "Acadêmico"
+        }
+    }
+
+    public var systemImage: String {
+        switch self {
+        case .toilet: return "toilet.fill"
+        case .facultyOffice: return "person.text.rectangle.fill"
+        case .entrance: return "door.left.hand.open"
+        case .dining: return "fork.knife"
+        case .library: return "books.vertical.fill"
+        case .parking: return "parkingsign.circle.fill"
+        case .academic: return "building.columns.fill"
+        }
+    }
 }
 
 public enum CampusRenderGeomKind: Sendable, Equatable {
@@ -86,6 +120,36 @@ public struct CampusMapSummaryModel: Sendable, Equatable, Identifiable {
     public let attribution: String
 
     public var id: String { campusId }
+
+    public var shortDisplayName: String {
+        switch campusId {
+        case "OP_MC": return "Morro do Cruzeiro"
+        case "JM_ICEA": return "ICEA"
+        case "MA_ICHS": return "ICHS"
+        case "MA_ICSA": return "ICSA"
+        default: return name
+        }
+    }
+
+    public init(
+        campusId: String,
+        name: String,
+        city: String,
+        defaultFloor: Int32,
+        availableFloors: [Int32],
+        floorLabels: [CampusFloorLabel],
+        bounds: CampusMapRect2D,
+        attribution: String
+    ) {
+        self.campusId = campusId
+        self.name = name
+        self.city = city
+        self.defaultFloor = defaultFloor
+        self.availableFloors = availableFloors
+        self.floorLabels = floorLabels
+        self.bounds = bounds
+        self.attribution = attribution
+    }
 }
 
 public struct CampusCameraFocus: Sendable, Equatable {
@@ -152,6 +216,15 @@ public enum CampusOccupancyStatus: Sendable, Equatable {
     case noData
     case outOfTerm
 
+    public var isOccupied: Bool {
+        if case .occupied = self { return true }
+        return false
+    }
+
+    public var isFree: Bool {
+        self == .noRegularClass
+    }
+
     public var displayTitle: String {
         switch self {
         case .occupied(let slot):
@@ -163,6 +236,93 @@ public enum CampusOccupancyStatus: Sendable, Equatable {
         case .outOfTerm:
             return "Fora do período letivo / feriado"
         }
+    }
+}
+
+public struct CampusSearchResult: Sendable, Equatable, Identifiable {
+    public let feature: CampusFeatureInfo
+    public let score: UInt32
+    public let matchedField: String
+
+    public var id: String { feature.id }
+
+    public init(feature: CampusFeatureInfo, score: UInt32, matchedField: String) {
+        self.feature = feature
+        self.score = score
+        self.matchedField = matchedField
+    }
+}
+
+public struct CampusRoomOccupancyItem: Sendable, Equatable, Identifiable {
+    public let roomId: String
+    public let roomCode: String
+    public let floor: Int32
+    public let isMock: Bool
+    public let status: CampusOccupancyStatus
+
+    public var id: String { roomId }
+
+    public init(
+        roomId: String,
+        roomCode: String,
+        floor: Int32,
+        isMock: Bool,
+        status: CampusOccupancyStatus
+    ) {
+        self.roomId = roomId
+        self.roomCode = roomCode
+        self.floor = floor
+        self.isMock = isMock
+        self.status = status
+    }
+}
+
+public struct CampusMapMeetingRequest: Sendable, Equatable {
+    public let courseCode: String
+    public let section: String
+    public let weekday: UInt32
+    public let startTime: String
+    public let fallbackBuildingRaw: String
+
+    public init(
+        courseCode: String,
+        section: String,
+        weekday: UInt32,
+        startTime: String,
+        fallbackBuildingRaw: String
+    ) {
+        self.courseCode = courseCode
+        self.section = section
+        self.weekday = weekday
+        self.startTime = startTime
+        self.fallbackBuildingRaw = fallbackBuildingRaw
+    }
+}
+
+public struct CampusFloorOccupancySummary: Sendable, Equatable {
+    public let freeCount: Int
+    public let occupiedCount: Int
+    public let noDataCount: Int
+    public let outOfTermCount: Int
+
+    public var totalRooms: Int {
+        freeCount + occupiedCount + noDataCount + outOfTermCount
+    }
+
+    public var hasAnyRooms: Bool {
+        totalRooms > 0
+    }
+
+    public init(
+        freeCount: Int = 0,
+        occupiedCount: Int = 0,
+        noDataCount: Int = 0,
+        outOfTermCount: Int = 0
+    ) {
+        self.freeCount = freeCount
+        self.occupiedCount = occupiedCount
+        self.noDataCount = noDataCount
+        self.outOfTermCount = outOfTermCount
     }
 }
 

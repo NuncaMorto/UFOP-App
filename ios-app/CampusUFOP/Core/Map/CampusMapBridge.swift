@@ -16,8 +16,15 @@ public final class CampusMapBridge {
     public private(set) var renderBatch: CampusRenderBatch? = nil
     public private(set) var selectedFeature: CampusFeatureInfo? = nil
     public private(set) var selectedOccupancy: CampusOccupancyStatus? = nil
+    public private(set) var selectedBuildingOccupancy: [CampusRoomOccupancyItem] = []
     public private(set) var pendingFocus: CampusCameraFocus? = nil
+    public private(set) var searchQuery: String = ""
+    public private(set) var activePoiFilter: CampusPoiType? = nil
+    public private(set) var searchResults: [CampusSearchResult] = []
+    public private(set) var isFreeRoomsModeEnabled: Bool = false
+    public private(set) var resolutionNotice: String? = nil
     public private(set) var isNativeAvailable: Bool = false
+    public private(set) var renderBatchRevision: Int = 0
     public private(set) var errorMessage: String? = nil
 
     private let adapter = CampusMapNativeAdapter()
@@ -25,6 +32,50 @@ public final class CampusMapBridge {
     public init(timestampIso: String? = nil) {
         self.timestampIso = timestampIso
         loadBundledEngine()
+    }
+
+    public var freeRoomsOnActiveFloor: [CampusRenderFeature] {
+        guard let batch = renderBatch else { return [] }
+        return batch.items
+            .filter { $0.layer == .room && $0.occupancy == .noRegularClass }
+            .sorted { lhs, rhs in
+                lhs.primaryLabel.localizedCaseInsensitiveCompare(rhs.primaryLabel) == .orderedAscending
+            }
+    }
+
+    public var floorOccupancySummary: CampusFloorOccupancySummary {
+        guard let batch = renderBatch else {
+            return CampusFloorOccupancySummary()
+        }
+        var freeCount = 0
+        var occupiedCount = 0
+        var noDataCount = 0
+        var outOfTermCount = 0
+
+        for item in batch.items where item.layer == .room {
+            switch item.occupancy {
+            case .noRegularClass:
+                freeCount += 1
+            case .occupied:
+                occupiedCount += 1
+            case .noData:
+                noDataCount += 1
+            case .outOfTerm:
+                outOfTermCount += 1
+            case .none:
+                break
+            }
+        }
+        return CampusFloorOccupancySummary(
+            freeCount: freeCount,
+            occupiedCount: occupiedCount,
+            noDataCount: noDataCount,
+            outOfTermCount: outOfTermCount
+        )
+    }
+
+    public func effectiveTimestampIso() -> String {
+        timestampIso ?? Self.currentIsoTimestamp()
     }
 
     public func loadBundledEngine() {
@@ -55,7 +106,10 @@ public final class CampusMapBridge {
             activeFloor = summary.defaultFloor
             selectedFeature = nil
             selectedOccupancy = nil
+            selectedBuildingOccupancy = []
+            resolutionNotice = nil
             refreshRenderBatch()
+            refreshSearchResults()
             pendingFocus = CampusCameraFocus(
                 campusId: summary.campusId,
                 featureId: summary.campusId,
@@ -71,6 +125,7 @@ public final class CampusMapBridge {
         guard floor != activeFloor else { return }
         activeFloor = floor
         refreshRenderBatch()
+        refreshSearchResults()
     }
 
     public func updateTimestamp(_ newTimestampIso: String?) {
@@ -83,11 +138,12 @@ public final class CampusMapBridge {
         do {
             guard let batch = try adapter.getRenderBatch(
                 activeFloor: activeFloor,
-                timestampIso: timestampIso
+                timestampIso: effectiveTimestampIso()
             ) else {
                 return
             }
             renderBatch = batch
+            renderBatchRevision &+= 1
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -95,6 +151,7 @@ public final class CampusMapBridge {
     }
 
     public func handleTap(mapX: Float, mapY: Float, zoom: Float) -> CampusMapHit? {
+        resolutionNotice = nil
         guard let hit = adapter.hitTest(
             mapX: mapX,
             mapY: mapY,
@@ -103,6 +160,7 @@ public final class CampusMapBridge {
         ) else {
             selectedFeature = nil
             selectedOccupancy = nil
+            selectedBuildingOccupancy = []
             return nil
         }
         selectedFeature = hit.feature
@@ -112,11 +170,62 @@ public final class CampusMapBridge {
 
     public func focusFeature(_ featureId: String) {
         guard let focus = adapter.getCameraFocus(featureId: featureId) else { return }
+        resolutionNotice = nil
         applyCameraFocus(focus)
         selectedFeature = adapter.getFeature(featureId: focus.featureId)
         refreshSelectedOccupancy()
     }
 
+    public func updateSearchQuery(_ query: String) {
+        searchQuery = query
+        refreshSearchResults()
+    }
+
+    public func togglePoiFilter(_ poiType: CampusPoiType) {
+        if activePoiFilter == poiType {
+            activePoiFilter = nil
+        } else {
+            activePoiFilter = poiType
+        }
+        refreshSearchResults()
+    }
+
+    public func clearSearchAndFilters() {
+        searchQuery = ""
+        activePoiFilter = nil
+        searchResults = []
+    }
+
+    public func selectSearchResult(_ result: CampusSearchResult) {
+        resolutionNotice = nil
+        let focus = adapter.getCameraFocus(featureId: result.feature.id)
+            ?? CampusCameraFocus(
+                campusId: result.feature.campusId,
+                featureId: result.feature.id,
+                targetFloor: result.feature.floor ?? result.feature.defaultFloor ?? activeFloor,
+                bounds: result.feature.bounds
+            )
+        applyCameraFocus(focus)
+        selectedFeature = adapter.getFeature(featureId: focus.featureId) ?? result.feature
+        refreshSelectedOccupancy()
+    }
+
+    public func toggleFreeRoomsMode() {
+        setFreeRoomsMode(!isFreeRoomsModeEnabled)
+    }
+
+    public func setFreeRoomsMode(_ enabled: Bool) {
+        isFreeRoomsModeEnabled = enabled
+        if enabled && timestampIso == nil {
+            refreshRenderBatch()
+        }
+    }
+
+    public func clearResolutionNotice() {
+        resolutionNotice = nil
+    }
+
+    @discardableResult
     public func resolveMeeting(
         courseCode: String,
         section: String,
@@ -133,15 +242,17 @@ public final class CampusMapBridge {
         )
         switch res {
         case .exactRoom(_, _, let roomId, _, let focus):
+            resolutionNotice = nil
             applyCameraFocus(focus)
             selectedFeature = adapter.getFeature(featureId: roomId)
             refreshSelectedOccupancy()
         case .buildingFallback(_, let buildingId, let focus):
+            resolutionNotice = "Sala específica sem mapa interno — exibindo o prédio."
             applyCameraFocus(focus)
             selectedFeature = adapter.getFeature(featureId: buildingId)
-            selectedOccupancy = nil
+            refreshSelectedOccupancy()
         case .unmapped:
-            break
+            resolutionNotice = "Local não mapeado neste campus. Use a busca para encontrar o prédio."
         }
         return res
     }
@@ -153,6 +264,7 @@ public final class CampusMapBridge {
     public func clearSelection() {
         selectedFeature = nil
         selectedOccupancy = nil
+        selectedBuildingOccupancy = []
     }
 
     public func availableFloorsForUi() -> [CampusFloorLabel] {
@@ -173,23 +285,50 @@ public final class CampusMapBridge {
     }
 
     private func applyCameraFocus(_ focus: CampusCameraFocus) {
-        if focus.campusId != activeCampusId {
+        let campusChanged = focus.campusId != activeCampusId
+        let floorChanged = focus.targetFloor != activeFloor
+        if campusChanged {
             _ = try? adapter.setActiveCampus(focus.campusId)
             activeCampusId = focus.campusId
         }
         activeFloor = focus.targetFloor
         refreshRenderBatch()
+        if campusChanged || floorChanged {
+            refreshSearchResults()
+        }
         pendingFocus = focus
     }
 
-    private func refreshSelectedOccupancy() {
-        guard let feat = selectedFeature,
-              feat.layer == .room else {
-            selectedOccupancy = nil
+    private func refreshSearchResults() {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty || activePoiFilter != nil else {
+            searchResults = []
             return
         }
-        let ts = timestampIso ?? Self.currentIsoTimestamp()
-        selectedOccupancy = adapter.getRoomOccupancy(roomId: feat.id, timestampIso: ts)
+        searchResults = adapter.search(
+            query: trimmed,
+            poiTypeFilter: activePoiFilter,
+            activeFloor: activeFloor
+        )
+    }
+
+    private func refreshSelectedOccupancy() {
+        guard let feat = selectedFeature else {
+            selectedOccupancy = nil
+            selectedBuildingOccupancy = []
+            return
+        }
+        let ts = effectiveTimestampIso()
+        if feat.layer == .room {
+            selectedOccupancy = adapter.getRoomOccupancy(roomId: feat.id, timestampIso: ts)
+            selectedBuildingOccupancy = []
+        } else if feat.layer == .building || feat.layer == .campusZone {
+            selectedOccupancy = nil
+            selectedBuildingOccupancy = (try? adapter.listBuildingOccupancy(buildingId: feat.id, timestampIso: ts)) ?? []
+        } else {
+            selectedOccupancy = nil
+            selectedBuildingOccupancy = []
+        }
     }
 
     private static func currentIsoTimestamp() -> String {
@@ -255,6 +394,15 @@ private final class CampusMapNativeAdapter {
         nativeEngine?.getFeature(featureId: featureId)?.toBridgeModel()
     }
 
+    func search(query: String, poiTypeFilter: CampusPoiType?, activeFloor: Int32) -> [CampusSearchResult] {
+        guard let engine = nativeEngine else { return [] }
+        return engine.search(
+            query: query,
+            poiTypeFilter: poiTypeFilter?.toFfi(),
+            activeFloor: activeFloor
+        ).map { $0.toBridgeModel() }
+    }
+
     func resolveMeeting(
         courseCode: String,
         section: String,
@@ -279,6 +427,14 @@ private final class CampusMapNativeAdapter {
             timestampEpochOrIso: timestampIso
         ).toBridgeModel()
     }
+
+    func listBuildingOccupancy(buildingId: String, timestampIso: String) throws -> [CampusRoomOccupancyItem] {
+        guard let engine = nativeEngine else { return [] }
+        return try engine.listBuildingOccupancy(
+            buildingId: buildingId,
+            timestampEpochOrIso: timestampIso
+        ).map { $0.toBridgeModel() }
+    }
     #else
     func loadBundled() throws -> CampusMapBundledSnapshot? { nil }
     func setActiveCampus(_ campusId: String) throws -> CampusMapSummaryModel? { nil }
@@ -286,6 +442,7 @@ private final class CampusMapNativeAdapter {
     func hitTest(mapX: Float, mapY: Float, activeFloor: Int32, zoom: Float) -> CampusMapHit? { nil }
     func getCameraFocus(featureId: String) -> CampusCameraFocus? { nil }
     func getFeature(featureId: String) -> CampusFeatureInfo? { nil }
+    func search(query: String, poiTypeFilter: CampusPoiType?, activeFloor: Int32) -> [CampusSearchResult] { [] }
     func resolveMeeting(
         courseCode: String,
         section: String,
@@ -296,246 +453,6 @@ private final class CampusMapNativeAdapter {
         .unmapped
     }
     func getRoomOccupancy(roomId: String, timestampIso: String) -> CampusOccupancyStatus? { nil }
+    func listBuildingOccupancy(buildingId: String, timestampIso: String) throws -> [CampusRoomOccupancyItem] { [] }
     #endif
 }
-
-#if canImport(CampusCoreFFI)
-private extension CampusCoreFFI.MapLayer {
-    func toBridgeModel() -> CampusMapLayer {
-        switch self {
-        case .campusGround: return .campusGround
-        case .campusZone: return .campusZone
-        case .greenArea: return .greenArea
-        case .parking: return .parking
-        case .sports: return .sports
-        case .walkway: return .walkway
-        case .building: return .building
-        case .room: return .room
-        case .poi: return .poi
-        }
-    }
-}
-
-private extension CampusCoreFFI.IndoorStatus {
-    func toBridgeModel() -> CampusIndoorStatus {
-        switch self {
-        case .floorplan: return .floorplan
-        case .partialFloorplan: return .partialFloorplan
-        case .provisional: return .provisional
-        case .exteriorOnly: return .exteriorOnly
-        }
-    }
-}
-
-private extension CampusCoreFFI.PoiType {
-    func toBridgeModel() -> CampusPoiType {
-        switch self {
-        case .toilet: return .toilet
-        case .facultyOffice: return .facultyOffice
-        case .entrance: return .entrance
-        case .dining: return .dining
-        case .library: return .library
-        case .parking: return .parking
-        case .academic: return .academic
-        }
-    }
-}
-
-private extension CampusCoreFFI.RenderGeomKind {
-    func toBridgeModel() -> CampusRenderGeomKind {
-        switch self {
-        case .polygon: return .polygon
-        case .polyline: return .polyline
-        case .point: return .point
-        }
-    }
-}
-
-private extension CampusCoreFFI.RenderOccupancyKind {
-    func toBridgeModel() -> CampusRenderOccupancyKind {
-        switch self {
-        case .none: return .none
-        case .occupied: return .occupied
-        case .noRegularClass: return .noRegularClass
-        case .noData: return .noData
-        case .outOfTerm: return .outOfTerm
-        }
-    }
-}
-
-private extension CampusCoreFFI.Rect2D {
-    func toBridgeModel() -> CampusMapRect2D {
-        CampusMapRect2D(minX: minX, minY: minY, maxX: maxX, maxY: maxY)
-    }
-}
-
-private extension CampusCoreFFI.FloorLabel {
-    func toBridgeModel() -> CampusFloorLabel {
-        CampusFloorLabel(floor: floor, label: label)
-    }
-}
-
-private extension CampusCoreFFI.CampusMapSummary {
-    func toBridgeModel() -> CampusMapSummaryModel {
-        CampusMapSummaryModel(
-            campusId: campusId,
-            name: name,
-            city: city,
-            defaultFloor: defaultFloor,
-            availableFloors: availableFloors,
-            floorLabels: floorLabels.map { $0.toBridgeModel() },
-            bounds: bounds.toBridgeModel(),
-            attribution: attribution
-        )
-    }
-}
-
-private extension CampusCoreFFI.CameraFocus {
-    func toBridgeModel() -> CampusCameraFocus {
-        CampusCameraFocus(
-            campusId: campusId,
-            featureId: featureId,
-            targetFloor: targetFloor,
-            bounds: bounds.toBridgeModel()
-        )
-    }
-}
-
-private extension CampusCoreFFI.FeatureInfo {
-    func toBridgeModel() -> CampusFeatureInfo {
-        CampusFeatureInfo(
-            id: id,
-            campusId: campusId,
-            layer: layer.toBridgeModel(),
-            code: code,
-            name: name,
-            category: category,
-            buildingId: buildingId,
-            parentId: parentId,
-            floor: floor,
-            availableFloors: availableFloors,
-            floorLabels: floorLabels.map { $0.toBridgeModel() },
-            defaultFloor: defaultFloor,
-            poiType: poiType?.toBridgeModel(),
-            indoorStatus: indoorStatus.toBridgeModel(),
-            isMock: isMock,
-            aliases: aliases,
-            departments: departments,
-            notes: notes,
-            minZoom: minZoom,
-            bounds: bounds.toBridgeModel(),
-            labelX: labelX,
-            labelY: labelY
-        )
-    }
-}
-
-private extension CampusCoreFFI.MapHit {
-    func toBridgeModel() -> CampusMapHit {
-        CampusMapHit(feature: feature.toBridgeModel(), distanceMeters: distanceM)
-    }
-}
-
-private extension CampusCoreFFI.SlotInfo {
-    func toBridgeModel() -> CampusSlotInfo {
-        CampusSlotInfo(
-            campusId: campusId,
-            buildingId: buildingId,
-            roomId: roomId,
-            roomCode: roomCode,
-            weekday: weekday,
-            startTime: startTime,
-            endTime: endTime,
-            kind: kind,
-            label: label,
-            title: title,
-            courseCodes: courseCodes
-        )
-    }
-}
-
-private extension CampusCoreFFI.OccupancyStatus {
-    func toBridgeModel() -> CampusOccupancyStatus {
-        switch self {
-        case .occupied(let slot):
-            return .occupied(slot: slot.toBridgeModel())
-        case .noRegularClass:
-            return .noRegularClass
-        case .noData:
-            return .noData
-        case .outOfTerm:
-            return .outOfTerm
-        }
-    }
-}
-
-private extension CampusCoreFFI.Resolution {
-    func toBridgeModel() -> CampusMeetingResolution {
-        switch self {
-        case .exactRoom(let campusId, let buildingId, let roomId, let floor, let cameraFocus):
-            return .exactRoom(
-                campusId: campusId,
-                buildingId: buildingId,
-                roomId: roomId,
-                floor: floor,
-                cameraFocus: cameraFocus.toBridgeModel()
-            )
-        case .buildingFallback(let campusId, let buildingId, let cameraFocus):
-            return .buildingFallback(
-                campusId: campusId,
-                buildingId: buildingId,
-                cameraFocus: cameraFocus.toBridgeModel()
-            )
-        case .unmapped:
-            return .unmapped
-        }
-    }
-}
-
-private extension CampusCoreFFI.RenderFeature {
-    func toBridgeModel() -> CampusRenderFeature {
-        CampusRenderFeature(
-            id: id,
-            layer: layer.toBridgeModel(),
-            geomKind: geomKind.toBridgeModel(),
-            ringStartIdx: ringStartIdx,
-            ringCount: ringCount,
-            pointX: pointX,
-            pointY: pointY,
-            labelX: labelX,
-            labelY: labelY,
-            bboxMinX: bboxMinX,
-            bboxMinY: bboxMinY,
-            bboxMaxX: bboxMaxX,
-            bboxMaxY: bboxMaxY,
-            minZoom: minZoom,
-            primaryLabel: primaryLabel,
-            secondaryLabel: secondaryLabel,
-            category: category,
-            poiType: poiType?.toBridgeModel(),
-            indoorStatus: indoorStatus.toBridgeModel(),
-            isMock: isMock,
-            occupancy: occupancy.toBridgeModel(),
-            occupancyLabel: occupancyLabel
-        )
-    }
-}
-
-private extension CampusCoreFFI.RenderBatch {
-    func toBridgeModel() -> CampusRenderBatch {
-        CampusRenderBatch(
-            campusId: campusId,
-            campusName: campusName,
-            activeFloor: activeFloor,
-            availableFloors: availableFloors,
-            floorLabels: floorLabels.map { $0.toBridgeModel() },
-            bounds: bounds.toBridgeModel(),
-            attribution: attribution,
-            coords: coords,
-            ringStarts: ringStarts,
-            ringCounts: ringCounts,
-            items: items.map { $0.toBridgeModel() }
-        )
-    }
-}
-#endif

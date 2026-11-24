@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct DisciplinesView: View {
     @Bindable public var viewModel: DisciplinesViewModel
+    public let onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)?
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
@@ -18,8 +19,12 @@ public struct DisciplinesView: View {
         [GridItem(.adaptive(minimum: isRegular ? 200 : 140), spacing: 12)]
     }
 
-    public init(viewModel: DisciplinesViewModel) {
+    public init(
+        viewModel: DisciplinesViewModel,
+        onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)? = nil
+    ) {
         self.viewModel = viewModel
+        self.onOpenLocationInMap = onOpenLocationInMap
     }
 
     private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
@@ -72,6 +77,12 @@ public struct DisciplinesView: View {
                         onDeleteCourse: {
                             viewModel.deleteCourse(courseId: detail.summary.id)
                         },
+                        onOpenLocationInMap: onOpenLocationInMap.map { handler in
+                            { request in
+                                viewModel.dismissDisciplineDetail()
+                                handler(request)
+                            }
+                        },
                         onClose: {
                             viewModel.dismissDisciplineDetail()
                         }
@@ -91,6 +102,12 @@ public struct DisciplinesView: View {
                 onDeleteCourse: {
                     viewModel.deleteCourse(courseId: detail.summary.id)
                 },
+                onOpenLocationInMap: onOpenLocationInMap.map { handler in
+                    { request in
+                        viewModel.dismissDisciplineDetail()
+                        handler(request)
+                    }
+                },
                 onClose: {
                     viewModel.dismissDisciplineDetail()
                 }
@@ -99,6 +116,12 @@ public struct DisciplinesView: View {
         .sheet(isPresented: $viewModel.isTimetablePresented) {
             TimetableGridView(
                 store: viewModel.store,
+                onOpenLocationInMap: onOpenLocationInMap.map { handler in
+                    { request in
+                        viewModel.dismissTimetable()
+                        handler(request)
+                    }
+                },
                 onClose: {
                     viewModel.dismissTimetable()
                 }

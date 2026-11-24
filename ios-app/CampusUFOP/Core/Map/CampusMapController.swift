@@ -9,7 +9,15 @@ public struct CampusMapUiState: Equatable, Sendable {
     public let renderBatch: CampusRenderBatch?
     public let selectedFeature: CampusFeatureInfo?
     public let selectedOccupancy: CampusOccupancyStatus?
+    public let selectedBuildingOccupancy: [CampusRoomOccupancyItem]
     public let pendingFocus: CampusCameraFocus?
+    public let searchQuery: String
+    public let activePoiFilter: CampusPoiType?
+    public let searchResults: [CampusSearchResult]
+    public let isFreeRoomsModeEnabled: Bool
+    public let resolutionNotice: String?
+    public let freeRoomsOnActiveFloor: [CampusRenderFeature]
+    public let floorOccupancySummary: CampusFloorOccupancySummary
     public let isNativeAvailable: Bool
     public let errorMessage: String?
 
@@ -21,7 +29,15 @@ public struct CampusMapUiState: Equatable, Sendable {
         renderBatch: CampusRenderBatch? = nil,
         selectedFeature: CampusFeatureInfo? = nil,
         selectedOccupancy: CampusOccupancyStatus? = nil,
+        selectedBuildingOccupancy: [CampusRoomOccupancyItem] = [],
         pendingFocus: CampusCameraFocus? = nil,
+        searchQuery: String = "",
+        activePoiFilter: CampusPoiType? = nil,
+        searchResults: [CampusSearchResult] = [],
+        isFreeRoomsModeEnabled: Bool = false,
+        resolutionNotice: String? = nil,
+        freeRoomsOnActiveFloor: [CampusRenderFeature] = [],
+        floorOccupancySummary: CampusFloorOccupancySummary = CampusFloorOccupancySummary(),
         isNativeAvailable: Bool = false,
         errorMessage: String? = nil
     ) {
@@ -32,7 +48,15 @@ public struct CampusMapUiState: Equatable, Sendable {
         self.renderBatch = renderBatch
         self.selectedFeature = selectedFeature
         self.selectedOccupancy = selectedOccupancy
+        self.selectedBuildingOccupancy = selectedBuildingOccupancy
         self.pendingFocus = pendingFocus
+        self.searchQuery = searchQuery
+        self.activePoiFilter = activePoiFilter
+        self.searchResults = searchResults
+        self.isFreeRoomsModeEnabled = isFreeRoomsModeEnabled
+        self.resolutionNotice = resolutionNotice
+        self.freeRoomsOnActiveFloor = freeRoomsOnActiveFloor
+        self.floorOccupancySummary = floorOccupancySummary
         self.isNativeAvailable = isNativeAvailable
         self.errorMessage = errorMessage
     }
@@ -58,6 +82,10 @@ public final class CampusMapController: ObservableObject {
 
     public func syncState() {
         state = Self.snapshot(from: bridge)
+    }
+
+    public func effectiveTimestampIso() -> String {
+        bridge.effectiveTimestampIso()
     }
 
     public func loadBundledEngine() {
@@ -94,6 +122,41 @@ public final class CampusMapController: ObservableObject {
 
     public func focusFeature(_ featureId: String) {
         bridge.focusFeature(featureId)
+        syncState()
+    }
+
+    public func updateSearchQuery(_ query: String) {
+        bridge.updateSearchQuery(query)
+        syncState()
+    }
+
+    public func togglePoiFilter(_ poiType: CampusPoiType) {
+        bridge.togglePoiFilter(poiType)
+        syncState()
+    }
+
+    public func clearSearchAndFilters() {
+        bridge.clearSearchAndFilters()
+        syncState()
+    }
+
+    public func selectSearchResult(_ result: CampusSearchResult) {
+        bridge.selectSearchResult(result)
+        syncState()
+    }
+
+    public func toggleFreeRoomsMode() {
+        bridge.toggleFreeRoomsMode()
+        syncState()
+    }
+
+    public func setFreeRoomsMode(_ enabled: Bool) {
+        bridge.setFreeRoomsMode(enabled)
+        syncState()
+    }
+
+    public func clearResolutionNotice() {
+        bridge.clearResolutionNotice()
         syncState()
     }
 
@@ -139,7 +202,15 @@ public final class CampusMapController: ObservableObject {
             renderBatch: bridge.renderBatch,
             selectedFeature: bridge.selectedFeature,
             selectedOccupancy: bridge.selectedOccupancy,
+            selectedBuildingOccupancy: bridge.selectedBuildingOccupancy,
             pendingFocus: bridge.pendingFocus,
+            searchQuery: bridge.searchQuery,
+            activePoiFilter: bridge.activePoiFilter,
+            searchResults: bridge.searchResults,
+            isFreeRoomsModeEnabled: bridge.isFreeRoomsModeEnabled,
+            resolutionNotice: bridge.resolutionNotice,
+            freeRoomsOnActiveFloor: bridge.freeRoomsOnActiveFloor,
+            floorOccupancySummary: bridge.floorOccupancySummary,
             isNativeAvailable: bridge.isNativeAvailable,
             errorMessage: bridge.errorMessage
         )

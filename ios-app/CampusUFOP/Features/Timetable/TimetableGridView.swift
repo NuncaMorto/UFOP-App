@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct TimetableGridView: View {
     @Bindable public var store: CampusStore
+    public let onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)?
     public let onClose: () -> Void
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
@@ -15,8 +16,13 @@ public struct TimetableGridView: View {
     @State private var activeCheckInDetail: ClassCheckInDetail?
     @State private var openedDisciplineDetail: DisciplineDetail?
 
-    public init(store: CampusStore, onClose: @escaping () -> Void) {
+    public init(
+        store: CampusStore,
+        onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)? = nil,
+        onClose: @escaping () -> Void
+    ) {
         self.store = store
+        self.onOpenLocationInMap = onOpenLocationInMap
         self.onClose = onClose
     }
 
@@ -103,6 +109,7 @@ public struct TimetableGridView: View {
         }
         .preferredColorScheme(appearance?.resolvedColorScheme)
         .sheet(item: $selectedCell) { cell in
+            let isEad = store.isCourseEad(cell.disciplineId) || CampusStore.isEadText(cell.roomLabel)
             TimetableCellDetailSheet(
                 cell: cell,
                 store: store,
@@ -121,6 +128,12 @@ public struct TimetableGridView: View {
                         }
                     }
                 },
+                onOpenLocationInMap: (!isEad && onOpenLocationInMap != nil) ? {
+                    let req = meetingRequest(for: cell)
+                    selectedCell = nil
+                    onClose()
+                    onOpenLocationInMap?(req)
+                } : nil,
                 onClose: {
                     selectedCell = nil
                 }
@@ -128,6 +141,7 @@ public struct TimetableGridView: View {
             .presentationDetents([.medium])
         }
         .sheet(item: $activeCheckInDetail) { detail in
+            let isEad = store.isCourseEad(detail.disciplineId) || CampusStore.isEadText(detail.location)
             ClassCheckInSheetView(
                 detail: detail,
                 onSave: { status, colorKey in
@@ -136,7 +150,13 @@ public struct TimetableGridView: View {
                 },
                 onCancel: {
                     activeCheckInDetail = nil
-                }
+                },
+                onOpenLocationInMap: (!isEad && onOpenLocationInMap != nil) ? {
+                    let req = meetingRequest(for: detail)
+                    activeCheckInDetail = nil
+                    onClose()
+                    onOpenLocationInMap?(req)
+                } : nil
             )
         }
         .sheet(item: $openedDisciplineDetail) { detail in
@@ -148,6 +168,13 @@ public struct TimetableGridView: View {
                 },
                 onDeleteCourse: {
                     store.deleteCourse(courseId: detail.summary.id)
+                },
+                onOpenLocationInMap: onOpenLocationInMap.map { handler in
+                    { req in
+                        openedDisciplineDetail = nil
+                        onClose()
+                        handler(req)
+                    }
                 },
                 onClose: {
                     openedDisciplineDetail = nil
@@ -509,6 +536,47 @@ public struct TimetableGridView: View {
         return store.getClassCheckInDetail(agendaItemId: "lecture-\(cell.id)@\(targetIso)")
             ?? store.getClassCheckInDetail(agendaItemId: "lecture-\(cell.id)")
     }
+
+    private func meetingRequest(for cell: TimetableSlotCell) -> CampusMapMeetingRequest {
+        let detail = store.getDisciplineDetail(disciplineId: cell.disciplineId)
+        let slotMeta = store.courseScheduleSlots.first { $0.slotId == cell.id }
+        let weekdayMap: [String: UInt32] = ["SEG": 1, "TER": 2, "QUA": 3, "QUI": 4, "SEX": 5, "SÁB": 6, "DOM": 7]
+        let weekday = UInt32(slotMeta?.dayOfWeek ?? Int(weekdayMap[cell.weekdayShort] ?? 1))
+        let startTime = CampusStore.normalizeTimeString(
+            slotMeta?.startTime ?? cell.timeRange.components(separatedBy: "–").first ?? ""
+        )
+        let fallback: String = {
+            if let slotMeta {
+                let r = slotMeta.room.trimmingCharacters(in: .whitespacesAndNewlines)
+                if r.isEmpty { return slotMeta.building }
+                return slotMeta.building.isEmpty ? r : "\(slotMeta.building) · \(r)"
+            }
+            return cell.roomLabel
+        }()
+        return CampusMapMeetingRequest(
+            courseCode: detail?.summary.code ?? "",
+            section: store.turmaByCourseId[cell.disciplineId] ?? "",
+            weekday: weekday,
+            startTime: startTime,
+            fallbackBuildingRaw: fallback
+        )
+    }
+
+    private func meetingRequest(for detail: ClassCheckInDetail) -> CampusMapMeetingRequest {
+        let disc = store.disciplines.first(where: { $0.id == detail.disciplineId })
+        let parsedDate = CampusStore.parseIsoDate(store.selectedDateIso) ?? Date()
+        let weekday = UInt32(CampusStore.isoWeekdayIndex(from: parsedDate))
+        let startTime = CampusStore.normalizeTimeString(
+            detail.timeRange.components(separatedBy: "–").first ?? detail.timeRange
+        )
+        return CampusMapMeetingRequest(
+            courseCode: disc?.code ?? "",
+            section: store.turmaByCourseId[detail.disciplineId] ?? "",
+            weekday: weekday,
+            startTime: startTime,
+            fallbackBuildingRaw: detail.location
+        )
+    }
 }
 
 // MARK: - Cell Detail Modal Sheet
@@ -518,6 +586,7 @@ private struct TimetableCellDetailSheet: View {
     let store: CampusStore
     let onOpenDiscipline: () -> Void
     let onQuickCheckIn: () -> Void
+    let onOpenLocationInMap: (() -> Void)?
     let onClose: () -> Void
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
@@ -573,8 +642,43 @@ private struct TimetableCellDetailSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("\(cell.weekdayShort) · \(cell.timeRange)", systemImage: "clock.fill")
                         .font(.system(size: 14, weight: .semibold))
-                    Label(roomDesc, systemImage: isEad ? "laptopcomputer" : "building.2.fill")
-                        .font(.system(size: 14, weight: .medium))
+
+                    if !isEad, let onOpenLocationInMap {
+                        Button {
+                            onOpenLocationInMap()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(accent.primary(for: colorScheme))
+
+                                Text(roomDesc)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+
+                                Spacer(minLength: 6)
+
+                                HStack(spacing: 4) {
+                                    Text("Ver no mapa")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundStyle(accent.primary(for: colorScheme))
+                            }
+                            .frame(minHeight: 36)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .campusHoverLift()
+                        .accessibilityLabel("Ver \(roomDesc) no mapa")
+                    } else {
+                        Label(roomDesc, systemImage: isEad ? "laptopcomputer" : "building.2.fill")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+
                     if !prof.isEmpty {
                         Label(prof, systemImage: "person.fill")
                             .font(.system(size: 14, weight: .medium))

@@ -4,6 +4,7 @@ public struct ClassCheckInSheetView: View {
     public let detail: ClassCheckInDetail
     public let onSave: (AttendanceStatus, DepartmentColorKey) -> Void
     public let onCancel: () -> Void
+    public let onOpenLocationInMap: (() -> Void)?
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
@@ -14,11 +15,13 @@ public struct ClassCheckInSheetView: View {
     public init(
         detail: ClassCheckInDetail,
         onSave: @escaping (AttendanceStatus, DepartmentColorKey) -> Void,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        onOpenLocationInMap: (() -> Void)? = nil
     ) {
         self.detail = detail
         self.onSave = onSave
         self.onCancel = onCancel
+        self.onOpenLocationInMap = onOpenLocationInMap
         self._selectedStatus = State(initialValue: detail.selectedStatus)
         self._selectedColorKey = State(initialValue: detail.selectedColorKey)
     }
@@ -142,17 +145,50 @@ public struct ClassCheckInSheetView: View {
             Divider()
                 .overlay(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
 
-            HStack(spacing: 10) {
-                Image(systemName: detail.location.localizedCaseInsensitiveContains("EAD") ? "laptopcomputer" : "building.2.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(deptColor)
-                    .frame(width: 20)
+            if !CampusStore.isEadText(detail.location), let onOpenLocationInMap {
+                Button {
+                    onOpenLocationInMap()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(accentColorObj.primary(for: colorScheme))
+                            .frame(width: 20)
 
-                Text(detail.location.isEmpty ? "Local não informado" : detail.location)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        Text(detail.location.isEmpty ? "Local não informado" : detail.location)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .multilineTextAlignment(.leading)
 
-                Spacer()
+                        Spacer(minLength: 6)
+
+                        HStack(spacing: 4) {
+                            Text("Ver no mapa")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundStyle(accentColorObj.primary(for: colorScheme))
+                    }
+                    .frame(minHeight: 36)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .campusHoverLift()
+                .accessibilityLabel("Ver \(detail.location) no mapa")
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: CampusStore.isEadText(detail.location) ? "laptopcomputer" : "mappin.and.ellipse")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(deptColor)
+                        .frame(width: 20)
+
+                    Text(detail.location.isEmpty ? "Local não informado" : detail.location)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                    Spacer()
+                }
             }
 
             if !cleanProfessor.isEmpty {

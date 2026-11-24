@@ -2,14 +2,20 @@ import SwiftUI
 
 public struct AgendaView: View {
     @Bindable public var viewModel: AgendaViewModel
+    public let onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)?
+
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var commitmentToDelete: AgendaTimelineItem?
 
-    public init(viewModel: AgendaViewModel) {
+    public init(
+        viewModel: AgendaViewModel,
+        onOpenLocationInMap: ((CampusMapMeetingRequest) -> Void)? = nil
+    ) {
         self.viewModel = viewModel
+        self.onOpenLocationInMap = onOpenLocationInMap
     }
 
     private var isRegular: Bool {
@@ -84,7 +90,7 @@ public struct AgendaView: View {
                         }
                         .padding(.horizontal, 18)
                         .padding(.top, 12)
-                        .padding(.bottom, 32)
+                        .padding(.bottom, 108)
                     }
                 }
             }
@@ -92,6 +98,7 @@ public struct AgendaView: View {
             .navigationBarHidden(true)
             #endif
             .sheet(item: $viewModel.activeCheckInDetail) { detail in
+                let isEad = viewModel.store.isCourseEad(detail.disciplineId) || CampusStore.isEadText(detail.location)
                 ClassCheckInSheetView(
                     detail: detail,
                     onSave: { status, colorKey in
@@ -103,7 +110,12 @@ public struct AgendaView: View {
                     },
                     onCancel: {
                         viewModel.dismissCheckInSheet()
-                    }
+                    },
+                    onOpenLocationInMap: (!isEad && onOpenLocationInMap != nil) ? {
+                        let req = meetingRequest(for: detail)
+                        viewModel.dismissCheckInSheet()
+                        onOpenLocationInMap?(req)
+                    } : nil
                 )
                 .presentationDetents([.large, .fraction(0.88)])
                 .presentationDragIndicator(.visible)
@@ -615,6 +627,29 @@ public struct AgendaView: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
         .background(Capsule().fill(color.opacity(colorScheme == .dark ? 0.20 : 0.12)))
+    }
+
+    private func meetingRequest(for detail: ClassCheckInDetail) -> CampusMapMeetingRequest {
+        let disc = viewModel.store.disciplines.first(where: { $0.id == detail.disciplineId })
+        let courseCode = disc?.code ?? ""
+        let section = viewModel.store.turmaByCourseId[detail.disciplineId] ?? ""
+        let parsedDate = CampusStore.parseIsoDate(viewModel.overview.selectedDateIso) ?? Date()
+        let weekday = UInt32(CampusStore.isoWeekdayIndex(from: parsedDate))
+        let startTime = CampusStore.normalizeTimeString(
+            detail.timeRange.components(separatedBy: "–").first ?? detail.timeRange
+        )
+        let matchingSlot = viewModel.store.courseScheduleSlots.first {
+            $0.courseId == detail.disciplineId && $0.dayOfWeek == Int(weekday) && $0.startTime == startTime
+        }
+        let trimmedLocation = detail.location.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = trimmedLocation.isEmpty ? (matchingSlot?.building ?? "") : trimmedLocation
+        return CampusMapMeetingRequest(
+            courseCode: courseCode,
+            section: section,
+            weekday: weekday,
+            startTime: startTime,
+            fallbackBuildingRaw: fallback
+        )
     }
 }
 
