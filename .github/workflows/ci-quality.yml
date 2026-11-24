@@ -105,6 +105,15 @@ jobs:
       - name: Verify site JavaScript syntax
         run: node --check docs/app.js
 
+      - name: Validate map assets & UniFFI bindings
+        run: pwsh -NoProfile -File scripts/check-map-assets.ps1
+
+      - name: Validate iOS Swift hygiene
+        run: pwsh -NoProfile -File scripts/check-swift-hygiene.ps1 -SkipSwiftc
+
+      - name: Check iOS shell scripts syntax
+        run: bash -n scripts/build-ios-xcframework.sh scripts/build-ios-ipa.sh
+
       - name: Verify blocked files, secrets & store-safe applicationId
         shell: bash
         run: |

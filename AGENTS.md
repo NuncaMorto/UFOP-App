@@ -30,7 +30,7 @@
   - Garantir alvo tátil mínimo de `48dp` com `minimumInteractiveComponentSize()` sem inflar desnecessariamente a altura visual de pílulas/filtros compactos quando a opção de acessibilidade de alvos grandes estiver desligada.
 
 ## 5. Mapa Rápido do Projeto
-- **Diferenciação dos 3 conceitos de "Grade / Matriz":**
+- **Diferenciação dos 4 Pilares (Grades, Matriz e Mapa):**
   - **Grade Dinâmica Interativa (Progresso & Pré-requisitos):**
     - Android: `android-app/app/src/main/java/br/ufop/campus/core/curriculum/DynamicCurriculumGrid.kt` + `ui/curriculum/DynamicCurriculumGridScreen.kt`
     - iOS: `ios-app/CampusUFOP/Core/Curriculum/DynamicCurriculumGrid.swift` + `Features/Curriculum/DynamicCurriculumGridView.swift`
@@ -39,13 +39,42 @@
     - Android: `core/curriculum/UfopCurriculumCatalog.kt` + `ui/curriculum/CurriculumMatrixScreen.kt`
     - iOS: `Core/Curriculum/UfopCatalogs.swift` + `Features/Curriculum/CurriculumMatrixView.swift`
   - **Grade de Horários Semanal (Turmas matriculadas no semestre):**
-    - Android: `ui/timetable/TimetableScreen.kt` | iOS: `Features/Timetable/TimetableView.swift`
+    - Android: `ui/timetable/TimetableModalScreen.kt` | iOS: `Features/Timetable/TimetableGridView.swift`
+  - **Mapa 2D Offline (Rust + UniFFI + Android + iOS):**
+    - Assets & Contrato (`rust-core/assets/map_data/`): `maps/campus_manifest.json`, bases vetoriais (`maps/*.geojson`), overlays indoor (`maps/indoor/*.geojson`), ocupação (`schedule/occupancy_2026_2.json`) e contrato (`schema/map_schema_contract.json`).
+    - Núcleo Rust (`rust-core/src/domain/map/` + `rust-core/src/ffi/`): `assets.rs`, `mod.rs` (`CampusMapEngine`), `occupancy.rs`, `overlay/` (`mod.rs`, `parser.rs`, `assembler.rs`), `projection.rs`, `render.rs`, `resolver.rs`, `search.rs`, `spatial.rs`, `types.rs`, `ffi/map_engine.rs`.
+    - Android (`android-app/...`): `core/map/CampusMapController.kt`, `core/map/CampusMapMath.kt`, `ui/map/CampusMapCanvas.kt`, `ui/map/CampusMapComponents.kt` + binding UniFFI em `core/uniffi/campus_core.kt`.
+    - iOS (`ios-app/CampusUFOP/`): `Core/Map/` (`CampusMapModels.swift`, `CampusMapBridge.swift`, `CampusMapController.swift`), `Features/Map/` (`CampusMapCanvasView.swift`, `CampusMapComponentsView.swift`) + bindings UniFFI em `CoreFFI/Generated/`.
 - **Módulos principais após refatoração:**
-  - Perfil Android (`ui/profile/`): `ProfilePlaceholderScreen.kt`, `ProfileMetricsTab.kt`, `ProfileSettingsTab.kt`, `ProfileUpdatesSubView.kt`, `ProfileFaqSubView.kt`, `ProfileCalendarSubView.kt`, `ProfileSecuritySubView.kt`, `ProfileFeedbackCard.kt`, `ProfileBackupAndLockDialogs.kt`, `ProfileSheets.kt`, `ProfileSharedComponents.kt`, `StudentOnboardingOverlay.kt`, `StudentOnboardingSteps.kt`, `StudentOnboardingHelpers.kt`.
-  - Disciplinas Android (`ui/disciplines/`): `DisciplineDetailBottomSheet.kt`, `DisciplineDetailComponents.kt`, `DisciplineDetailSlotEditor.kt`, `DisciplineDetailDialogs.kt`.
-  - Núcleo/Contratos Kotlin (`core/ffi/`): `CampusContracts.kt`, `CampusDomainModels.kt`, `CampusEngineBridgeRepository.kt`, `InMemoryCampusRepository.kt`, `CampusOfficialSeeds.kt`, `CampusPortugueseTextNormalizer.kt`, `CampusEnrollmentParser.kt`, `CampusSyllabusParser.kt`, `CampusCalendarAndTranscriptParser.kt`, `CampusRepositoryHolder.kt`.
-  - Ponte iOS (`ios-app/CampusUFOP/CoreFFI/`): `CampusCoreModels.swift`, `CampusCoreBridge.swift`, `CampusCoreBridgeExtensions.swift`, `CampusStoreSeeds.swift`, `CampusStoreAgendaAndAssessments.swift`, `CampusStoreDisciplinesAndTemplates.swift`, `CampusStoreProfileAndDynamicGrid.swift`.
+  - Núcleo Rust (`rust-core/src/`): `lib.rs`, `tests.rs`, `db.rs`, `models.rs`, `ffi/` (`mod.rs`, `campus_engine.rs`, `map_engine.rs`), `repository/` (`mod.rs`, `helpers.rs`, `disciplines.rs`, `agenda.rs`, `assessments.rs`, `profile.rs`), `domain/` (`agenda.rs`, `attendance.rs`, `timetable.rs`, `map/`).
+  - Núcleo/Contratos Kotlin (`core/ffi/`): `CampusContracts.kt`, `CampusDomainModels.kt`, `CampusEngineBridgeRepository.kt`, `InMemoryCampusRepository.kt`, `InMemoryRepositoryPersistence.kt`, `InMemoryRepositorySnapshotReader.kt`, `InMemoryRepositorySnapshotWriter.kt`, `InMemoryRepositoryDisciplines.kt`, `InMemoryRepositoryImports.kt`, `InMemoryRepositoryAgenda.kt`, `InMemoryRepositoryAssessments.kt`, `InMemoryRepositoryProfileAndGrid.kt`, `CampusOfficialSeeds.kt`, `CampusPortugueseTextNormalizer.kt`, `CampusEnrollmentParser.kt`, `CampusSyllabusParser.kt`, `CampusCalendarAndTranscriptParser.kt`, `CampusRepositoryHolder.kt`.
+  - UI Android (`ui/`):
+    - `ui/timetable/`: `TimetableModalScreen.kt`, `TimetableToolbarComponents.kt`, `TimetableComparisonComponents.kt`, `TimetableGridComponents.kt`, `TimetableDialogs.kt`, `TimetableHelpers.kt`.
+    - `ui/agenda/`: `AgendaScreen.kt`, `AgendaHeaderAndEventsComponents.kt`, `AgendaCalendarControls.kt`, `AgendaMonthCalendarCard.kt`, `AgendaTimelineComponents.kt`, `AddCommitmentBottomSheet.kt`, `ClassCheckInBottomSheet.kt`, `AgendaViewModel.kt`.
+    - `ui/curriculum/`: `DynamicCurriculumGridScreen.kt`, `DynamicGridHeaderAndFilters.kt`, `DynamicGridHeaderControls.kt`, `DynamicGridSemesterColumns.kt`, `DynamicGridCourseCard.kt`, `DynamicGridSheetsAndDialogs.kt`, `CurriculumMatrixScreen.kt`, `CurriculumMatrixCoursePicker.kt`, `CurriculumMatrixSemesterList.kt`, `CurriculumMatrixDialogs.kt`.
+    - `ui/activities/`: `ActivitiesPlaceholderScreen.kt`, `ActivitiesFilterBar.kt`, `ActivitiesListComponents.kt`, `ActivitiesDialogs.kt`, `AssessmentDetailBottomSheet.kt`.
+    - `ui/disciplines/`: `DisciplinesScreen.kt`, `DisciplinesCards.kt`, `DisciplinesFilterComponents.kt`, `DisciplinesDialogs.kt`, `AddCourseBottomSheet.kt`, `AddCourseCatalogSection.kt`, `AddCourseScheduleEditor.kt`, `AddCourseFormComponents.kt`, `DisciplineDetailBottomSheet.kt`, `DisciplineDetailComponents.kt`, `DisciplineDetailSlotEditor.kt`, `DisciplineDetailDialogs.kt`, `DisciplinesViewModel.kt`.
+    - `ui/profile/`: `ProfilePlaceholderScreen.kt`, `ProfileMetricsTab.kt`, `ProfileSettingsTab.kt`, `ProfileUpdatesSubView.kt`, `ProfileFaqSubView.kt`, `ProfileCalendarSubView.kt`, `ProfileSecuritySubView.kt`, `ProfileFeedbackCard.kt`, `ProfileBackupAndLockDialogs.kt`, `ProfileSheets.kt`, `ProfileSharedComponents.kt`, `StudentOnboardingOverlay.kt`, `StudentOnboardingSteps.kt`, `StudentOnboardingHelpers.kt`.
+  - iOS (`ios-app/CampusUFOP/`):
+    - `CoreFFI/`: `CampusCoreDomainModels.swift`, `CampusCoreScheduleModels.swift`, `CampusCoreProfileAndBackupModels.swift`, `CampusCoreBridge.swift`, `CampusCoreBridgeExtensions.swift`, `CampusStoreSeeds.swift`, `CampusStoreAgendaAndAssessments.swift`, `CampusStoreDisciplinesAndTemplates.swift`, `CampusStoreProfileAndDynamicGrid.swift`.
+    - `Core/Curriculum/` & `Core/Parsers/`: `DynamicCurriculumGrid.swift`, `DynamicCurriculumGridModels.swift`, `DynamicCurriculumGridBuilder.swift`, `DynamicCurriculumGridEngine.swift`, `UfopPdfParsers.swift`, `UfopEnrollmentPdfParser.swift`, `UfopSyllabusAndTranscriptParser.swift`.
+    - `Features/`: `ProfileView.swift` (+ `ProfileSummarySectionView.swift`, `ProfileCalendarAndUpdatesViews.swift`, `ProfileSettingsAndFaqViews.swift`, `ScheduleShareImportSheetView.swift`), `DisciplineDetailSheetView.swift` (+ `DisciplineDetailComponentsView.swift`, `DisciplineDetailSlotEditorView.swift`, `DisciplineDetailAssessmentsView.swift`), `StudentOnboardingView.swift` (+ `StudentOnboardingStepsView.swift`, `StudentOnboardingComponentsView.swift`), `DynamicCurriculumGridView.swift` (+ `DynamicCurriculumGridComponentsView.swift`, `DynamicCurriculumGridSheetsView.swift`).
+- **Higiene de Contexto / Arquivos de Dados (NÃO LER):**
+  - Nunca ler, abrir ou imprimir no contexto os seguintes arquivos volumosos ou gerados:
+    - `rust-core/assets/map_data/maps/**/*.geojson`
+    - `rust-core/assets/map_data/schedule/occupancy_*.json`
+    - `rust-core/assets/map_data/schema/*.json`
+    - `android-app/app/src/main/assets/*.json`
+    - `android-app/app/src/main/java/br/ufop/campus/core/ffi/CampusOfficialSeeds.kt`
+    - `ios-app/CampusUFOP/CoreFFI/CampusStoreSeeds.swift`
+    - `ios-app/CampusUFOP/Core/Curriculum/UfopCatalogs.swift`
+    - `android-app/app/src/main/java/br/ufop/campus/core/uniffi/campus_core.kt`
+    - `ios-app/CampusUFOP/CoreFFI/Generated/*`
+  - Para validar esses dados ou bindings sem inflar contexto, usar exclusivamente `.\scripts\check-map-assets.ps1`, `cargo test --workspace` (ou `.\scripts\verify-core.ps1`) e consultas pontuais com `git grep`.
 - **Comandos Prontos (Windows PowerShell):**
+  - Verificação completa do núcleo Rust: `.\scripts\verify-core.ps1`
+  - Validação de assets de mapa, JSON/GeoJSON, privacidade e bindings UniFFI: `.\scripts\check-map-assets.ps1`
+  - Compilação FFI Android + geração de bindings Kotlin: `.\scripts\build-android-ffi.ps1`
   - Higiene Swift pré-push: `.\scripts\check-swift-hygiene.ps1`
   - Atualizar/verificar versão: `.\scripts\bump-version.ps1 -Version X.Y.Z -Code N` e `-CheckOnly -Strict`
   - Testes JVM Android: `$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA "Android\Sdk"; Push-Location android-app; .\gradlew.bat :app:testDebugUnitTest --no-daemon --offline; $ec = $LASTEXITCODE; Pop-Location; exit $ec`

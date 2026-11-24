@@ -9,7 +9,7 @@ RUST_CORE_DIR="${REPO_ROOT}/rust-core"
 IOS_DIR="${REPO_ROOT}/ios-app"
 BUILD_DIR="${REPO_ROOT}/target/ios-xcframework"
 HEADERS_DIR="${BUILD_DIR}/headers"
-SWIFT_OUT_DIR="${IOS_DIR}/CampusApp/Generated"
+SWIFT_OUT_DIR="${IOS_DIR}/CampusUFOP/CoreFFI/Generated"
 XCFRAMEWORK_OUT="${IOS_DIR}/Frameworks/CampusCoreFFI.xcframework"
 UNIFFI_CONFIG="${RUST_CORE_DIR}/uniffi.toml"
 
@@ -53,7 +53,7 @@ if command -v uniffi-bindgen >/dev/null 2>&1; then
     --config "${UNIFFI_CONFIG}" \
     --out-dir "${BUILD_DIR}/swift"
 else
-  cargo run -p uniffi --features cli --bin uniffi-bindgen -- generate \
+  cargo run -p campus_core --bin uniffi-bindgen -- generate \
     --library "${HOST_LIB}" \
     --language swift \
     --config "${UNIFFI_CONFIG}" \

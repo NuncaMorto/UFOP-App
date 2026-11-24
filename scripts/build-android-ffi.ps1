@@ -82,7 +82,7 @@ try {
                 --config $UniffiConfig `
                 --out-dir $KotlinOutDir
         } else {
-            & cargo run -p uniffi --features cli --bin uniffi-bindgen -- generate `
+            & cargo run -p campus_core --bin uniffi-bindgen -- generate `
                 --library $LibPath `
                 --language kotlin `
                 --config $UniffiConfig `
