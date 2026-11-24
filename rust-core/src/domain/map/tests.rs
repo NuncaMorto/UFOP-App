@@ -1,0 +1,608 @@
+use std::collections::HashSet;
+
+use serde::Deserialize;
+
+use super::assets::{
+    MORRO_DO_CRUZEIRO_GEOJSON, OVERLAY_BSA_GEOJSON, OVERLAY_EM_GEOJSON, OVERLAY_ICEB_GEOJSON,
+};
+use super::occupancy::expand_section_tokens;
+use super::types::{
+    IndoorStatus, MapLayer, OccupancyStatus, PoiType, RenderOccupancyKind, Resolution,
+};
+use super::{CampusMapEngine, validate_overlay};
+
+const TEST_RESOLUTIONS_JSON: &str =
+    include_str!("../../../assets/map_data/schema/test_schedule_resolutions_2026_2.json");
+
+#[derive(Debug, Deserialize)]
+struct TestResolutionDoc {
+    test_cases_expected_resolutions: Vec<TestResolutionCase>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TestResolutionCase {
+    course_code: String,
+    section: String,
+    atestado_building: String,
+    weekday: u32,
+    start: String,
+    expected_building: String,
+    expected_room_id: String,
+    expected_floor: i32,
+}
+
+#[test]
+fn loads_all_four_campuses_and_overlays_without_duplicates() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled map engine should load");
+    let campuses = engine.list_campuses();
+    let ids: Vec<&str> = campuses.iter().map(|c| c.campus_id.as_str()).collect();
+    assert_eq!(ids, vec!["OP_MC", "JM_ICEA", "MA_ICHS", "MA_ICSA"]);
+
+    // Verifica que todas as feições do campus ativo têm IDs únicos após merge dos overlays.
+    let batch_floor1 = engine
+        .get_render_batch(1, Some("2026-11-17T21:15:00-03:00".to_string()))
+        .expect("render batch floor 1");
+    let mut seen = HashSet::new();
+    for item in &batch_floor1.items {
+        assert!(
+            seen.insert(item.id.clone()),
+            "ID duplicado no render batch: {}",
+            item.id
+        );
+    }
+    assert_eq!(batch_floor1.floor_labels.len(), 2);
+
+    // Verifica indoor_status calculado dinamicamente.
+    let em = engine.get_feature("EM".to_string()).expect("EM feature");
+    assert_eq!(em.indoor_status, IndoorStatus::PartialFloorplan);
+
+    let iceb = engine
+        .get_feature("ICEB".to_string())
+        .expect("ICEB feature");
+    assert_eq!(iceb.indoor_status, IndoorStatus::Provisional);
+
+    let bsa = engine.get_feature("BSA".to_string()).expect("BSA feature");
+    assert_eq!(bsa.indoor_status, IndoorStatus::Provisional);
+
+    let efar = engine
+        .get_feature("EFAR".to_string())
+        .expect("EFAR feature");
+    assert_eq!(efar.indoor_status, IndoorStatus::ExteriorOnly);
+
+    // Salas do 2º Pav da EM são reais; do 1º Pav da EM são provisórias.
+    let em_11 = engine.get_feature("EM_11".to_string()).expect("EM_11");
+    assert!(!em_11.is_mock);
+    assert_eq!(em_11.floor, Some(1));
+
+    let em_04 = engine.get_feature("EM_04".to_string()).expect("EM_04");
+    assert!(em_04.is_mock);
+    assert_eq!(em_04.floor, Some(0));
+
+    // Ocupação no batch de EM_11 às 21:15 de terça (CAT163-T21/22).
+    let em_11_render = batch_floor1
+        .items
+        .iter()
+        .find(|i| i.id == "EM_11")
+        .expect("EM_11 in floor 1 batch");
+    assert_eq!(em_11_render.occupancy, RenderOccupancyKind::Occupied);
+    assert!(
+        em_11_render
+            .occupancy_label
+            .as_deref()
+            .is_some_and(|l| l.contains("CAT163"))
+    );
+
+    // #14: Verifica preservação de holes (EM com 1 exterior + 2 pátios = 3 anéis) e eixo Y invertido.
+    let em_render = batch_floor1
+        .items
+        .iter()
+        .find(|i| i.id == "EM")
+        .expect("EM in floor 1 batch");
+    assert_eq!(em_render.ring_count, 3);
+    assert!(
+        em.label_y > 0.0,
+        "EM ao sul da origem deve ter Y positivo para Canvas"
+    );
+    assert!(
+        iceb.label_y < 0.0,
+        "ICEB ao norte da origem deve ter Y negativo para Canvas"
+    );
+
+    // Trocar campus para JM_ICEA e validar andares e sala ICEA_H102.
+    let jm_summary = engine
+        .set_active_campus("JM_ICEA".to_string())
+        .expect("switch to JM_ICEA");
+    assert_eq!(jm_summary.available_floors, vec![0, 1, 2, 3]);
+    let icea_h102 = engine
+        .get_feature("ICEA_H102".to_string())
+        .expect("ICEA_H102");
+    assert_eq!(icea_h102.floor, Some(1));
+    assert!(icea_h102.is_mock);
+}
+
+#[test]
+fn plug_and_play_overlay_replaces_mock_floor_without_code_changes() {
+    // Simula adição futura de planta real para o 1º andar (floor 0) da EM.
+    let custom_em_floor0_overlay = r#"{
+      "type": "FeatureCollection",
+      "metadata": {
+        "schema_version": "2.0.0",
+        "campus_id": "OP_MC",
+        "building_id": "EM",
+        "replaces_mock_floors": [0]
+      },
+      "features": [
+        {
+          "type": "Feature",
+          "id": "EM_04",
+          "properties": {
+            "id": "EM_04",
+            "layer": "room",
+            "parent_id": "EM",
+            "building_id": "EM",
+            "code": "04",
+            "name": "Sala 04 — Escola de Minas",
+            "category": "classroom",
+            "floor": 0,
+            "min_zoom": 1.8,
+            "is_mock": false
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+              [-43.509149, -20.398496],
+              [-43.509149, -20.398421],
+              [-43.509225, -20.398421],
+              [-43.509225, -20.398496],
+              [-43.509149, -20.398496]
+            ]]
+          }
+        }
+      ]
+    }"#;
+
+    let engine = CampusMapEngine::load_with_overlays(
+        MORRO_DO_CRUZEIRO_GEOJSON.to_string(),
+        vec![
+            OVERLAY_EM_GEOJSON.to_string(),
+            custom_em_floor0_overlay.to_string(),
+        ],
+    )
+    .expect("load_with_overlays");
+
+    // EM_04 agora deve ser real (is_mock = false), EM_01 (do mock antigo do floor 0) foi removida e EM passa a Floorplan.
+    let em_04 = engine.get_feature("EM_04".to_string()).expect("EM_04");
+    assert!(!em_04.is_mock);
+    assert_eq!(em_04.indoor_status, IndoorStatus::Floorplan);
+    assert!(engine.get_feature("EM_01".to_string()).is_none());
+
+    let em = engine.get_feature("EM".to_string()).expect("EM");
+    assert_eq!(em.indoor_status, IndoorStatus::Floorplan);
+}
+
+#[test]
+fn validates_all_11_real_schedule_resolutions_and_fallbacks() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+    let doc: TestResolutionDoc =
+        serde_json::from_str(TEST_RESOLUTIONS_JSON).expect("parse test resolutions");
+    assert_eq!(doc.test_cases_expected_resolutions.len(), 11);
+
+    for case in &doc.test_cases_expected_resolutions {
+        let res = engine.resolve_meeting(
+            case.course_code.clone(),
+            case.section.clone(),
+            case.weekday,
+            case.start.clone(),
+            case.atestado_building.clone(),
+        );
+        match res {
+            Resolution::ExactRoom {
+                building_id,
+                room_id,
+                floor,
+                camera_focus,
+                ..
+            } => {
+                assert_eq!(
+                    building_id, case.expected_building,
+                    "building mismatch for {}-{}",
+                    case.course_code, case.section
+                );
+                assert_eq!(
+                    room_id, case.expected_room_id,
+                    "room_id mismatch for {}-{}",
+                    case.course_code, case.section
+                );
+                assert_eq!(
+                    floor, case.expected_floor,
+                    "floor mismatch for {}-{}",
+                    case.course_code, case.section
+                );
+                assert_eq!(camera_focus.target_floor, case.expected_floor);
+                assert_eq!(camera_focus.feature_id, case.expected_room_id);
+            }
+            other => panic!(
+                "Expected ExactRoom for {}-{} (weekday={} {}), got {:?}",
+                case.course_code, case.section, case.weekday, case.start, other
+            ),
+        }
+    }
+
+    // Fallback por alias do Atestado quando não houver alocação na grade.
+    let fallback = engine.resolve_meeting(
+        "FAR999".to_string(),
+        "11".to_string(),
+        2,
+        "08:20".to_string(),
+        "Escola de Farmácia".to_string(),
+    );
+    match fallback {
+        Resolution::BuildingFallback {
+            campus_id,
+            building_id,
+            camera_focus,
+        } => {
+            assert_eq!(campus_id, "OP_MC");
+            assert_eq!(building_id, "EFAR");
+            assert_eq!(camera_focus.feature_id, "EFAR");
+        }
+        other => panic!("Expected BuildingFallback to EFAR, got {other:?}"),
+    }
+
+    // Caso desconhecido -> Unmapped.
+    let unmapped = engine.resolve_meeting(
+        "XXX999".to_string(),
+        "11".to_string(),
+        2,
+        "08:20".to_string(),
+        "Prédio Inexistente".to_string(),
+    );
+    assert_eq!(unmapped, Resolution::Unmapped);
+
+    // #15: Expansão de turmas agrupadas ("21/22", "T21|22", "41 a 44", "31a33").
+    let expanded = expand_section_tokens(&[
+        "21/22".to_string(),
+        "T21|22".to_string(),
+        "41 a 44".to_string(),
+        "31a33".to_string(),
+    ]);
+    assert!(expanded.contains(&"41".to_string()));
+    assert!(expanded.contains(&"42".to_string()));
+    assert!(expanded.contains(&"43".to_string()));
+    assert!(expanded.contains(&"44".to_string()));
+    assert!(expanded.contains(&"31".to_string()));
+    assert!(expanded.contains(&"32".to_string()));
+    assert!(expanded.contains(&"33".to_string()));
+
+    // Múltiplas disciplinas na mesma célula (CBI197 e EFD131 quarta 19:00 -> BSA_103).
+    match engine.resolve_meeting(
+        "EFD131".to_string(),
+        "".to_string(),
+        3,
+        "19:00".to_string(),
+        "BSA".to_string(),
+    ) {
+        Resolution::ExactRoom { room_id, .. } => assert_eq!(room_id, "BSA_103"),
+        other => panic!("Expected BSA_103 for EFD131, got {other:?}"),
+    }
+
+    // Aliases do Atestado: ESCOLA DE MINAS -> EM, PAVILHAO DE AULAS -> BSA, CEDUFOP -> EEF.
+    for (raw_alias, expected_bid) in [
+        ("ESCOLA DE MINAS", "EM"),
+        ("PAVILHAO DE AULAS", "BSA"),
+        ("CEDUFOP", "EEF"),
+    ] {
+        match engine.resolve_meeting(
+            "ZZZ999".to_string(),
+            "11".to_string(),
+            2,
+            "08:20".to_string(),
+            raw_alias.to_string(),
+        ) {
+            Resolution::BuildingFallback { building_id, .. } => {
+                assert_eq!(building_id, expected_bid);
+            }
+            other => {
+                panic!("Expected BuildingFallback {expected_bid} for '{raw_alias}', got {other:?}")
+            }
+        }
+    }
+}
+
+#[test]
+fn hit_test_handles_real_em_rooms_bibem_courtyard_holes_and_bsa() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+
+    // 1. EM_11 (2º Pav real, floor = 1).
+    let em_11 = engine.get_feature("EM_11".to_string()).expect("EM_11");
+    let hit_11 = engine
+        .hit_test(em_11.label_x, em_11.label_y, 1, 3.0)
+        .expect("hit EM_11");
+    assert_eq!(hit_11.feature.id, "EM_11");
+    assert!(!hit_11.feature.is_mock);
+
+    // 2. EM_BIBEM em ponto dentro do polígono longe do pino POI_EM_1_BIBEM.
+    let bibem = engine
+        .get_feature("EM_BIBEM".to_string())
+        .expect("EM_BIBEM");
+    let hit_bibem = engine
+        .hit_test(bibem.label_x, bibem.bounds.min_y + 4.0, 1, 3.0)
+        .expect("hit EM_BIBEM");
+    assert_eq!(hit_bibem.feature.id, "EM_BIBEM");
+    assert!(!hit_bibem.feature.is_mock);
+
+    // 3. Prioridade POI -> Room sobre o pino da BIBEM.
+    let poi_bibem = engine
+        .get_feature("POI_EM_1_BIBEM".to_string())
+        .expect("POI_EM_1_BIBEM");
+    let hit_poi = engine
+        .hit_test(poi_bibem.label_x, poi_bibem.label_y, 1, 3.0)
+        .expect("hit POI_EM_1_BIBEM");
+    assert_eq!(hit_poi.feature.id, "POI_EM_1_BIBEM");
+    assert_eq!(hit_poi.feature.layer, MapLayer::Poi);
+
+    // 4. Pátio interno leste da EM (hole): NÃO deve dar hit em sala nem no prédio EM.
+    assert!(
+        engine.hit_test(71.6, 165.6, 1, 3.0).is_none(),
+        "pátio interno leste da EM não pode retornar hit"
+    );
+    assert!(
+        engine.hit_test(-20.0, 166.0, 1, 3.0).is_none(),
+        "pátio interno oeste da EM não pode retornar hit"
+    );
+
+    // 5. BSA_205 (2º andar provisório).
+    let bsa_205 = engine.get_feature("BSA_205".to_string()).expect("BSA_205");
+    let hit_bsa = engine
+        .hit_test(bsa_205.label_x, bsa_205.label_y, 1, 3.0)
+        .expect("hit BSA_205");
+    assert_eq!(hit_bsa.feature.id, "BSA_205");
+    assert!(hit_bsa.feature.is_mock);
+
+    // 6. #20: Filtro de min_zoom (zoom = 0.5 < 1.8 ignora EM_11 e acerta o prédio EM) + CameraFocus.
+    let hit_zoom_out = engine
+        .hit_test(em_11.label_x, em_11.label_y, 1, 0.5)
+        .expect("hit building EM when zoomed out");
+    assert_eq!(hit_zoom_out.feature.id, "EM");
+    assert_eq!(hit_zoom_out.feature.layer, MapLayer::Building);
+
+    let focus = engine
+        .get_camera_focus("EM_11".to_string())
+        .expect("camera focus EM_11");
+    assert_eq!(focus.target_floor, 1);
+    assert!(focus.bounds.max_x > focus.bounds.min_x);
+    assert!(focus.bounds.max_y > focus.bounds.min_y);
+}
+
+#[test]
+fn room_occupancy_covers_op_jm_free_nodata_and_out_of_term() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+
+    // 1. Sala ocupada em Ouro Preto (EM_11, terça 2026-11-17 21:15 -03:00 -> CAT163-T21/22 21:00..21:50).
+    let op_occ = engine
+        .get_room_occupancy("EM_11".to_string(), "2026-11-17T21:15:00-03:00".to_string())
+        .expect("OP occupancy");
+    match op_occ {
+        OccupancyStatus::Occupied { slot } => {
+            assert_eq!(slot.room_id, "EM_11");
+            assert!(slot.course_codes.contains(&"CAT163".to_string()));
+        }
+        other => panic!("Expected Occupied for EM_11, got {other:?}"),
+    }
+
+    // Mesma consulta via epoch UTC em segundos (2026-11-17 21:15 -03:00 == 2026-11-18T00:15:00Z = 1794960900).
+    let op_epoch = engine
+        .get_room_occupancy("EM_11".to_string(), "1794960900".to_string())
+        .expect("OP occupancy epoch");
+    assert!(matches!(op_epoch, OccupancyStatus::Occupied { .. }));
+
+    // 2. Sala ocupada em João Monlevade (ICEA_C103, segunda 2026-11-16 16:00 -03:00 -> bloco 15:25-17:05).
+    let jm_occ = engine
+        .get_room_occupancy(
+            "ICEA_C103".to_string(),
+            "2026-11-16T16:00:00-03:00".to_string(),
+        )
+        .expect("JM occupancy");
+    match jm_occ {
+        OccupancyStatus::Occupied { slot } => {
+            assert_eq!(slot.room_id, "ICEA_C103");
+            assert_eq!(slot.start_time, "15:25");
+            assert_eq!(slot.end_time, "17:05");
+            assert!(slot.course_codes.contains(&"ELT562".to_string()));
+        }
+        other => panic!("Expected Occupied for ICEA_C103, got {other:?}"),
+    }
+
+    // 3. Sala sem aula regular no horário de almoço em dia coberto.
+    let op_free = engine
+        .get_room_occupancy("EM_11".to_string(), "2026-11-17T12:15:00-03:00".to_string())
+        .expect("EM_11 lunch");
+    assert_eq!(op_free, OccupancyStatus::NoRegularClass);
+
+    // 4. Sábado no BSA (BSA só cobre seg-sex) -> obrigatoriamente NoData.
+    let bsa_sat = engine
+        .get_room_occupancy(
+            "BSA_205".to_string(),
+            "2026-11-21T10:00:00-03:00".to_string(),
+        )
+        .expect("BSA saturday");
+    assert_eq!(bsa_sat, OccupancyStatus::NoData);
+
+    // 5. Prédio sem grade importada (EFAR / EMED) em dia útil -> NoData.
+    let efar_tue = engine
+        .get_room_occupancy(
+            "EFAR_01".to_string(),
+            "2026-11-17T10:00:00-03:00".to_string(),
+        )
+        .expect("EFAR tuesday");
+    assert_eq!(efar_tue, OccupancyStatus::NoData);
+
+    // 6. Feriado (2026-11-20 Consciência Negra), domingo (2026-11-22) e fora do período letivo -> OutOfTerm.
+    assert_eq!(
+        engine
+            .get_room_occupancy("EM_11".to_string(), "2026-11-20T14:00:00-03:00".to_string())
+            .expect("holiday"),
+        OccupancyStatus::OutOfTerm
+    );
+    assert_eq!(
+        engine
+            .get_room_occupancy("EM_11".to_string(), "2026-11-22T14:00:00-03:00".to_string())
+            .expect("sunday"),
+        OccupancyStatus::OutOfTerm
+    );
+    assert_eq!(
+        engine
+            .get_room_occupancy("EM_11".to_string(), "2026-08-10T14:00:00-03:00".to_string())
+            .expect("before term"),
+        OccupancyStatus::OutOfTerm
+    );
+    assert_eq!(
+        engine
+            .get_room_occupancy("EM_11".to_string(), "2026-12-28T14:00:00-03:00".to_string())
+            .expect("after term"),
+        OccupancyStatus::OutOfTerm
+    );
+
+    // 7. list_building_occupancy em BSA terça às 15:30 deve incluir BSA_205 como Occupied (BCC721-11).
+    let bsa_list = engine
+        .list_building_occupancy("BSA".to_string(), "2026-11-17T15:30:00-03:00".to_string())
+        .expect("list BSA occupancy");
+    assert_eq!(bsa_list.len(), 20);
+    let item_205 = bsa_list
+        .iter()
+        .find(|i| i.room_id == "BSA_205")
+        .expect("BSA_205 in building list");
+    assert!(matches!(item_205.status, OccupancyStatus::Occupied { .. }));
+
+    // 8. #16: Reserva institucional (BSA_102 quarta 13:30-14:20 -> kind="reservation", label="EFD").
+    let reservation = engine
+        .get_room_occupancy(
+            "BSA_102".to_string(),
+            "2026-11-18T13:45:00-03:00".to_string(),
+        )
+        .expect("reservation occupancy");
+    match reservation {
+        OccupancyStatus::Occupied { slot } => {
+            assert_eq!(slot.kind, "reservation");
+            assert_eq!(slot.label, "EFD");
+        }
+        other => panic!("Expected Occupied reservation EFD for BSA_102, got {other:?}"),
+    }
+}
+
+#[test]
+fn search_supports_accents_aliases_and_poi_filters() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+    let libs = engine.search("biblioteca".to_string(), Some(PoiType::Library), 1);
+    assert!(
+        libs.iter()
+            .any(|r| r.feature.id == "EM_BIBEM" || r.feature.id == "POI_EM_1_BIBEM"),
+        "search for 'biblioteca' with Library filter should match BIBEM"
+    );
+
+    let cg_labs = engine.search("computacao".to_string(), None, 1);
+    assert!(
+        cg_labs.iter().any(|r| r.feature.id == "EM_LAB_DEARQ_1"),
+        "search for 'computacao' without diacritics should match EM_LAB_DEARQ_1"
+    );
+
+    let depts = engine.search("decom".to_string(), None, 0);
+    assert!(
+        depts.iter().any(|r| r.feature.id == "ICEB"),
+        "search for 'decom' should match ICEB via departments/aliases"
+    );
+}
+
+#[test]
+fn validate_overlay_accepts_official_overlays_and_rejects_broken_ones() {
+    for ov in [
+        OVERLAY_EM_GEOJSON,
+        OVERLAY_ICEB_GEOJSON,
+        OVERLAY_BSA_GEOJSON,
+    ] {
+        let rep = validate_overlay(MORRO_DO_CRUZEIRO_GEOJSON.to_string(), ov.to_string())
+            .expect("official overlay must pass validation");
+        assert!(rep.checked_features > 0);
+    }
+
+    // Rejeita ID duplicado.
+    let duplicate_id_overlay = r#"{
+      "type": "FeatureCollection",
+      "metadata": {
+        "schema_version": "2.0.0",
+        "campus_id": "OP_MC",
+        "building_id": "BSA",
+        "replaces_mock_floors": [0]
+      },
+      "features": [
+        {
+          "type": "Feature",
+          "id": "BSA_101",
+          "properties": { "id": "BSA_101", "layer": "room", "building_id": "BSA", "code": "101", "floor": 0, "is_mock": false },
+          "geometry": { "type": "Polygon", "coordinates": [[[-43.511828,-20.397508],[-43.511828,-20.397385],[-43.511954,-20.397385],[-43.511954,-20.397508],[-43.511828,-20.397508]]] }
+        },
+        {
+          "type": "Feature",
+          "id": "BSA_101",
+          "properties": { "id": "BSA_101", "layer": "room", "building_id": "BSA", "code": "101", "floor": 0, "is_mock": false },
+          "geometry": { "type": "Polygon", "coordinates": [[[-43.511828,-20.397508],[-43.511828,-20.397385],[-43.511954,-20.397385],[-43.511954,-20.397508],[-43.511828,-20.397508]]] }
+        }
+      ]
+    }"#;
+    let dup_err = validate_overlay(
+        MORRO_DO_CRUZEIRO_GEOJSON.to_string(),
+        duplicate_id_overlay.to_string(),
+    )
+    .expect_err("duplicate ID must be rejected");
+    assert!(dup_err.to_string().contains("duplicado"));
+
+    // Rejeita geometria fora do polígono do prédio (coordenadas no outro extremo do campus).
+    let outside_overlay = r#"{
+      "type": "FeatureCollection",
+      "metadata": {
+        "schema_version": "2.0.0",
+        "campus_id": "OP_MC",
+        "building_id": "BSA",
+        "replaces_mock_floors": [0]
+      },
+      "features": [
+        {
+          "type": "Feature",
+          "id": "BSA_999",
+          "properties": { "id": "BSA_999", "layer": "room", "building_id": "BSA", "code": "999", "floor": 0, "is_mock": false },
+          "geometry": { "type": "Polygon", "coordinates": [[[-43.5089,-20.3984],[-43.5089,-20.3983],[-43.5088,-20.3983],[-43.5088,-20.3984],[-43.5089,-20.3984]]] }
+        }
+      ]
+    }"#;
+    let out_err = validate_overlay(
+        MORRO_DO_CRUZEIRO_GEOJSON.to_string(),
+        outside_overlay.to_string(),
+    )
+    .expect_err("out-of-bounds room must be rejected");
+    assert!(out_err.to_string().contains("fora do polígono"));
+
+    // Rejeita andar inválido.
+    let bad_floor_overlay = r#"{
+      "type": "FeatureCollection",
+      "metadata": {
+        "schema_version": "2.0.0",
+        "campus_id": "OP_MC",
+        "building_id": "BSA",
+        "replaces_mock_floors": [9]
+      },
+      "features": [
+        {
+          "type": "Feature",
+          "id": "BSA_901",
+          "properties": { "id": "BSA_901", "layer": "room", "building_id": "BSA", "code": "901", "floor": 9, "is_mock": false },
+          "geometry": { "type": "Polygon", "coordinates": [[[-43.511828,-20.397508],[-43.511828,-20.397385],[-43.511954,-20.397385],[-43.511954,-20.397508],[-43.511828,-20.397508]]] }
+        }
+      ]
+    }"#;
+    let floor_err = validate_overlay(
+        MORRO_DO_CRUZEIRO_GEOJSON.to_string(),
+        bad_floor_overlay.to_string(),
+    )
+    .expect_err("invalid floor must be rejected");
+    assert!(floor_err.to_string().contains("Andar inválido"));
+}

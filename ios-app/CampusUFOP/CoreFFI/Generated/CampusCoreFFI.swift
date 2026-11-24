@@ -431,6 +431,22 @@ fileprivate struct FfiConverterInt32: FfiConverterPrimitive {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterFloat: FfiConverterPrimitive {
+    typealias FfiType = Float
+    typealias SwiftType = Float
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Float {
+        return try lift(readFloat(&buf))
+    }
+
+    public static func write(_ value: Float, into buf: inout [UInt8]) {
+        writeFloat(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterBool : FfiConverter {
     typealias FfiType = Int8
     typealias SwiftType = Bool
@@ -983,6 +999,278 @@ public func FfiConverterTypeCampusEngine_lift(_ pointer: UnsafeMutableRawPointer
 #endif
 public func FfiConverterTypeCampusEngine_lower(_ value: CampusEngine) -> UnsafeMutableRawPointer {
     return FfiConverterTypeCampusEngine.lower(value)
+}
+
+
+
+
+/**
+ * Motor vetorial offline 2D para os campi da UFOP e ocupação multi-campus 2026/2.
+ */
+public protocol CampusMapEngineProtocol : AnyObject {
+    
+    func getActiveCampusId()  -> String
+    
+    func getCameraFocus(featureId: String)  -> CameraFocus?
+    
+    func getFeature(featureId: String)  -> FeatureInfo?
+    
+    func getRenderBatch(activeFloor: Int32, timestampOpt: String?) throws  -> RenderBatch
+    
+    func getRoomOccupancy(roomId: String, timestampEpochOrIso: String) throws  -> OccupancyStatus
+    
+    func hitTest(mapX: Float, mapY: Float, activeFloor: Int32, zoom: Float)  -> MapHit?
+    
+    func listBuildingOccupancy(buildingId: String, timestampEpochOrIso: String) throws  -> [RoomOccupancyItem]
+    
+    func listCampuses()  -> [CampusMapSummary]
+    
+    func resolveMeeting(courseCode: String, section: String, weekday: UInt32, startTime: String, fallbackBuildingRaw: String)  -> Resolution
+    
+    func search(query: String, poiTypeFilter: PoiType?, activeFloor: Int32)  -> [SearchResult]
+    
+    func setActiveCampus(campusId: String) throws  -> CampusMapSummary
+    
+}
+
+/**
+ * Motor vetorial offline 2D para os campi da UFOP e ocupação multi-campus 2026/2.
+ */
+open class CampusMapEngine:
+    CampusMapEngineProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoPointer {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_campus_core_fn_clone_campusmapengine(self.pointer, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        guard let pointer = pointer else {
+            return
+        }
+
+        try! rustCall { uniffi_campus_core_fn_free_campusmapengine(pointer, $0) }
+    }
+
+    
+    /**
+     * Carrega um mapa base GeoJSON aplicando overlays plug-and-play (usando ocupação embutida 2026/2).
+     */
+public static func loadWithOverlays(baseGeojson: String, overlaysGeojson: [String])throws  -> CampusMapEngine {
+    return try  FfiConverterTypeCampusMapEngine.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_constructor_campusmapengine_load_with_overlays(
+        FfiConverterString.lower(baseGeojson),
+        FfiConverterSequenceString.lower(overlaysGeojson),$0
+    )
+})
+}
+    
+    /**
+     * Carrega um mapa base GeoJSON com overlays e arquivo de ocupação customizado (ou embutido quando `None`).
+     */
+public static func loadWithOverlaysAndOccupancy(baseGeojson: String, overlaysGeojson: [String], occupancyJson: String?)throws  -> CampusMapEngine {
+    return try  FfiConverterTypeCampusMapEngine.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_constructor_campusmapengine_load_with_overlays_and_occupancy(
+        FfiConverterString.lower(baseGeojson),
+        FfiConverterSequenceString.lower(overlaysGeojson),
+        FfiConverterOptionString.lower(occupancyJson),$0
+    )
+})
+}
+    
+    /**
+     * Carrega todos os 4 campi, seus overlays declarados em `campus_manifest.json` e a ocupação 2026/2 embutida.
+     */
+public static func newBundled()throws  -> CampusMapEngine {
+    return try  FfiConverterTypeCampusMapEngine.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_constructor_campusmapengine_new_bundled($0
+    )
+})
+}
+    
+
+    
+open func getActiveCampusId() -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_get_active_campus_id(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func getCameraFocus(featureId: String) -> CameraFocus? {
+    return try!  FfiConverterOptionTypeCameraFocus.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_get_camera_focus(self.uniffiClonePointer(),
+        FfiConverterString.lower(featureId),$0
+    )
+})
+}
+    
+open func getFeature(featureId: String) -> FeatureInfo? {
+    return try!  FfiConverterOptionTypeFeatureInfo.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_get_feature(self.uniffiClonePointer(),
+        FfiConverterString.lower(featureId),$0
+    )
+})
+}
+    
+open func getRenderBatch(activeFloor: Int32, timestampOpt: String?)throws  -> RenderBatch {
+    return try  FfiConverterTypeRenderBatch.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_method_campusmapengine_get_render_batch(self.uniffiClonePointer(),
+        FfiConverterInt32.lower(activeFloor),
+        FfiConverterOptionString.lower(timestampOpt),$0
+    )
+})
+}
+    
+open func getRoomOccupancy(roomId: String, timestampEpochOrIso: String)throws  -> OccupancyStatus {
+    return try  FfiConverterTypeOccupancyStatus.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_method_campusmapengine_get_room_occupancy(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),
+        FfiConverterString.lower(timestampEpochOrIso),$0
+    )
+})
+}
+    
+open func hitTest(mapX: Float, mapY: Float, activeFloor: Int32, zoom: Float) -> MapHit? {
+    return try!  FfiConverterOptionTypeMapHit.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_hit_test(self.uniffiClonePointer(),
+        FfiConverterFloat.lower(mapX),
+        FfiConverterFloat.lower(mapY),
+        FfiConverterInt32.lower(activeFloor),
+        FfiConverterFloat.lower(zoom),$0
+    )
+})
+}
+    
+open func listBuildingOccupancy(buildingId: String, timestampEpochOrIso: String)throws  -> [RoomOccupancyItem] {
+    return try  FfiConverterSequenceTypeRoomOccupancyItem.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_method_campusmapengine_list_building_occupancy(self.uniffiClonePointer(),
+        FfiConverterString.lower(buildingId),
+        FfiConverterString.lower(timestampEpochOrIso),$0
+    )
+})
+}
+    
+open func listCampuses() -> [CampusMapSummary] {
+    return try!  FfiConverterSequenceTypeCampusMapSummary.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_list_campuses(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func resolveMeeting(courseCode: String, section: String, weekday: UInt32, startTime: String, fallbackBuildingRaw: String) -> Resolution {
+    return try!  FfiConverterTypeResolution.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_resolve_meeting(self.uniffiClonePointer(),
+        FfiConverterString.lower(courseCode),
+        FfiConverterString.lower(section),
+        FfiConverterUInt32.lower(weekday),
+        FfiConverterString.lower(startTime),
+        FfiConverterString.lower(fallbackBuildingRaw),$0
+    )
+})
+}
+    
+open func search(query: String, poiTypeFilter: PoiType?, activeFloor: Int32) -> [SearchResult] {
+    return try!  FfiConverterSequenceTypeSearchResult.lift(try! rustCall() {
+    uniffi_campus_core_fn_method_campusmapengine_search(self.uniffiClonePointer(),
+        FfiConverterString.lower(query),
+        FfiConverterOptionTypePoiType.lower(poiTypeFilter),
+        FfiConverterInt32.lower(activeFloor),$0
+    )
+})
+}
+    
+open func setActiveCampus(campusId: String)throws  -> CampusMapSummary {
+    return try  FfiConverterTypeCampusMapSummary.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_method_campusmapengine_set_active_campus(self.uniffiClonePointer(),
+        FfiConverterString.lower(campusId),$0
+    )
+})
+}
+    
+
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCampusMapEngine: FfiConverter {
+
+    typealias FfiType = UnsafeMutableRawPointer
+    typealias SwiftType = CampusMapEngine
+
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> CampusMapEngine {
+        return CampusMapEngine(unsafeFromRawPointer: pointer)
+    }
+
+    public static func lower(_ value: CampusMapEngine) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CampusMapEngine {
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
+    }
+
+    public static func write(_ value: CampusMapEngine, into buf: inout [UInt8]) {
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
+    }
+}
+
+
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCampusMapEngine_lift(_ pointer: UnsafeMutableRawPointer) throws -> CampusMapEngine {
+    return try FfiConverterTypeCampusMapEngine.lift(pointer)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCampusMapEngine_lower(_ value: CampusMapEngine) -> UnsafeMutableRawPointer {
+    return FfiConverterTypeCampusMapEngine.lower(value)
 }
 
 
@@ -1816,6 +2104,208 @@ public func FfiConverterTypeAssessmentWithCourse_lower(_ value: AssessmentWithCo
 }
 
 
+/**
+ * Alvo de foco de câmera retornado por buscas, resoluções de aula ou seleção direta.
+ */
+public struct CameraFocus {
+    public var campusId: String
+    public var featureId: String
+    public var targetFloor: Int32
+    public var bounds: Rect2D
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(campusId: String, featureId: String, targetFloor: Int32, bounds: Rect2D) {
+        self.campusId = campusId
+        self.featureId = featureId
+        self.targetFloor = targetFloor
+        self.bounds = bounds
+    }
+}
+
+
+
+extension CameraFocus: Equatable, Hashable {
+    public static func ==(lhs: CameraFocus, rhs: CameraFocus) -> Bool {
+        if lhs.campusId != rhs.campusId {
+            return false
+        }
+        if lhs.featureId != rhs.featureId {
+            return false
+        }
+        if lhs.targetFloor != rhs.targetFloor {
+            return false
+        }
+        if lhs.bounds != rhs.bounds {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(campusId)
+        hasher.combine(featureId)
+        hasher.combine(targetFloor)
+        hasher.combine(bounds)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCameraFocus: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CameraFocus {
+        return
+            try CameraFocus(
+                campusId: FfiConverterString.read(from: &buf), 
+                featureId: FfiConverterString.read(from: &buf), 
+                targetFloor: FfiConverterInt32.read(from: &buf), 
+                bounds: FfiConverterTypeRect2D.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CameraFocus, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.campusId, into: &buf)
+        FfiConverterString.write(value.featureId, into: &buf)
+        FfiConverterInt32.write(value.targetFloor, into: &buf)
+        FfiConverterTypeRect2D.write(value.bounds, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCameraFocus_lift(_ buf: RustBuffer) throws -> CameraFocus {
+    return try FfiConverterTypeCameraFocus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCameraFocus_lower(_ value: CameraFocus) -> RustBuffer {
+    return FfiConverterTypeCameraFocus.lower(value)
+}
+
+
+/**
+ * Resumo de um campus carregado pelo motor vetorial.
+ */
+public struct CampusMapSummary {
+    public var campusId: String
+    public var name: String
+    public var city: String
+    public var defaultFloor: Int32
+    public var availableFloors: [Int32]
+    public var floorLabels: [FloorLabel]
+    public var bounds: Rect2D
+    public var attribution: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(campusId: String, name: String, city: String, defaultFloor: Int32, availableFloors: [Int32], floorLabels: [FloorLabel], bounds: Rect2D, attribution: String) {
+        self.campusId = campusId
+        self.name = name
+        self.city = city
+        self.defaultFloor = defaultFloor
+        self.availableFloors = availableFloors
+        self.floorLabels = floorLabels
+        self.bounds = bounds
+        self.attribution = attribution
+    }
+}
+
+
+
+extension CampusMapSummary: Equatable, Hashable {
+    public static func ==(lhs: CampusMapSummary, rhs: CampusMapSummary) -> Bool {
+        if lhs.campusId != rhs.campusId {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        if lhs.city != rhs.city {
+            return false
+        }
+        if lhs.defaultFloor != rhs.defaultFloor {
+            return false
+        }
+        if lhs.availableFloors != rhs.availableFloors {
+            return false
+        }
+        if lhs.floorLabels != rhs.floorLabels {
+            return false
+        }
+        if lhs.bounds != rhs.bounds {
+            return false
+        }
+        if lhs.attribution != rhs.attribution {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(campusId)
+        hasher.combine(name)
+        hasher.combine(city)
+        hasher.combine(defaultFloor)
+        hasher.combine(availableFloors)
+        hasher.combine(floorLabels)
+        hasher.combine(bounds)
+        hasher.combine(attribution)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCampusMapSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CampusMapSummary {
+        return
+            try CampusMapSummary(
+                campusId: FfiConverterString.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                city: FfiConverterString.read(from: &buf), 
+                defaultFloor: FfiConverterInt32.read(from: &buf), 
+                availableFloors: FfiConverterSequenceInt32.read(from: &buf), 
+                floorLabels: FfiConverterSequenceTypeFloorLabel.read(from: &buf), 
+                bounds: FfiConverterTypeRect2D.read(from: &buf), 
+                attribution: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CampusMapSummary, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.campusId, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.city, into: &buf)
+        FfiConverterInt32.write(value.defaultFloor, into: &buf)
+        FfiConverterSequenceInt32.write(value.availableFloors, into: &buf)
+        FfiConverterSequenceTypeFloorLabel.write(value.floorLabels, into: &buf)
+        FfiConverterTypeRect2D.write(value.bounds, into: &buf)
+        FfiConverterString.write(value.attribution, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCampusMapSummary_lift(_ buf: RustBuffer) throws -> CampusMapSummary {
+    return try FfiConverterTypeCampusMapSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCampusMapSummary_lower(_ value: CampusMapSummary) -> RustBuffer {
+    return FfiConverterTypeCampusMapSummary.lower(value)
+}
+
+
 public struct CampusSearchResults {
     public var query: String
     public var courses: [DisciplineSummaryCard]
@@ -2542,6 +3032,1216 @@ public func FfiConverterTypeDisciplineSummaryCard_lower(_ value: DisciplineSumma
 }
 
 
+/**
+ * Metadados detalhados de uma feição do mapa (sem qualquer campo de capacidade).
+ */
+public struct FeatureInfo {
+    public var id: String
+    public var campusId: String
+    public var layer: MapLayer
+    public var code: String?
+    public var name: String
+    public var category: String?
+    public var buildingId: String?
+    public var parentId: String?
+    public var floor: Int32?
+    public var availableFloors: [Int32]
+    public var floorLabels: [FloorLabel]
+    public var defaultFloor: Int32?
+    public var poiType: PoiType?
+    public var indoorStatus: IndoorStatus
+    public var isMock: Bool
+    public var aliases: [String]
+    public var departments: [String]
+    public var notes: String?
+    public var minZoom: Float
+    public var bounds: Rect2D
+    public var labelX: Float
+    public var labelY: Float
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, campusId: String, layer: MapLayer, code: String?, name: String, category: String?, buildingId: String?, parentId: String?, floor: Int32?, availableFloors: [Int32], floorLabels: [FloorLabel], defaultFloor: Int32?, poiType: PoiType?, indoorStatus: IndoorStatus, isMock: Bool, aliases: [String], departments: [String], notes: String?, minZoom: Float, bounds: Rect2D, labelX: Float, labelY: Float) {
+        self.id = id
+        self.campusId = campusId
+        self.layer = layer
+        self.code = code
+        self.name = name
+        self.category = category
+        self.buildingId = buildingId
+        self.parentId = parentId
+        self.floor = floor
+        self.availableFloors = availableFloors
+        self.floorLabels = floorLabels
+        self.defaultFloor = defaultFloor
+        self.poiType = poiType
+        self.indoorStatus = indoorStatus
+        self.isMock = isMock
+        self.aliases = aliases
+        self.departments = departments
+        self.notes = notes
+        self.minZoom = minZoom
+        self.bounds = bounds
+        self.labelX = labelX
+        self.labelY = labelY
+    }
+}
+
+
+
+extension FeatureInfo: Equatable, Hashable {
+    public static func ==(lhs: FeatureInfo, rhs: FeatureInfo) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.campusId != rhs.campusId {
+            return false
+        }
+        if lhs.layer != rhs.layer {
+            return false
+        }
+        if lhs.code != rhs.code {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        if lhs.category != rhs.category {
+            return false
+        }
+        if lhs.buildingId != rhs.buildingId {
+            return false
+        }
+        if lhs.parentId != rhs.parentId {
+            return false
+        }
+        if lhs.floor != rhs.floor {
+            return false
+        }
+        if lhs.availableFloors != rhs.availableFloors {
+            return false
+        }
+        if lhs.floorLabels != rhs.floorLabels {
+            return false
+        }
+        if lhs.defaultFloor != rhs.defaultFloor {
+            return false
+        }
+        if lhs.poiType != rhs.poiType {
+            return false
+        }
+        if lhs.indoorStatus != rhs.indoorStatus {
+            return false
+        }
+        if lhs.isMock != rhs.isMock {
+            return false
+        }
+        if lhs.aliases != rhs.aliases {
+            return false
+        }
+        if lhs.departments != rhs.departments {
+            return false
+        }
+        if lhs.notes != rhs.notes {
+            return false
+        }
+        if lhs.minZoom != rhs.minZoom {
+            return false
+        }
+        if lhs.bounds != rhs.bounds {
+            return false
+        }
+        if lhs.labelX != rhs.labelX {
+            return false
+        }
+        if lhs.labelY != rhs.labelY {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(campusId)
+        hasher.combine(layer)
+        hasher.combine(code)
+        hasher.combine(name)
+        hasher.combine(category)
+        hasher.combine(buildingId)
+        hasher.combine(parentId)
+        hasher.combine(floor)
+        hasher.combine(availableFloors)
+        hasher.combine(floorLabels)
+        hasher.combine(defaultFloor)
+        hasher.combine(poiType)
+        hasher.combine(indoorStatus)
+        hasher.combine(isMock)
+        hasher.combine(aliases)
+        hasher.combine(departments)
+        hasher.combine(notes)
+        hasher.combine(minZoom)
+        hasher.combine(bounds)
+        hasher.combine(labelX)
+        hasher.combine(labelY)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFeatureInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FeatureInfo {
+        return
+            try FeatureInfo(
+                id: FfiConverterString.read(from: &buf), 
+                campusId: FfiConverterString.read(from: &buf), 
+                layer: FfiConverterTypeMapLayer.read(from: &buf), 
+                code: FfiConverterOptionString.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                category: FfiConverterOptionString.read(from: &buf), 
+                buildingId: FfiConverterOptionString.read(from: &buf), 
+                parentId: FfiConverterOptionString.read(from: &buf), 
+                floor: FfiConverterOptionInt32.read(from: &buf), 
+                availableFloors: FfiConverterSequenceInt32.read(from: &buf), 
+                floorLabels: FfiConverterSequenceTypeFloorLabel.read(from: &buf), 
+                defaultFloor: FfiConverterOptionInt32.read(from: &buf), 
+                poiType: FfiConverterOptionTypePoiType.read(from: &buf), 
+                indoorStatus: FfiConverterTypeIndoorStatus.read(from: &buf), 
+                isMock: FfiConverterBool.read(from: &buf), 
+                aliases: FfiConverterSequenceString.read(from: &buf), 
+                departments: FfiConverterSequenceString.read(from: &buf), 
+                notes: FfiConverterOptionString.read(from: &buf), 
+                minZoom: FfiConverterFloat.read(from: &buf), 
+                bounds: FfiConverterTypeRect2D.read(from: &buf), 
+                labelX: FfiConverterFloat.read(from: &buf), 
+                labelY: FfiConverterFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FeatureInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.campusId, into: &buf)
+        FfiConverterTypeMapLayer.write(value.layer, into: &buf)
+        FfiConverterOptionString.write(value.code, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterOptionString.write(value.category, into: &buf)
+        FfiConverterOptionString.write(value.buildingId, into: &buf)
+        FfiConverterOptionString.write(value.parentId, into: &buf)
+        FfiConverterOptionInt32.write(value.floor, into: &buf)
+        FfiConverterSequenceInt32.write(value.availableFloors, into: &buf)
+        FfiConverterSequenceTypeFloorLabel.write(value.floorLabels, into: &buf)
+        FfiConverterOptionInt32.write(value.defaultFloor, into: &buf)
+        FfiConverterOptionTypePoiType.write(value.poiType, into: &buf)
+        FfiConverterTypeIndoorStatus.write(value.indoorStatus, into: &buf)
+        FfiConverterBool.write(value.isMock, into: &buf)
+        FfiConverterSequenceString.write(value.aliases, into: &buf)
+        FfiConverterSequenceString.write(value.departments, into: &buf)
+        FfiConverterOptionString.write(value.notes, into: &buf)
+        FfiConverterFloat.write(value.minZoom, into: &buf)
+        FfiConverterTypeRect2D.write(value.bounds, into: &buf)
+        FfiConverterFloat.write(value.labelX, into: &buf)
+        FfiConverterFloat.write(value.labelY, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFeatureInfo_lift(_ buf: RustBuffer) throws -> FeatureInfo {
+    return try FfiConverterTypeFeatureInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFeatureInfo_lower(_ value: FeatureInfo) -> RustBuffer {
+    return FfiConverterTypeFeatureInfo.lower(value)
+}
+
+
+/**
+ * Rótulo legível associado a um índice de andar (`0 -> "Térreo"`, `1 -> "2º Pav"`, etc.).
+ */
+public struct FloorLabel {
+    public var floor: Int32
+    public var label: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(floor: Int32, label: String) {
+        self.floor = floor
+        self.label = label
+    }
+}
+
+
+
+extension FloorLabel: Equatable, Hashable {
+    public static func ==(lhs: FloorLabel, rhs: FloorLabel) -> Bool {
+        if lhs.floor != rhs.floor {
+            return false
+        }
+        if lhs.label != rhs.label {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(floor)
+        hasher.combine(label)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFloorLabel: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FloorLabel {
+        return
+            try FloorLabel(
+                floor: FfiConverterInt32.read(from: &buf), 
+                label: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FloorLabel, into buf: inout [UInt8]) {
+        FfiConverterInt32.write(value.floor, into: &buf)
+        FfiConverterString.write(value.label, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFloorLabel_lift(_ buf: RustBuffer) throws -> FloorLabel {
+    return try FfiConverterTypeFloorLabel.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFloorLabel_lower(_ value: FloorLabel) -> RustBuffer {
+    return FfiConverterTypeFloorLabel.lower(value)
+}
+
+
+/**
+ * Resultado de `hit_test` em coordenadas locais do mapa.
+ */
+public struct MapHit {
+    public var feature: FeatureInfo
+    public var distanceM: Float
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(feature: FeatureInfo, distanceM: Float) {
+        self.feature = feature
+        self.distanceM = distanceM
+    }
+}
+
+
+
+extension MapHit: Equatable, Hashable {
+    public static func ==(lhs: MapHit, rhs: MapHit) -> Bool {
+        if lhs.feature != rhs.feature {
+            return false
+        }
+        if lhs.distanceM != rhs.distanceM {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(feature)
+        hasher.combine(distanceM)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMapHit: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MapHit {
+        return
+            try MapHit(
+                feature: FfiConverterTypeFeatureInfo.read(from: &buf), 
+                distanceM: FfiConverterFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MapHit, into buf: inout [UInt8]) {
+        FfiConverterTypeFeatureInfo.write(value.feature, into: &buf)
+        FfiConverterFloat.write(value.distanceM, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMapHit_lift(_ buf: RustBuffer) throws -> MapHit {
+    return try FfiConverterTypeMapHit.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMapHit_lower(_ value: MapHit) -> RustBuffer {
+    return FfiConverterTypeMapHit.lower(value)
+}
+
+
+/**
+ * Relatório emitido por `validate_overlay`.
+ */
+public struct OverlayValidationReport {
+    public var buildingId: String
+    public var checkedFeatures: UInt32
+    public var replacedFloors: [Int32]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(buildingId: String, checkedFeatures: UInt32, replacedFloors: [Int32]) {
+        self.buildingId = buildingId
+        self.checkedFeatures = checkedFeatures
+        self.replacedFloors = replacedFloors
+    }
+}
+
+
+
+extension OverlayValidationReport: Equatable, Hashable {
+    public static func ==(lhs: OverlayValidationReport, rhs: OverlayValidationReport) -> Bool {
+        if lhs.buildingId != rhs.buildingId {
+            return false
+        }
+        if lhs.checkedFeatures != rhs.checkedFeatures {
+            return false
+        }
+        if lhs.replacedFloors != rhs.replacedFloors {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(buildingId)
+        hasher.combine(checkedFeatures)
+        hasher.combine(replacedFloors)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOverlayValidationReport: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OverlayValidationReport {
+        return
+            try OverlayValidationReport(
+                buildingId: FfiConverterString.read(from: &buf), 
+                checkedFeatures: FfiConverterUInt32.read(from: &buf), 
+                replacedFloors: FfiConverterSequenceInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: OverlayValidationReport, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.buildingId, into: &buf)
+        FfiConverterUInt32.write(value.checkedFeatures, into: &buf)
+        FfiConverterSequenceInt32.write(value.replacedFloors, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOverlayValidationReport_lift(_ buf: RustBuffer) throws -> OverlayValidationReport {
+    return try FfiConverterTypeOverlayValidationReport.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOverlayValidationReport_lower(_ value: OverlayValidationReport) -> RustBuffer {
+    return FfiConverterTypeOverlayValidationReport.lower(value)
+}
+
+
+/**
+ * Caixa delimitadora 2D em metros no sistema de projeção local do campus.
+ */
+public struct Rect2D {
+    public var minX: Float
+    public var minY: Float
+    public var maxX: Float
+    public var maxY: Float
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(minX: Float, minY: Float, maxX: Float, maxY: Float) {
+        self.minX = minX
+        self.minY = minY
+        self.maxX = maxX
+        self.maxY = maxY
+    }
+}
+
+
+
+extension Rect2D: Equatable, Hashable {
+    public static func ==(lhs: Rect2D, rhs: Rect2D) -> Bool {
+        if lhs.minX != rhs.minX {
+            return false
+        }
+        if lhs.minY != rhs.minY {
+            return false
+        }
+        if lhs.maxX != rhs.maxX {
+            return false
+        }
+        if lhs.maxY != rhs.maxY {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(minX)
+        hasher.combine(minY)
+        hasher.combine(maxX)
+        hasher.combine(maxY)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRect2D: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Rect2D {
+        return
+            try Rect2D(
+                minX: FfiConverterFloat.read(from: &buf), 
+                minY: FfiConverterFloat.read(from: &buf), 
+                maxX: FfiConverterFloat.read(from: &buf), 
+                maxY: FfiConverterFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Rect2D, into buf: inout [UInt8]) {
+        FfiConverterFloat.write(value.minX, into: &buf)
+        FfiConverterFloat.write(value.minY, into: &buf)
+        FfiConverterFloat.write(value.maxX, into: &buf)
+        FfiConverterFloat.write(value.maxY, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRect2D_lift(_ buf: RustBuffer) throws -> Rect2D {
+    return try FfiConverterTypeRect2D.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRect2D_lower(_ value: Rect2D) -> RustBuffer {
+    return FfiConverterTypeRect2D.lower(value)
+}
+
+
+/**
+ * Lote completo de renderização de um andar sem FFI por frame durante pan/zoom.
+ */
+public struct RenderBatch {
+    public var campusId: String
+    public var campusName: String
+    public var activeFloor: Int32
+    public var availableFloors: [Int32]
+    public var floorLabels: [FloorLabel]
+    public var bounds: Rect2D
+    public var attribution: String
+    public var coords: [Float]
+    public var ringStarts: [UInt32]
+    public var ringCounts: [UInt32]
+    public var items: [RenderFeature]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(campusId: String, campusName: String, activeFloor: Int32, availableFloors: [Int32], floorLabels: [FloorLabel], bounds: Rect2D, attribution: String, coords: [Float], ringStarts: [UInt32], ringCounts: [UInt32], items: [RenderFeature]) {
+        self.campusId = campusId
+        self.campusName = campusName
+        self.activeFloor = activeFloor
+        self.availableFloors = availableFloors
+        self.floorLabels = floorLabels
+        self.bounds = bounds
+        self.attribution = attribution
+        self.coords = coords
+        self.ringStarts = ringStarts
+        self.ringCounts = ringCounts
+        self.items = items
+    }
+}
+
+
+
+extension RenderBatch: Equatable, Hashable {
+    public static func ==(lhs: RenderBatch, rhs: RenderBatch) -> Bool {
+        if lhs.campusId != rhs.campusId {
+            return false
+        }
+        if lhs.campusName != rhs.campusName {
+            return false
+        }
+        if lhs.activeFloor != rhs.activeFloor {
+            return false
+        }
+        if lhs.availableFloors != rhs.availableFloors {
+            return false
+        }
+        if lhs.floorLabels != rhs.floorLabels {
+            return false
+        }
+        if lhs.bounds != rhs.bounds {
+            return false
+        }
+        if lhs.attribution != rhs.attribution {
+            return false
+        }
+        if lhs.coords != rhs.coords {
+            return false
+        }
+        if lhs.ringStarts != rhs.ringStarts {
+            return false
+        }
+        if lhs.ringCounts != rhs.ringCounts {
+            return false
+        }
+        if lhs.items != rhs.items {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(campusId)
+        hasher.combine(campusName)
+        hasher.combine(activeFloor)
+        hasher.combine(availableFloors)
+        hasher.combine(floorLabels)
+        hasher.combine(bounds)
+        hasher.combine(attribution)
+        hasher.combine(coords)
+        hasher.combine(ringStarts)
+        hasher.combine(ringCounts)
+        hasher.combine(items)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRenderBatch: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RenderBatch {
+        return
+            try RenderBatch(
+                campusId: FfiConverterString.read(from: &buf), 
+                campusName: FfiConverterString.read(from: &buf), 
+                activeFloor: FfiConverterInt32.read(from: &buf), 
+                availableFloors: FfiConverterSequenceInt32.read(from: &buf), 
+                floorLabels: FfiConverterSequenceTypeFloorLabel.read(from: &buf), 
+                bounds: FfiConverterTypeRect2D.read(from: &buf), 
+                attribution: FfiConverterString.read(from: &buf), 
+                coords: FfiConverterSequenceFloat.read(from: &buf), 
+                ringStarts: FfiConverterSequenceUInt32.read(from: &buf), 
+                ringCounts: FfiConverterSequenceUInt32.read(from: &buf), 
+                items: FfiConverterSequenceTypeRenderFeature.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RenderBatch, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.campusId, into: &buf)
+        FfiConverterString.write(value.campusName, into: &buf)
+        FfiConverterInt32.write(value.activeFloor, into: &buf)
+        FfiConverterSequenceInt32.write(value.availableFloors, into: &buf)
+        FfiConverterSequenceTypeFloorLabel.write(value.floorLabels, into: &buf)
+        FfiConverterTypeRect2D.write(value.bounds, into: &buf)
+        FfiConverterString.write(value.attribution, into: &buf)
+        FfiConverterSequenceFloat.write(value.coords, into: &buf)
+        FfiConverterSequenceUInt32.write(value.ringStarts, into: &buf)
+        FfiConverterSequenceUInt32.write(value.ringCounts, into: &buf)
+        FfiConverterSequenceTypeRenderFeature.write(value.items, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderBatch_lift(_ buf: RustBuffer) throws -> RenderBatch {
+    return try FfiConverterTypeRenderBatch.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderBatch_lower(_ value: RenderBatch) -> RustBuffer {
+    return FfiConverterTypeRenderBatch.lower(value)
+}
+
+
+/**
+ * Feição pronta para desenho direto em Canvas 2D nativo.
+ */
+public struct RenderFeature {
+    public var id: String
+    public var layer: MapLayer
+    public var geomKind: RenderGeomKind
+    public var ringStartIdx: UInt32
+    public var ringCount: UInt32
+    public var pointX: Float
+    public var pointY: Float
+    public var labelX: Float
+    public var labelY: Float
+    public var bboxMinX: Float
+    public var bboxMinY: Float
+    public var bboxMaxX: Float
+    public var bboxMaxY: Float
+    public var minZoom: Float
+    public var primaryLabel: String
+    public var secondaryLabel: String
+    public var category: String
+    public var poiType: PoiType?
+    public var indoorStatus: IndoorStatus
+    public var isMock: Bool
+    public var occupancy: RenderOccupancyKind
+    public var occupancyLabel: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, layer: MapLayer, geomKind: RenderGeomKind, ringStartIdx: UInt32, ringCount: UInt32, pointX: Float, pointY: Float, labelX: Float, labelY: Float, bboxMinX: Float, bboxMinY: Float, bboxMaxX: Float, bboxMaxY: Float, minZoom: Float, primaryLabel: String, secondaryLabel: String, category: String, poiType: PoiType?, indoorStatus: IndoorStatus, isMock: Bool, occupancy: RenderOccupancyKind, occupancyLabel: String?) {
+        self.id = id
+        self.layer = layer
+        self.geomKind = geomKind
+        self.ringStartIdx = ringStartIdx
+        self.ringCount = ringCount
+        self.pointX = pointX
+        self.pointY = pointY
+        self.labelX = labelX
+        self.labelY = labelY
+        self.bboxMinX = bboxMinX
+        self.bboxMinY = bboxMinY
+        self.bboxMaxX = bboxMaxX
+        self.bboxMaxY = bboxMaxY
+        self.minZoom = minZoom
+        self.primaryLabel = primaryLabel
+        self.secondaryLabel = secondaryLabel
+        self.category = category
+        self.poiType = poiType
+        self.indoorStatus = indoorStatus
+        self.isMock = isMock
+        self.occupancy = occupancy
+        self.occupancyLabel = occupancyLabel
+    }
+}
+
+
+
+extension RenderFeature: Equatable, Hashable {
+    public static func ==(lhs: RenderFeature, rhs: RenderFeature) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.layer != rhs.layer {
+            return false
+        }
+        if lhs.geomKind != rhs.geomKind {
+            return false
+        }
+        if lhs.ringStartIdx != rhs.ringStartIdx {
+            return false
+        }
+        if lhs.ringCount != rhs.ringCount {
+            return false
+        }
+        if lhs.pointX != rhs.pointX {
+            return false
+        }
+        if lhs.pointY != rhs.pointY {
+            return false
+        }
+        if lhs.labelX != rhs.labelX {
+            return false
+        }
+        if lhs.labelY != rhs.labelY {
+            return false
+        }
+        if lhs.bboxMinX != rhs.bboxMinX {
+            return false
+        }
+        if lhs.bboxMinY != rhs.bboxMinY {
+            return false
+        }
+        if lhs.bboxMaxX != rhs.bboxMaxX {
+            return false
+        }
+        if lhs.bboxMaxY != rhs.bboxMaxY {
+            return false
+        }
+        if lhs.minZoom != rhs.minZoom {
+            return false
+        }
+        if lhs.primaryLabel != rhs.primaryLabel {
+            return false
+        }
+        if lhs.secondaryLabel != rhs.secondaryLabel {
+            return false
+        }
+        if lhs.category != rhs.category {
+            return false
+        }
+        if lhs.poiType != rhs.poiType {
+            return false
+        }
+        if lhs.indoorStatus != rhs.indoorStatus {
+            return false
+        }
+        if lhs.isMock != rhs.isMock {
+            return false
+        }
+        if lhs.occupancy != rhs.occupancy {
+            return false
+        }
+        if lhs.occupancyLabel != rhs.occupancyLabel {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(layer)
+        hasher.combine(geomKind)
+        hasher.combine(ringStartIdx)
+        hasher.combine(ringCount)
+        hasher.combine(pointX)
+        hasher.combine(pointY)
+        hasher.combine(labelX)
+        hasher.combine(labelY)
+        hasher.combine(bboxMinX)
+        hasher.combine(bboxMinY)
+        hasher.combine(bboxMaxX)
+        hasher.combine(bboxMaxY)
+        hasher.combine(minZoom)
+        hasher.combine(primaryLabel)
+        hasher.combine(secondaryLabel)
+        hasher.combine(category)
+        hasher.combine(poiType)
+        hasher.combine(indoorStatus)
+        hasher.combine(isMock)
+        hasher.combine(occupancy)
+        hasher.combine(occupancyLabel)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRenderFeature: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RenderFeature {
+        return
+            try RenderFeature(
+                id: FfiConverterString.read(from: &buf), 
+                layer: FfiConverterTypeMapLayer.read(from: &buf), 
+                geomKind: FfiConverterTypeRenderGeomKind.read(from: &buf), 
+                ringStartIdx: FfiConverterUInt32.read(from: &buf), 
+                ringCount: FfiConverterUInt32.read(from: &buf), 
+                pointX: FfiConverterFloat.read(from: &buf), 
+                pointY: FfiConverterFloat.read(from: &buf), 
+                labelX: FfiConverterFloat.read(from: &buf), 
+                labelY: FfiConverterFloat.read(from: &buf), 
+                bboxMinX: FfiConverterFloat.read(from: &buf), 
+                bboxMinY: FfiConverterFloat.read(from: &buf), 
+                bboxMaxX: FfiConverterFloat.read(from: &buf), 
+                bboxMaxY: FfiConverterFloat.read(from: &buf), 
+                minZoom: FfiConverterFloat.read(from: &buf), 
+                primaryLabel: FfiConverterString.read(from: &buf), 
+                secondaryLabel: FfiConverterString.read(from: &buf), 
+                category: FfiConverterString.read(from: &buf), 
+                poiType: FfiConverterOptionTypePoiType.read(from: &buf), 
+                indoorStatus: FfiConverterTypeIndoorStatus.read(from: &buf), 
+                isMock: FfiConverterBool.read(from: &buf), 
+                occupancy: FfiConverterTypeRenderOccupancyKind.read(from: &buf), 
+                occupancyLabel: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RenderFeature, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterTypeMapLayer.write(value.layer, into: &buf)
+        FfiConverterTypeRenderGeomKind.write(value.geomKind, into: &buf)
+        FfiConverterUInt32.write(value.ringStartIdx, into: &buf)
+        FfiConverterUInt32.write(value.ringCount, into: &buf)
+        FfiConverterFloat.write(value.pointX, into: &buf)
+        FfiConverterFloat.write(value.pointY, into: &buf)
+        FfiConverterFloat.write(value.labelX, into: &buf)
+        FfiConverterFloat.write(value.labelY, into: &buf)
+        FfiConverterFloat.write(value.bboxMinX, into: &buf)
+        FfiConverterFloat.write(value.bboxMinY, into: &buf)
+        FfiConverterFloat.write(value.bboxMaxX, into: &buf)
+        FfiConverterFloat.write(value.bboxMaxY, into: &buf)
+        FfiConverterFloat.write(value.minZoom, into: &buf)
+        FfiConverterString.write(value.primaryLabel, into: &buf)
+        FfiConverterString.write(value.secondaryLabel, into: &buf)
+        FfiConverterString.write(value.category, into: &buf)
+        FfiConverterOptionTypePoiType.write(value.poiType, into: &buf)
+        FfiConverterTypeIndoorStatus.write(value.indoorStatus, into: &buf)
+        FfiConverterBool.write(value.isMock, into: &buf)
+        FfiConverterTypeRenderOccupancyKind.write(value.occupancy, into: &buf)
+        FfiConverterOptionString.write(value.occupancyLabel, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderFeature_lift(_ buf: RustBuffer) throws -> RenderFeature {
+    return try FfiConverterTypeRenderFeature.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderFeature_lower(_ value: RenderFeature) -> RustBuffer {
+    return FfiConverterTypeRenderFeature.lower(value)
+}
+
+
+/**
+ * Item consolidado para listagem de ocupação por prédio.
+ */
+public struct RoomOccupancyItem {
+    public var roomId: String
+    public var roomCode: String
+    public var floor: Int32
+    public var isMock: Bool
+    public var status: OccupancyStatus
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(roomId: String, roomCode: String, floor: Int32, isMock: Bool, status: OccupancyStatus) {
+        self.roomId = roomId
+        self.roomCode = roomCode
+        self.floor = floor
+        self.isMock = isMock
+        self.status = status
+    }
+}
+
+
+
+extension RoomOccupancyItem: Equatable, Hashable {
+    public static func ==(lhs: RoomOccupancyItem, rhs: RoomOccupancyItem) -> Bool {
+        if lhs.roomId != rhs.roomId {
+            return false
+        }
+        if lhs.roomCode != rhs.roomCode {
+            return false
+        }
+        if lhs.floor != rhs.floor {
+            return false
+        }
+        if lhs.isMock != rhs.isMock {
+            return false
+        }
+        if lhs.status != rhs.status {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(roomId)
+        hasher.combine(roomCode)
+        hasher.combine(floor)
+        hasher.combine(isMock)
+        hasher.combine(status)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomOccupancyItem: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomOccupancyItem {
+        return
+            try RoomOccupancyItem(
+                roomId: FfiConverterString.read(from: &buf), 
+                roomCode: FfiConverterString.read(from: &buf), 
+                floor: FfiConverterInt32.read(from: &buf), 
+                isMock: FfiConverterBool.read(from: &buf), 
+                status: FfiConverterTypeOccupancyStatus.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomOccupancyItem, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterString.write(value.roomCode, into: &buf)
+        FfiConverterInt32.write(value.floor, into: &buf)
+        FfiConverterBool.write(value.isMock, into: &buf)
+        FfiConverterTypeOccupancyStatus.write(value.status, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomOccupancyItem_lift(_ buf: RustBuffer) throws -> RoomOccupancyItem {
+    return try FfiConverterTypeRoomOccupancyItem.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomOccupancyItem_lower(_ value: RoomOccupancyItem) -> RustBuffer {
+    return FfiConverterTypeRoomOccupancyItem.lower(value)
+}
+
+
+/**
+ * Resultado de busca textual sobre prédios, salas e POIs.
+ */
+public struct SearchResult {
+    public var feature: FeatureInfo
+    public var score: UInt32
+    public var matchedField: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(feature: FeatureInfo, score: UInt32, matchedField: String) {
+        self.feature = feature
+        self.score = score
+        self.matchedField = matchedField
+    }
+}
+
+
+
+extension SearchResult: Equatable, Hashable {
+    public static func ==(lhs: SearchResult, rhs: SearchResult) -> Bool {
+        if lhs.feature != rhs.feature {
+            return false
+        }
+        if lhs.score != rhs.score {
+            return false
+        }
+        if lhs.matchedField != rhs.matchedField {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(feature)
+        hasher.combine(score)
+        hasher.combine(matchedField)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSearchResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchResult {
+        return
+            try SearchResult(
+                feature: FfiConverterTypeFeatureInfo.read(from: &buf), 
+                score: FfiConverterUInt32.read(from: &buf), 
+                matchedField: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SearchResult, into buf: inout [UInt8]) {
+        FfiConverterTypeFeatureInfo.write(value.feature, into: &buf)
+        FfiConverterUInt32.write(value.score, into: &buf)
+        FfiConverterString.write(value.matchedField, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchResult_lift(_ buf: RustBuffer) throws -> SearchResult {
+    return try FfiConverterTypeSearchResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSearchResult_lower(_ value: SearchResult) -> RustBuffer {
+    return FfiConverterTypeSearchResult.lower(value)
+}
+
+
+/**
+ * Informações de aula/reserva ativa em um intervalo de ocupação.
+ */
+public struct SlotInfo {
+    public var campusId: String
+    public var buildingId: String
+    public var roomId: String
+    public var roomCode: String
+    public var weekday: UInt32
+    public var startTime: String
+    public var endTime: String
+    public var kind: String
+    public var label: String
+    public var title: String?
+    public var courseCodes: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(campusId: String, buildingId: String, roomId: String, roomCode: String, weekday: UInt32, startTime: String, endTime: String, kind: String, label: String, title: String?, courseCodes: [String]) {
+        self.campusId = campusId
+        self.buildingId = buildingId
+        self.roomId = roomId
+        self.roomCode = roomCode
+        self.weekday = weekday
+        self.startTime = startTime
+        self.endTime = endTime
+        self.kind = kind
+        self.label = label
+        self.title = title
+        self.courseCodes = courseCodes
+    }
+}
+
+
+
+extension SlotInfo: Equatable, Hashable {
+    public static func ==(lhs: SlotInfo, rhs: SlotInfo) -> Bool {
+        if lhs.campusId != rhs.campusId {
+            return false
+        }
+        if lhs.buildingId != rhs.buildingId {
+            return false
+        }
+        if lhs.roomId != rhs.roomId {
+            return false
+        }
+        if lhs.roomCode != rhs.roomCode {
+            return false
+        }
+        if lhs.weekday != rhs.weekday {
+            return false
+        }
+        if lhs.startTime != rhs.startTime {
+            return false
+        }
+        if lhs.endTime != rhs.endTime {
+            return false
+        }
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.label != rhs.label {
+            return false
+        }
+        if lhs.title != rhs.title {
+            return false
+        }
+        if lhs.courseCodes != rhs.courseCodes {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(campusId)
+        hasher.combine(buildingId)
+        hasher.combine(roomId)
+        hasher.combine(roomCode)
+        hasher.combine(weekday)
+        hasher.combine(startTime)
+        hasher.combine(endTime)
+        hasher.combine(kind)
+        hasher.combine(label)
+        hasher.combine(title)
+        hasher.combine(courseCodes)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSlotInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SlotInfo {
+        return
+            try SlotInfo(
+                campusId: FfiConverterString.read(from: &buf), 
+                buildingId: FfiConverterString.read(from: &buf), 
+                roomId: FfiConverterString.read(from: &buf), 
+                roomCode: FfiConverterString.read(from: &buf), 
+                weekday: FfiConverterUInt32.read(from: &buf), 
+                startTime: FfiConverterString.read(from: &buf), 
+                endTime: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterString.read(from: &buf), 
+                label: FfiConverterString.read(from: &buf), 
+                title: FfiConverterOptionString.read(from: &buf), 
+                courseCodes: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SlotInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.campusId, into: &buf)
+        FfiConverterString.write(value.buildingId, into: &buf)
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterString.write(value.roomCode, into: &buf)
+        FfiConverterUInt32.write(value.weekday, into: &buf)
+        FfiConverterString.write(value.startTime, into: &buf)
+        FfiConverterString.write(value.endTime, into: &buf)
+        FfiConverterString.write(value.kind, into: &buf)
+        FfiConverterString.write(value.label, into: &buf)
+        FfiConverterOptionString.write(value.title, into: &buf)
+        FfiConverterSequenceString.write(value.courseCodes, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSlotInfo_lift(_ buf: RustBuffer) throws -> SlotInfo {
+    return try FfiConverterTypeSlotInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSlotInfo_lower(_ value: SlotInfo) -> RustBuffer {
+    return FfiConverterTypeSlotInfo.lower(value)
+}
+
+
 public struct TimetableCell {
     public var slotId: String
     public var courseId: String
@@ -3233,6 +4933,637 @@ extension CampusError: Foundation.LocalizedError {
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Estado de digitalização interna de um prédio ou zona acadêmica.
+ */
+
+public enum IndoorStatus {
+    
+    case floorplan
+    case partialFloorplan
+    case provisional
+    case exteriorOnly
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIndoorStatus: FfiConverterRustBuffer {
+    typealias SwiftType = IndoorStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IndoorStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .floorplan
+        
+        case 2: return .partialFloorplan
+        
+        case 3: return .provisional
+        
+        case 4: return .exteriorOnly
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: IndoorStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .floorplan:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .partialFloorplan:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .provisional:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .exteriorOnly:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIndoorStatus_lift(_ buf: RustBuffer) throws -> IndoorStatus {
+    return try FfiConverterTypeIndoorStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIndoorStatus_lower(_ value: IndoorStatus) -> RustBuffer {
+    return FfiConverterTypeIndoorStatus.lower(value)
+}
+
+
+
+extension IndoorStatus: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Camadas vetoriais ordenadas de baixo para cima conforme `layer_z_order` do contrato.
+ */
+
+public enum MapLayer {
+    
+    case campusGround
+    case campusZone
+    case greenArea
+    case parking
+    case sports
+    case walkway
+    case building
+    case room
+    case poi
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMapLayer: FfiConverterRustBuffer {
+    typealias SwiftType = MapLayer
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MapLayer {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .campusGround
+        
+        case 2: return .campusZone
+        
+        case 3: return .greenArea
+        
+        case 4: return .parking
+        
+        case 5: return .sports
+        
+        case 6: return .walkway
+        
+        case 7: return .building
+        
+        case 8: return .room
+        
+        case 9: return .poi
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MapLayer, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .campusGround:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .campusZone:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .greenArea:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .parking:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .sports:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .walkway:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .building:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .room:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .poi:
+            writeInt(&buf, Int32(9))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMapLayer_lift(_ buf: RustBuffer) throws -> MapLayer {
+    return try FfiConverterTypeMapLayer.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMapLayer_lower(_ value: MapLayer) -> RustBuffer {
+    return FfiConverterTypeMapLayer.lower(value)
+}
+
+
+
+extension MapLayer: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Estado de ocupação de uma sala em um instante no fuso `America/Sao_Paulo`.
+ */
+
+public enum OccupancyStatus {
+    
+    case occupied(slot: SlotInfo
+    )
+    case noRegularClass
+    case noData
+    case outOfTerm
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOccupancyStatus: FfiConverterRustBuffer {
+    typealias SwiftType = OccupancyStatus
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OccupancyStatus {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .occupied(slot: try FfiConverterTypeSlotInfo.read(from: &buf)
+        )
+        
+        case 2: return .noRegularClass
+        
+        case 3: return .noData
+        
+        case 4: return .outOfTerm
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: OccupancyStatus, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .occupied(slot):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeSlotInfo.write(slot, into: &buf)
+            
+        
+        case .noRegularClass:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .noData:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .outOfTerm:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOccupancyStatus_lift(_ buf: RustBuffer) throws -> OccupancyStatus {
+    return try FfiConverterTypeOccupancyStatus.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOccupancyStatus_lower(_ value: OccupancyStatus) -> RustBuffer {
+    return FfiConverterTypeOccupancyStatus.lower(value)
+}
+
+
+
+extension OccupancyStatus: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Tipos suportados para pontos de interesse (POIs) nos campi.
+ */
+
+public enum PoiType {
+    
+    case toilet
+    case facultyOffice
+    case entrance
+    case dining
+    case library
+    case parking
+    case academic
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePoiType: FfiConverterRustBuffer {
+    typealias SwiftType = PoiType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PoiType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .toilet
+        
+        case 2: return .facultyOffice
+        
+        case 3: return .entrance
+        
+        case 4: return .dining
+        
+        case 5: return .library
+        
+        case 6: return .parking
+        
+        case 7: return .academic
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: PoiType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .toilet:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .facultyOffice:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .entrance:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .dining:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .library:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .parking:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .academic:
+            writeInt(&buf, Int32(7))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePoiType_lift(_ buf: RustBuffer) throws -> PoiType {
+    return try FfiConverterTypePoiType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePoiType_lower(_ value: PoiType) -> RustBuffer {
+    return FfiConverterTypePoiType.lower(value)
+}
+
+
+
+extension PoiType: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Tipo geométrico primitivo achatado no `RenderBatch`.
+ */
+
+public enum RenderGeomKind {
+    
+    case polygon
+    case polyline
+    case point
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRenderGeomKind: FfiConverterRustBuffer {
+    typealias SwiftType = RenderGeomKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RenderGeomKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .polygon
+        
+        case 2: return .polyline
+        
+        case 3: return .point
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RenderGeomKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .polygon:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .polyline:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .point:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderGeomKind_lift(_ buf: RustBuffer) throws -> RenderGeomKind {
+    return try FfiConverterTypeRenderGeomKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderGeomKind_lower(_ value: RenderGeomKind) -> RustBuffer {
+    return FfiConverterTypeRenderGeomKind.lower(value)
+}
+
+
+
+extension RenderGeomKind: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Estado resumido de ocupação para estilização rápida na UI sem alocações por frame.
+ */
+
+public enum RenderOccupancyKind {
+    
+    case none
+    case occupied
+    case noRegularClass
+    case noData
+    case outOfTerm
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRenderOccupancyKind: FfiConverterRustBuffer {
+    typealias SwiftType = RenderOccupancyKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RenderOccupancyKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .none
+        
+        case 2: return .occupied
+        
+        case 3: return .noRegularClass
+        
+        case 4: return .noData
+        
+        case 5: return .outOfTerm
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RenderOccupancyKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .none:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .occupied:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .noRegularClass:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .noData:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .outOfTerm:
+            writeInt(&buf, Int32(5))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderOccupancyKind_lift(_ buf: RustBuffer) throws -> RenderOccupancyKind {
+    return try FfiConverterTypeRenderOccupancyKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenderOccupancyKind_lower(_ value: RenderOccupancyKind) -> RustBuffer {
+    return FfiConverterTypeRenderOccupancyKind.lower(value)
+}
+
+
+
+extension RenderOccupancyKind: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Resultado da resolução de encontro aula <-> mapa.
+ */
+
+public enum Resolution {
+    
+    case exactRoom(campusId: String, buildingId: String, roomId: String, floor: Int32, cameraFocus: CameraFocus
+    )
+    case buildingFallback(campusId: String, buildingId: String, cameraFocus: CameraFocus
+    )
+    case unmapped
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeResolution: FfiConverterRustBuffer {
+    typealias SwiftType = Resolution
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Resolution {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .exactRoom(campusId: try FfiConverterString.read(from: &buf), buildingId: try FfiConverterString.read(from: &buf), roomId: try FfiConverterString.read(from: &buf), floor: try FfiConverterInt32.read(from: &buf), cameraFocus: try FfiConverterTypeCameraFocus.read(from: &buf)
+        )
+        
+        case 2: return .buildingFallback(campusId: try FfiConverterString.read(from: &buf), buildingId: try FfiConverterString.read(from: &buf), cameraFocus: try FfiConverterTypeCameraFocus.read(from: &buf)
+        )
+        
+        case 3: return .unmapped
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Resolution, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .exactRoom(campusId,buildingId,roomId,floor,cameraFocus):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(campusId, into: &buf)
+            FfiConverterString.write(buildingId, into: &buf)
+            FfiConverterString.write(roomId, into: &buf)
+            FfiConverterInt32.write(floor, into: &buf)
+            FfiConverterTypeCameraFocus.write(cameraFocus, into: &buf)
+            
+        
+        case let .buildingFallback(campusId,buildingId,cameraFocus):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(campusId, into: &buf)
+            FfiConverterString.write(buildingId, into: &buf)
+            FfiConverterTypeCameraFocus.write(cameraFocus, into: &buf)
+            
+        
+        case .unmapped:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeResolution_lift(_ buf: RustBuffer) throws -> Resolution {
+    return try FfiConverterTypeResolution.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeResolution_lower(_ value: Resolution) -> RustBuffer {
+    return FfiConverterTypeResolution.lower(value)
+}
+
+
+
+extension Resolution: Equatable, Hashable {}
+
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum TimelineItemKind {
     
@@ -3346,6 +5677,78 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeCameraFocus: FfiConverterRustBuffer {
+    typealias SwiftType = CameraFocus?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeCameraFocus.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeCameraFocus.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeFeatureInfo: FfiConverterRustBuffer {
+    typealias SwiftType = FeatureInfo?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFeatureInfo.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFeatureInfo.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeMapHit: FfiConverterRustBuffer {
+    typealias SwiftType = MapHit?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeMapHit.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeMapHit.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeTimetableCell: FfiConverterRustBuffer {
     typealias SwiftType = TimetableCell?
 
@@ -3388,6 +5791,105 @@ fileprivate struct FfiConverterOptionTypeAttendanceStatus: FfiConverterRustBuffe
         case 1: return try FfiConverterTypeAttendanceStatus.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypePoiType: FfiConverterRustBuffer {
+    typealias SwiftType = PoiType?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePoiType.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePoiType.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceUInt32: FfiConverterRustBuffer {
+    typealias SwiftType = [UInt32]
+
+    public static func write(_ value: [UInt32], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterUInt32.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UInt32] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UInt32]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterUInt32.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceInt32: FfiConverterRustBuffer {
+    typealias SwiftType = [Int32]
+
+    public static func write(_ value: [Int32], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterInt32.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Int32] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Int32]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterInt32.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceFloat: FfiConverterRustBuffer {
+    typealias SwiftType = [Float]
+
+    public static func write(_ value: [Float], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterFloat.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Float] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Float]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterFloat.read(from: &buf))
+        }
+        return seq
     }
 }
 
@@ -3544,6 +6046,31 @@ fileprivate struct FfiConverterSequenceTypeAssessmentWithCourse: FfiConverterRus
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeCampusMapSummary: FfiConverterRustBuffer {
+    typealias SwiftType = [CampusMapSummary]
+
+    public static func write(_ value: [CampusMapSummary], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeCampusMapSummary.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [CampusMapSummary] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [CampusMapSummary]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeCampusMapSummary.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeCourseScheduleSlotItem: FfiConverterRustBuffer {
     typealias SwiftType = [CourseScheduleSlotItem]
 
@@ -3636,6 +6163,106 @@ fileprivate struct FfiConverterSequenceTypeDisciplineSummaryCard: FfiConverterRu
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeDisciplineSummaryCard.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFloorLabel: FfiConverterRustBuffer {
+    typealias SwiftType = [FloorLabel]
+
+    public static func write(_ value: [FloorLabel], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFloorLabel.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FloorLabel] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FloorLabel]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFloorLabel.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeRenderFeature: FfiConverterRustBuffer {
+    typealias SwiftType = [RenderFeature]
+
+    public static func write(_ value: [RenderFeature], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRenderFeature.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RenderFeature] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RenderFeature]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRenderFeature.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeRoomOccupancyItem: FfiConverterRustBuffer {
+    typealias SwiftType = [RoomOccupancyItem]
+
+    public static func write(_ value: [RoomOccupancyItem], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRoomOccupancyItem.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RoomOccupancyItem] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RoomOccupancyItem]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRoomOccupancyItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSearchResult: FfiConverterRustBuffer {
+    typealias SwiftType = [SearchResult]
+
+    public static func write(_ value: [SearchResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSearchResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [SearchResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [SearchResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSearchResult.read(from: &buf))
         }
         return seq
     }
@@ -3750,6 +6377,17 @@ public func calculateMaxAbsences(workloadHours: UInt32) -> UInt32 {
     )
 })
 }
+/**
+ * Valida um overlay GeoJSON contra um mapa base GeoJSON sem integrá-lo ao motor.
+ */
+public func validateOverlay(baseGeojson: String, overlayGeojson: String)throws  -> OverlayValidationReport {
+    return try  FfiConverterTypeOverlayValidationReport.lift(try rustCallWithError(FfiConverterTypeCampusError.lift) {
+    uniffi_campus_core_fn_func_validate_overlay(
+        FfiConverterString.lower(baseGeojson),
+        FfiConverterString.lower(overlayGeojson),$0
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -3767,6 +6405,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.contractVersionMismatch
     }
     if (uniffi_campus_core_checksum_func_calculate_max_absences() != 40204) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_func_validate_overlay() != 51210) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_campus_core_checksum_method_campusengine_add_schedule_slot() != 55654) {
@@ -3862,6 +6503,39 @@ private var initializationResult: InitializationResult = {
     if (uniffi_campus_core_checksum_method_campusengine_update_schedule_slot() != 12785) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_campus_core_checksum_method_campusmapengine_get_active_campus_id() != 31725) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_get_camera_focus() != 52467) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_get_feature() != 2573) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_get_render_batch() != 39382) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_get_room_occupancy() != 9833) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_hit_test() != 7844) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_list_building_occupancy() != 9985) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_list_campuses() != 10111) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_resolve_meeting() != 42837) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_search() != 33248) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_method_campusmapengine_set_active_campus() != 13744) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_campus_core_checksum_constructor_campusengine_new() != 10319) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3872,6 +6546,15 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_campus_core_checksum_constructor_campusengine_new_in_memory_empty() != 44663) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_constructor_campusmapengine_load_with_overlays() != 56948) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_constructor_campusmapengine_load_with_overlays_and_occupancy() != 61040) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_campus_core_checksum_constructor_campusmapengine_new_bundled() != 17135) {
         return InitializationResult.apiChecksumMismatch
     }
 

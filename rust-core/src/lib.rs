@@ -6,16 +6,28 @@ pub mod repository;
 use std::sync::Arc;
 
 use db::Database;
+pub use domain::map::CampusMapEngine;
 pub use models::{
     AbsenceHistoryEntry, AcademicCalendarEvent, AcademicProfileSummary, AgendaDayOverview,
-    AgendaTimelineItem, AssessmentItem, AssessmentWithCourse, AttendanceStatus,
-    CampusSearchResults, ClassCheckInDetail, CourseScheduleSlotItem, DayPillItem,
-    DepartmentColorOption, DisciplineDetail, DisciplineSummaryCard, TimelineItemKind,
-    TimetableCell, TimetableDayCell, TimetableRow, UfopCampusInfo, UfopCurriculumTemplate,
-    WeeklyTimetable,
+    AgendaTimelineItem, AssessmentItem, AssessmentWithCourse, AttendanceStatus, CameraFocus,
+    CampusMapSummary, CampusSearchResults, ClassCheckInDetail, CourseScheduleSlotItem, DayPillItem,
+    DepartmentColorOption, DisciplineDetail, DisciplineSummaryCard, FeatureInfo, FloorLabel,
+    IndoorStatus, MapHit, MapLayer, OccupancyStatus, OverlayValidationReport, PoiType, Rect2D,
+    RenderBatch, RenderFeature, RenderGeomKind, RenderOccupancyKind, Resolution, RoomOccupancyItem,
+    SearchResult, SlotInfo, TimelineItemKind, TimetableCell, TimetableDayCell, TimetableRow,
+    UfopCampusInfo, UfopCurriculumTemplate, WeeklyTimetable,
 };
 
 uniffi::setup_scaffolding!();
+
+/// Valida um overlay GeoJSON contra um mapa base GeoJSON sem integrá-lo ao motor.
+#[uniffi::export]
+pub fn validate_overlay(
+    base_geojson: String,
+    overlay_geojson: String,
+) -> Result<OverlayValidationReport, CampusError> {
+    domain::map::validate_overlay(base_geojson, overlay_geojson)
+}
 
 #[derive(uniffi::Error, thiserror::Error, Debug)]
 #[uniffi(flat_error)]

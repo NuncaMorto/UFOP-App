@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+pub use crate::domain::map::types::{
+    CameraFocus, CampusMapSummary, FeatureInfo, FloorLabel, IndoorStatus, MapHit, MapLayer,
+    OccupancyStatus, OverlayValidationReport, PoiType, Rect2D, RenderBatch, RenderFeature,
+    RenderGeomKind, RenderOccupancyKind, Resolution, RoomOccupancyItem, SearchResult, SlotInfo,
+};
+
 #[derive(uniffi::Enum, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AttendanceStatus {
     Attending,

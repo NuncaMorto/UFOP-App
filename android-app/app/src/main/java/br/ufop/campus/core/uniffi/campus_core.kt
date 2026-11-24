@@ -786,6 +786,38 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -879,8 +911,42 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_campus_core_fn_method_campusengine_update_schedule_slot(`ptr`: Pointer,`slotId`: RustBuffer.ByValue,`dayOfWeek`: Int,`startTime`: RustBuffer.ByValue,`endTime`: RustBuffer.ByValue,`building`: RustBuffer.ByValue,`room`: RustBuffer.ByValue,`shortLocation`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_clone_campusmapengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_campus_core_fn_free_campusmapengine(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    fun uniffi_campus_core_fn_constructor_campusmapengine_load_with_overlays(`baseGeojson`: RustBuffer.ByValue,`overlaysGeojson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_campus_core_fn_constructor_campusmapengine_load_with_overlays_and_occupancy(`baseGeojson`: RustBuffer.ByValue,`overlaysGeojson`: RustBuffer.ByValue,`occupancyJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_campus_core_fn_constructor_campusmapengine_new_bundled(uniffi_out_err: UniffiRustCallStatus, 
+    ): Pointer
+    fun uniffi_campus_core_fn_method_campusmapengine_get_active_campus_id(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_get_camera_focus(`ptr`: Pointer,`featureId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_get_feature(`ptr`: Pointer,`featureId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_get_render_batch(`ptr`: Pointer,`activeFloor`: Int,`timestampOpt`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_get_room_occupancy(`ptr`: Pointer,`roomId`: RustBuffer.ByValue,`timestampEpochOrIso`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_hit_test(`ptr`: Pointer,`mapX`: Float,`mapY`: Float,`activeFloor`: Int,`zoom`: Float,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_list_building_occupancy(`ptr`: Pointer,`buildingId`: RustBuffer.ByValue,`timestampEpochOrIso`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_list_campuses(`ptr`: Pointer,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_resolve_meeting(`ptr`: Pointer,`courseCode`: RustBuffer.ByValue,`section`: RustBuffer.ByValue,`weekday`: Int,`startTime`: RustBuffer.ByValue,`fallbackBuildingRaw`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_search(`ptr`: Pointer,`query`: RustBuffer.ByValue,`poiTypeFilter`: RustBuffer.ByValue,`activeFloor`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_campus_core_fn_method_campusmapengine_set_active_campus(`ptr`: Pointer,`campusId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_campus_core_fn_func_calculate_max_absences(`workloadHours`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    fun uniffi_campus_core_fn_func_validate_overlay(`baseGeojson`: RustBuffer.ByValue,`overlayGeojson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun ffi_campus_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_campus_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -995,6 +1061,8 @@ internal interface UniffiLib : Library {
     ): Unit
     fun uniffi_campus_core_checksum_func_calculate_max_absences(
     ): Short
+    fun uniffi_campus_core_checksum_func_validate_overlay(
+    ): Short
     fun uniffi_campus_core_checksum_method_campusengine_add_schedule_slot(
     ): Short
     fun uniffi_campus_core_checksum_method_campusengine_apply_ufop_template(
@@ -1057,6 +1125,28 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_campus_core_checksum_method_campusengine_update_schedule_slot(
     ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_get_active_campus_id(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_get_camera_focus(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_get_feature(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_get_render_batch(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_get_room_occupancy(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_hit_test(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_list_building_occupancy(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_list_campuses(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_resolve_meeting(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_search(
+    ): Short
+    fun uniffi_campus_core_checksum_method_campusmapengine_set_active_campus(
+    ): Short
     fun uniffi_campus_core_checksum_constructor_campusengine_new(
     ): Short
     fun uniffi_campus_core_checksum_constructor_campusengine_new_empty(
@@ -1064,6 +1154,12 @@ internal interface UniffiLib : Library {
     fun uniffi_campus_core_checksum_constructor_campusengine_new_in_memory(
     ): Short
     fun uniffi_campus_core_checksum_constructor_campusengine_new_in_memory_empty(
+    ): Short
+    fun uniffi_campus_core_checksum_constructor_campusmapengine_load_with_overlays(
+    ): Short
+    fun uniffi_campus_core_checksum_constructor_campusmapengine_load_with_overlays_and_occupancy(
+    ): Short
+    fun uniffi_campus_core_checksum_constructor_campusmapengine_new_bundled(
     ): Short
     fun ffi_campus_core_uniffi_contract_version(
     ): Int
@@ -1083,6 +1179,9 @@ private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_campus_core_checksum_func_calculate_max_absences() != 40204.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_func_validate_overlay() != 51210.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_campus_core_checksum_method_campusengine_add_schedule_slot() != 55654.toShort()) {
@@ -1178,6 +1277,39 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_campus_core_checksum_method_campusengine_update_schedule_slot() != 12785.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_get_active_campus_id() != 31725.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_get_camera_focus() != 52467.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_get_feature() != 2573.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_get_render_batch() != 39382.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_get_room_occupancy() != 9833.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_hit_test() != 7844.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_list_building_occupancy() != 9985.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_list_campuses() != 10111.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_resolve_meeting() != 42837.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_search() != 33248.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_method_campusmapengine_set_active_campus() != 13744.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_campus_core_checksum_constructor_campusengine_new() != 10319.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1188,6 +1320,15 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_campus_core_checksum_constructor_campusengine_new_in_memory_empty() != 44663.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_constructor_campusmapengine_load_with_overlays() != 56948.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_constructor_campusmapengine_load_with_overlays_and_occupancy() != 61040.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_campus_core_checksum_constructor_campusmapengine_new_bundled() != 17135.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1280,6 +1421,29 @@ public object FfiConverterInt: FfiConverter<Int, Int> {
 
     override fun write(value: Int, buf: ByteBuffer) {
         buf.putInt(value)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterFloat: FfiConverter<Float, Float> {
+    override fun lift(value: Float): Float {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Float {
+        return buf.getFloat()
+    }
+
+    override fun lower(value: Float): Float {
+        return value
+    }
+
+    override fun allocationSize(value: Float) = 4UL
+
+    override fun write(value: Float, buf: ByteBuffer) {
+        buf.putFloat(value)
     }
 }
 
@@ -2150,6 +2314,434 @@ public object FfiConverterTypeCampusEngine: FfiConverter<CampusEngine, Pointer> 
 }
 
 
+// This template implements a class for working with a Rust struct via a Pointer/Arc<T>
+// to the live Rust struct on the other side of the FFI.
+//
+// Each instance implements core operations for working with the Rust `Arc<T>` and the
+// Kotlin Pointer to work with the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque pointer to the underlying Rust struct.
+//     Method calls need to read this pointer from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its pointer should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the pointer, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the pointer, but is interrupted
+//      before it can pass the pointer over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read pointer value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * Motor vetorial offline 2D para os campi da UFOP e ocupação multi-campus 2026/2.
+ */
+public interface CampusMapEngineInterface {
+    
+    fun `getActiveCampusId`(): kotlin.String
+    
+    fun `getCameraFocus`(`featureId`: kotlin.String): CameraFocus?
+    
+    fun `getFeature`(`featureId`: kotlin.String): FeatureInfo?
+    
+    fun `getRenderBatch`(`activeFloor`: kotlin.Int, `timestampOpt`: kotlin.String?): RenderBatch
+    
+    fun `getRoomOccupancy`(`roomId`: kotlin.String, `timestampEpochOrIso`: kotlin.String): OccupancyStatus
+    
+    fun `hitTest`(`mapX`: kotlin.Float, `mapY`: kotlin.Float, `activeFloor`: kotlin.Int, `zoom`: kotlin.Float): MapHit?
+    
+    fun `listBuildingOccupancy`(`buildingId`: kotlin.String, `timestampEpochOrIso`: kotlin.String): List<RoomOccupancyItem>
+    
+    fun `listCampuses`(): List<CampusMapSummary>
+    
+    fun `resolveMeeting`(`courseCode`: kotlin.String, `section`: kotlin.String, `weekday`: kotlin.UInt, `startTime`: kotlin.String, `fallbackBuildingRaw`: kotlin.String): Resolution
+    
+    fun `search`(`query`: kotlin.String, `poiTypeFilter`: PoiType?, `activeFloor`: kotlin.Int): List<SearchResult>
+    
+    fun `setActiveCampus`(`campusId`: kotlin.String): CampusMapSummary
+    
+    companion object
+}
+
+/**
+ * Motor vetorial offline 2D para os campi da UFOP e ocupação multi-campus 2026/2.
+ */
+open class CampusMapEngine: Disposable, AutoCloseable, CampusMapEngineInterface {
+
+    constructor(pointer: Pointer) {
+        this.pointer = pointer
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    /**
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noPointer: NoPointer) {
+        this.pointer = null
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(pointer))
+    }
+
+    protected val pointer: Pointer?
+    protected val cleanable: UniffiCleaner.Cleanable
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithPointer(block: (ptr: Pointer) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the pointer being freed concurrently.
+        try {
+            return block(this.uniffiClonePointer())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val pointer: Pointer?) : Runnable {
+        override fun run() {
+            pointer?.let { ptr ->
+                uniffiRustCall { status ->
+                    UniffiLib.INSTANCE.uniffi_campus_core_fn_free_campusmapengine(ptr, status)
+                }
+            }
+        }
+    }
+
+    fun uniffiClonePointer(): Pointer {
+        return uniffiRustCall() { status ->
+            UniffiLib.INSTANCE.uniffi_campus_core_fn_clone_campusmapengine(pointer!!, status)
+        }
+    }
+
+    override fun `getActiveCampusId`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_get_active_campus_id(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    override fun `getCameraFocus`(`featureId`: kotlin.String): CameraFocus? {
+            return FfiConverterOptionalTypeCameraFocus.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_get_camera_focus(
+        it, FfiConverterString.lower(`featureId`),_status)
+}
+    }
+    )
+    }
+    
+
+    override fun `getFeature`(`featureId`: kotlin.String): FeatureInfo? {
+            return FfiConverterOptionalTypeFeatureInfo.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_get_feature(
+        it, FfiConverterString.lower(`featureId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CampusException::class)override fun `getRenderBatch`(`activeFloor`: kotlin.Int, `timestampOpt`: kotlin.String?): RenderBatch {
+            return FfiConverterTypeRenderBatch.lift(
+    callWithPointer {
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_get_render_batch(
+        it, FfiConverterInt.lower(`activeFloor`),FfiConverterOptionalString.lower(`timestampOpt`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CampusException::class)override fun `getRoomOccupancy`(`roomId`: kotlin.String, `timestampEpochOrIso`: kotlin.String): OccupancyStatus {
+            return FfiConverterTypeOccupancyStatus.lift(
+    callWithPointer {
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_get_room_occupancy(
+        it, FfiConverterString.lower(`roomId`),FfiConverterString.lower(`timestampEpochOrIso`),_status)
+}
+    }
+    )
+    }
+    
+
+    override fun `hitTest`(`mapX`: kotlin.Float, `mapY`: kotlin.Float, `activeFloor`: kotlin.Int, `zoom`: kotlin.Float): MapHit? {
+            return FfiConverterOptionalTypeMapHit.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_hit_test(
+        it, FfiConverterFloat.lower(`mapX`),FfiConverterFloat.lower(`mapY`),FfiConverterInt.lower(`activeFloor`),FfiConverterFloat.lower(`zoom`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CampusException::class)override fun `listBuildingOccupancy`(`buildingId`: kotlin.String, `timestampEpochOrIso`: kotlin.String): List<RoomOccupancyItem> {
+            return FfiConverterSequenceTypeRoomOccupancyItem.lift(
+    callWithPointer {
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_list_building_occupancy(
+        it, FfiConverterString.lower(`buildingId`),FfiConverterString.lower(`timestampEpochOrIso`),_status)
+}
+    }
+    )
+    }
+    
+
+    override fun `listCampuses`(): List<CampusMapSummary> {
+            return FfiConverterSequenceTypeCampusMapSummary.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_list_campuses(
+        it, _status)
+}
+    }
+    )
+    }
+    
+
+    override fun `resolveMeeting`(`courseCode`: kotlin.String, `section`: kotlin.String, `weekday`: kotlin.UInt, `startTime`: kotlin.String, `fallbackBuildingRaw`: kotlin.String): Resolution {
+            return FfiConverterTypeResolution.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_resolve_meeting(
+        it, FfiConverterString.lower(`courseCode`),FfiConverterString.lower(`section`),FfiConverterUInt.lower(`weekday`),FfiConverterString.lower(`startTime`),FfiConverterString.lower(`fallbackBuildingRaw`),_status)
+}
+    }
+    )
+    }
+    
+
+    override fun `search`(`query`: kotlin.String, `poiTypeFilter`: PoiType?, `activeFloor`: kotlin.Int): List<SearchResult> {
+            return FfiConverterSequenceTypeSearchResult.lift(
+    callWithPointer {
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_search(
+        it, FfiConverterString.lower(`query`),FfiConverterOptionalTypePoiType.lower(`poiTypeFilter`),FfiConverterInt.lower(`activeFloor`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(CampusException::class)override fun `setActiveCampus`(`campusId`: kotlin.String): CampusMapSummary {
+            return FfiConverterTypeCampusMapSummary.lift(
+    callWithPointer {
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_method_campusmapengine_set_active_campus(
+        it, FfiConverterString.lower(`campusId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+
+    
+    companion object {
+        
+    /**
+     * Carrega um mapa base GeoJSON aplicando overlays plug-and-play (usando ocupação embutida 2026/2).
+     */
+    @Throws(CampusException::class) fun `loadWithOverlays`(`baseGeojson`: kotlin.String, `overlaysGeojson`: List<kotlin.String>): CampusMapEngine {
+            return FfiConverterTypeCampusMapEngine.lift(
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_constructor_campusmapengine_load_with_overlays(
+        FfiConverterString.lower(`baseGeojson`),FfiConverterSequenceString.lower(`overlaysGeojson`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Carrega um mapa base GeoJSON com overlays e arquivo de ocupação customizado (ou embutido quando `None`).
+     */
+    @Throws(CampusException::class) fun `loadWithOverlaysAndOccupancy`(`baseGeojson`: kotlin.String, `overlaysGeojson`: List<kotlin.String>, `occupancyJson`: kotlin.String?): CampusMapEngine {
+            return FfiConverterTypeCampusMapEngine.lift(
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_constructor_campusmapengine_load_with_overlays_and_occupancy(
+        FfiConverterString.lower(`baseGeojson`),FfiConverterSequenceString.lower(`overlaysGeojson`),FfiConverterOptionalString.lower(`occupancyJson`),_status)
+}
+    )
+    }
+    
+
+        
+    /**
+     * Carrega todos os 4 campi, seus overlays declarados em `campus_manifest.json` e a ocupação 2026/2 embutida.
+     */
+    @Throws(CampusException::class) fun `newBundled`(): CampusMapEngine {
+            return FfiConverterTypeCampusMapEngine.lift(
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_constructor_campusmapengine_new_bundled(
+        _status)
+}
+    )
+    }
+    
+
+        
+    }
+    
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCampusMapEngine: FfiConverter<CampusMapEngine, Pointer> {
+
+    override fun lower(value: CampusMapEngine): Pointer {
+        return value.uniffiClonePointer()
+    }
+
+    override fun lift(value: Pointer): CampusMapEngine {
+        return CampusMapEngine(value)
+    }
+
+    override fun read(buf: ByteBuffer): CampusMapEngine {
+        // The Rust code always writes pointers as 8 bytes, and will
+        // fail to compile if they don't fit.
+        return lift(Pointer(buf.getLong()))
+    }
+
+    override fun allocationSize(value: CampusMapEngine) = 8UL
+
+    override fun write(value: CampusMapEngine, buf: ByteBuffer) {
+        // The Rust code always expects pointers written as 8 bytes,
+        // and will fail to compile if they don't fit.
+        buf.putLong(Pointer.nativeValue(lower(value)))
+    }
+}
+
+
 
 data class AbsenceHistoryEntry (
     var `sessionId`: kotlin.String, 
@@ -2559,6 +3151,108 @@ public object FfiConverterTypeAssessmentWithCourse: FfiConverterRustBuffer<Asses
 
 
 
+/**
+ * Alvo de foco de câmera retornado por buscas, resoluções de aula ou seleção direta.
+ */
+data class CameraFocus (
+    var `campusId`: kotlin.String, 
+    var `featureId`: kotlin.String, 
+    var `targetFloor`: kotlin.Int, 
+    var `bounds`: Rect2D
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCameraFocus: FfiConverterRustBuffer<CameraFocus> {
+    override fun read(buf: ByteBuffer): CameraFocus {
+        return CameraFocus(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterTypeRect2D.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CameraFocus) = (
+            FfiConverterString.allocationSize(value.`campusId`) +
+            FfiConverterString.allocationSize(value.`featureId`) +
+            FfiConverterInt.allocationSize(value.`targetFloor`) +
+            FfiConverterTypeRect2D.allocationSize(value.`bounds`)
+    )
+
+    override fun write(value: CameraFocus, buf: ByteBuffer) {
+            FfiConverterString.write(value.`campusId`, buf)
+            FfiConverterString.write(value.`featureId`, buf)
+            FfiConverterInt.write(value.`targetFloor`, buf)
+            FfiConverterTypeRect2D.write(value.`bounds`, buf)
+    }
+}
+
+
+
+/**
+ * Resumo de um campus carregado pelo motor vetorial.
+ */
+data class CampusMapSummary (
+    var `campusId`: kotlin.String, 
+    var `name`: kotlin.String, 
+    var `city`: kotlin.String, 
+    var `defaultFloor`: kotlin.Int, 
+    var `availableFloors`: List<kotlin.Int>, 
+    var `floorLabels`: List<FloorLabel>, 
+    var `bounds`: Rect2D, 
+    var `attribution`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCampusMapSummary: FfiConverterRustBuffer<CampusMapSummary> {
+    override fun read(buf: ByteBuffer): CampusMapSummary {
+        return CampusMapSummary(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+            FfiConverterSequenceTypeFloorLabel.read(buf),
+            FfiConverterTypeRect2D.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CampusMapSummary) = (
+            FfiConverterString.allocationSize(value.`campusId`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`city`) +
+            FfiConverterInt.allocationSize(value.`defaultFloor`) +
+            FfiConverterSequenceInt.allocationSize(value.`availableFloors`) +
+            FfiConverterSequenceTypeFloorLabel.allocationSize(value.`floorLabels`) +
+            FfiConverterTypeRect2D.allocationSize(value.`bounds`) +
+            FfiConverterString.allocationSize(value.`attribution`)
+    )
+
+    override fun write(value: CampusMapSummary, buf: ByteBuffer) {
+            FfiConverterString.write(value.`campusId`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`city`, buf)
+            FfiConverterInt.write(value.`defaultFloor`, buf)
+            FfiConverterSequenceInt.write(value.`availableFloors`, buf)
+            FfiConverterSequenceTypeFloorLabel.write(value.`floorLabels`, buf)
+            FfiConverterTypeRect2D.write(value.`bounds`, buf)
+            FfiConverterString.write(value.`attribution`, buf)
+    }
+}
+
+
+
 data class CampusSearchResults (
     var `query`: kotlin.String, 
     var `courses`: List<DisciplineSummaryCard>, 
@@ -2910,6 +3604,616 @@ public object FfiConverterTypeDisciplineSummaryCard: FfiConverterRustBuffer<Disc
             FfiConverterUInt.write(value.`currentAbsences`, buf)
             FfiConverterUInt.write(value.`maxAbsences`, buf)
             FfiConverterUInt.write(value.`cancelledClasses`, buf)
+    }
+}
+
+
+
+/**
+ * Metadados detalhados de uma feição do mapa (sem qualquer campo de capacidade).
+ */
+data class FeatureInfo (
+    var `id`: kotlin.String, 
+    var `campusId`: kotlin.String, 
+    var `layer`: MapLayer, 
+    var `code`: kotlin.String?, 
+    var `name`: kotlin.String, 
+    var `category`: kotlin.String?, 
+    var `buildingId`: kotlin.String?, 
+    var `parentId`: kotlin.String?, 
+    var `floor`: kotlin.Int?, 
+    var `availableFloors`: List<kotlin.Int>, 
+    var `floorLabels`: List<FloorLabel>, 
+    var `defaultFloor`: kotlin.Int?, 
+    var `poiType`: PoiType?, 
+    var `indoorStatus`: IndoorStatus, 
+    var `isMock`: kotlin.Boolean, 
+    var `aliases`: List<kotlin.String>, 
+    var `departments`: List<kotlin.String>, 
+    var `notes`: kotlin.String?, 
+    var `minZoom`: kotlin.Float, 
+    var `bounds`: Rect2D, 
+    var `labelX`: kotlin.Float, 
+    var `labelY`: kotlin.Float
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeFeatureInfo: FfiConverterRustBuffer<FeatureInfo> {
+    override fun read(buf: ByteBuffer): FeatureInfo {
+        return FeatureInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeMapLayer.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+            FfiConverterSequenceTypeFloorLabel.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalTypePoiType.read(buf),
+            FfiConverterTypeIndoorStatus.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterTypeRect2D.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: FeatureInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`campusId`) +
+            FfiConverterTypeMapLayer.allocationSize(value.`layer`) +
+            FfiConverterOptionalString.allocationSize(value.`code`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterOptionalString.allocationSize(value.`category`) +
+            FfiConverterOptionalString.allocationSize(value.`buildingId`) +
+            FfiConverterOptionalString.allocationSize(value.`parentId`) +
+            FfiConverterOptionalInt.allocationSize(value.`floor`) +
+            FfiConverterSequenceInt.allocationSize(value.`availableFloors`) +
+            FfiConverterSequenceTypeFloorLabel.allocationSize(value.`floorLabels`) +
+            FfiConverterOptionalInt.allocationSize(value.`defaultFloor`) +
+            FfiConverterOptionalTypePoiType.allocationSize(value.`poiType`) +
+            FfiConverterTypeIndoorStatus.allocationSize(value.`indoorStatus`) +
+            FfiConverterBoolean.allocationSize(value.`isMock`) +
+            FfiConverterSequenceString.allocationSize(value.`aliases`) +
+            FfiConverterSequenceString.allocationSize(value.`departments`) +
+            FfiConverterOptionalString.allocationSize(value.`notes`) +
+            FfiConverterFloat.allocationSize(value.`minZoom`) +
+            FfiConverterTypeRect2D.allocationSize(value.`bounds`) +
+            FfiConverterFloat.allocationSize(value.`labelX`) +
+            FfiConverterFloat.allocationSize(value.`labelY`)
+    )
+
+    override fun write(value: FeatureInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`campusId`, buf)
+            FfiConverterTypeMapLayer.write(value.`layer`, buf)
+            FfiConverterOptionalString.write(value.`code`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterOptionalString.write(value.`category`, buf)
+            FfiConverterOptionalString.write(value.`buildingId`, buf)
+            FfiConverterOptionalString.write(value.`parentId`, buf)
+            FfiConverterOptionalInt.write(value.`floor`, buf)
+            FfiConverterSequenceInt.write(value.`availableFloors`, buf)
+            FfiConverterSequenceTypeFloorLabel.write(value.`floorLabels`, buf)
+            FfiConverterOptionalInt.write(value.`defaultFloor`, buf)
+            FfiConverterOptionalTypePoiType.write(value.`poiType`, buf)
+            FfiConverterTypeIndoorStatus.write(value.`indoorStatus`, buf)
+            FfiConverterBoolean.write(value.`isMock`, buf)
+            FfiConverterSequenceString.write(value.`aliases`, buf)
+            FfiConverterSequenceString.write(value.`departments`, buf)
+            FfiConverterOptionalString.write(value.`notes`, buf)
+            FfiConverterFloat.write(value.`minZoom`, buf)
+            FfiConverterTypeRect2D.write(value.`bounds`, buf)
+            FfiConverterFloat.write(value.`labelX`, buf)
+            FfiConverterFloat.write(value.`labelY`, buf)
+    }
+}
+
+
+
+/**
+ * Rótulo legível associado a um índice de andar (`0 -> "Térreo"`, `1 -> "2º Pav"`, etc.).
+ */
+data class FloorLabel (
+    var `floor`: kotlin.Int, 
+    var `label`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeFloorLabel: FfiConverterRustBuffer<FloorLabel> {
+    override fun read(buf: ByteBuffer): FloorLabel {
+        return FloorLabel(
+            FfiConverterInt.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: FloorLabel) = (
+            FfiConverterInt.allocationSize(value.`floor`) +
+            FfiConverterString.allocationSize(value.`label`)
+    )
+
+    override fun write(value: FloorLabel, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`floor`, buf)
+            FfiConverterString.write(value.`label`, buf)
+    }
+}
+
+
+
+/**
+ * Resultado de `hit_test` em coordenadas locais do mapa.
+ */
+data class MapHit (
+    var `feature`: FeatureInfo, 
+    var `distanceM`: kotlin.Float
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMapHit: FfiConverterRustBuffer<MapHit> {
+    override fun read(buf: ByteBuffer): MapHit {
+        return MapHit(
+            FfiConverterTypeFeatureInfo.read(buf),
+            FfiConverterFloat.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MapHit) = (
+            FfiConverterTypeFeatureInfo.allocationSize(value.`feature`) +
+            FfiConverterFloat.allocationSize(value.`distanceM`)
+    )
+
+    override fun write(value: MapHit, buf: ByteBuffer) {
+            FfiConverterTypeFeatureInfo.write(value.`feature`, buf)
+            FfiConverterFloat.write(value.`distanceM`, buf)
+    }
+}
+
+
+
+/**
+ * Relatório emitido por `validate_overlay`.
+ */
+data class OverlayValidationReport (
+    var `buildingId`: kotlin.String, 
+    var `checkedFeatures`: kotlin.UInt, 
+    var `replacedFloors`: List<kotlin.Int>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOverlayValidationReport: FfiConverterRustBuffer<OverlayValidationReport> {
+    override fun read(buf: ByteBuffer): OverlayValidationReport {
+        return OverlayValidationReport(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: OverlayValidationReport) = (
+            FfiConverterString.allocationSize(value.`buildingId`) +
+            FfiConverterUInt.allocationSize(value.`checkedFeatures`) +
+            FfiConverterSequenceInt.allocationSize(value.`replacedFloors`)
+    )
+
+    override fun write(value: OverlayValidationReport, buf: ByteBuffer) {
+            FfiConverterString.write(value.`buildingId`, buf)
+            FfiConverterUInt.write(value.`checkedFeatures`, buf)
+            FfiConverterSequenceInt.write(value.`replacedFloors`, buf)
+    }
+}
+
+
+
+/**
+ * Caixa delimitadora 2D em metros no sistema de projeção local do campus.
+ */
+data class Rect2D (
+    var `minX`: kotlin.Float, 
+    var `minY`: kotlin.Float, 
+    var `maxX`: kotlin.Float, 
+    var `maxY`: kotlin.Float
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRect2D: FfiConverterRustBuffer<Rect2D> {
+    override fun read(buf: ByteBuffer): Rect2D {
+        return Rect2D(
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Rect2D) = (
+            FfiConverterFloat.allocationSize(value.`minX`) +
+            FfiConverterFloat.allocationSize(value.`minY`) +
+            FfiConverterFloat.allocationSize(value.`maxX`) +
+            FfiConverterFloat.allocationSize(value.`maxY`)
+    )
+
+    override fun write(value: Rect2D, buf: ByteBuffer) {
+            FfiConverterFloat.write(value.`minX`, buf)
+            FfiConverterFloat.write(value.`minY`, buf)
+            FfiConverterFloat.write(value.`maxX`, buf)
+            FfiConverterFloat.write(value.`maxY`, buf)
+    }
+}
+
+
+
+/**
+ * Lote completo de renderização de um andar sem FFI por frame durante pan/zoom.
+ */
+data class RenderBatch (
+    var `campusId`: kotlin.String, 
+    var `campusName`: kotlin.String, 
+    var `activeFloor`: kotlin.Int, 
+    var `availableFloors`: List<kotlin.Int>, 
+    var `floorLabels`: List<FloorLabel>, 
+    var `bounds`: Rect2D, 
+    var `attribution`: kotlin.String, 
+    var `coords`: List<kotlin.Float>, 
+    var `ringStarts`: List<kotlin.UInt>, 
+    var `ringCounts`: List<kotlin.UInt>, 
+    var `items`: List<RenderFeature>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRenderBatch: FfiConverterRustBuffer<RenderBatch> {
+    override fun read(buf: ByteBuffer): RenderBatch {
+        return RenderBatch(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterSequenceInt.read(buf),
+            FfiConverterSequenceTypeFloorLabel.read(buf),
+            FfiConverterTypeRect2D.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceFloat.read(buf),
+            FfiConverterSequenceUInt.read(buf),
+            FfiConverterSequenceUInt.read(buf),
+            FfiConverterSequenceTypeRenderFeature.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RenderBatch) = (
+            FfiConverterString.allocationSize(value.`campusId`) +
+            FfiConverterString.allocationSize(value.`campusName`) +
+            FfiConverterInt.allocationSize(value.`activeFloor`) +
+            FfiConverterSequenceInt.allocationSize(value.`availableFloors`) +
+            FfiConverterSequenceTypeFloorLabel.allocationSize(value.`floorLabels`) +
+            FfiConverterTypeRect2D.allocationSize(value.`bounds`) +
+            FfiConverterString.allocationSize(value.`attribution`) +
+            FfiConverterSequenceFloat.allocationSize(value.`coords`) +
+            FfiConverterSequenceUInt.allocationSize(value.`ringStarts`) +
+            FfiConverterSequenceUInt.allocationSize(value.`ringCounts`) +
+            FfiConverterSequenceTypeRenderFeature.allocationSize(value.`items`)
+    )
+
+    override fun write(value: RenderBatch, buf: ByteBuffer) {
+            FfiConverterString.write(value.`campusId`, buf)
+            FfiConverterString.write(value.`campusName`, buf)
+            FfiConverterInt.write(value.`activeFloor`, buf)
+            FfiConverterSequenceInt.write(value.`availableFloors`, buf)
+            FfiConverterSequenceTypeFloorLabel.write(value.`floorLabels`, buf)
+            FfiConverterTypeRect2D.write(value.`bounds`, buf)
+            FfiConverterString.write(value.`attribution`, buf)
+            FfiConverterSequenceFloat.write(value.`coords`, buf)
+            FfiConverterSequenceUInt.write(value.`ringStarts`, buf)
+            FfiConverterSequenceUInt.write(value.`ringCounts`, buf)
+            FfiConverterSequenceTypeRenderFeature.write(value.`items`, buf)
+    }
+}
+
+
+
+/**
+ * Feição pronta para desenho direto em Canvas 2D nativo.
+ */
+data class RenderFeature (
+    var `id`: kotlin.String, 
+    var `layer`: MapLayer, 
+    var `geomKind`: RenderGeomKind, 
+    var `ringStartIdx`: kotlin.UInt, 
+    var `ringCount`: kotlin.UInt, 
+    var `pointX`: kotlin.Float, 
+    var `pointY`: kotlin.Float, 
+    var `labelX`: kotlin.Float, 
+    var `labelY`: kotlin.Float, 
+    var `bboxMinX`: kotlin.Float, 
+    var `bboxMinY`: kotlin.Float, 
+    var `bboxMaxX`: kotlin.Float, 
+    var `bboxMaxY`: kotlin.Float, 
+    var `minZoom`: kotlin.Float, 
+    var `primaryLabel`: kotlin.String, 
+    var `secondaryLabel`: kotlin.String, 
+    var `category`: kotlin.String, 
+    var `poiType`: PoiType?, 
+    var `indoorStatus`: IndoorStatus, 
+    var `isMock`: kotlin.Boolean, 
+    var `occupancy`: RenderOccupancyKind, 
+    var `occupancyLabel`: kotlin.String?
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRenderFeature: FfiConverterRustBuffer<RenderFeature> {
+    override fun read(buf: ByteBuffer): RenderFeature {
+        return RenderFeature(
+            FfiConverterString.read(buf),
+            FfiConverterTypeMapLayer.read(buf),
+            FfiConverterTypeRenderGeomKind.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterFloat.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalTypePoiType.read(buf),
+            FfiConverterTypeIndoorStatus.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterTypeRenderOccupancyKind.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RenderFeature) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterTypeMapLayer.allocationSize(value.`layer`) +
+            FfiConverterTypeRenderGeomKind.allocationSize(value.`geomKind`) +
+            FfiConverterUInt.allocationSize(value.`ringStartIdx`) +
+            FfiConverterUInt.allocationSize(value.`ringCount`) +
+            FfiConverterFloat.allocationSize(value.`pointX`) +
+            FfiConverterFloat.allocationSize(value.`pointY`) +
+            FfiConverterFloat.allocationSize(value.`labelX`) +
+            FfiConverterFloat.allocationSize(value.`labelY`) +
+            FfiConverterFloat.allocationSize(value.`bboxMinX`) +
+            FfiConverterFloat.allocationSize(value.`bboxMinY`) +
+            FfiConverterFloat.allocationSize(value.`bboxMaxX`) +
+            FfiConverterFloat.allocationSize(value.`bboxMaxY`) +
+            FfiConverterFloat.allocationSize(value.`minZoom`) +
+            FfiConverterString.allocationSize(value.`primaryLabel`) +
+            FfiConverterString.allocationSize(value.`secondaryLabel`) +
+            FfiConverterString.allocationSize(value.`category`) +
+            FfiConverterOptionalTypePoiType.allocationSize(value.`poiType`) +
+            FfiConverterTypeIndoorStatus.allocationSize(value.`indoorStatus`) +
+            FfiConverterBoolean.allocationSize(value.`isMock`) +
+            FfiConverterTypeRenderOccupancyKind.allocationSize(value.`occupancy`) +
+            FfiConverterOptionalString.allocationSize(value.`occupancyLabel`)
+    )
+
+    override fun write(value: RenderFeature, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterTypeMapLayer.write(value.`layer`, buf)
+            FfiConverterTypeRenderGeomKind.write(value.`geomKind`, buf)
+            FfiConverterUInt.write(value.`ringStartIdx`, buf)
+            FfiConverterUInt.write(value.`ringCount`, buf)
+            FfiConverterFloat.write(value.`pointX`, buf)
+            FfiConverterFloat.write(value.`pointY`, buf)
+            FfiConverterFloat.write(value.`labelX`, buf)
+            FfiConverterFloat.write(value.`labelY`, buf)
+            FfiConverterFloat.write(value.`bboxMinX`, buf)
+            FfiConverterFloat.write(value.`bboxMinY`, buf)
+            FfiConverterFloat.write(value.`bboxMaxX`, buf)
+            FfiConverterFloat.write(value.`bboxMaxY`, buf)
+            FfiConverterFloat.write(value.`minZoom`, buf)
+            FfiConverterString.write(value.`primaryLabel`, buf)
+            FfiConverterString.write(value.`secondaryLabel`, buf)
+            FfiConverterString.write(value.`category`, buf)
+            FfiConverterOptionalTypePoiType.write(value.`poiType`, buf)
+            FfiConverterTypeIndoorStatus.write(value.`indoorStatus`, buf)
+            FfiConverterBoolean.write(value.`isMock`, buf)
+            FfiConverterTypeRenderOccupancyKind.write(value.`occupancy`, buf)
+            FfiConverterOptionalString.write(value.`occupancyLabel`, buf)
+    }
+}
+
+
+
+/**
+ * Item consolidado para listagem de ocupação por prédio.
+ */
+data class RoomOccupancyItem (
+    var `roomId`: kotlin.String, 
+    var `roomCode`: kotlin.String, 
+    var `floor`: kotlin.Int, 
+    var `isMock`: kotlin.Boolean, 
+    var `status`: OccupancyStatus
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRoomOccupancyItem: FfiConverterRustBuffer<RoomOccupancyItem> {
+    override fun read(buf: ByteBuffer): RoomOccupancyItem {
+        return RoomOccupancyItem(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterTypeOccupancyStatus.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RoomOccupancyItem) = (
+            FfiConverterString.allocationSize(value.`roomId`) +
+            FfiConverterString.allocationSize(value.`roomCode`) +
+            FfiConverterInt.allocationSize(value.`floor`) +
+            FfiConverterBoolean.allocationSize(value.`isMock`) +
+            FfiConverterTypeOccupancyStatus.allocationSize(value.`status`)
+    )
+
+    override fun write(value: RoomOccupancyItem, buf: ByteBuffer) {
+            FfiConverterString.write(value.`roomId`, buf)
+            FfiConverterString.write(value.`roomCode`, buf)
+            FfiConverterInt.write(value.`floor`, buf)
+            FfiConverterBoolean.write(value.`isMock`, buf)
+            FfiConverterTypeOccupancyStatus.write(value.`status`, buf)
+    }
+}
+
+
+
+/**
+ * Resultado de busca textual sobre prédios, salas e POIs.
+ */
+data class SearchResult (
+    var `feature`: FeatureInfo, 
+    var `score`: kotlin.UInt, 
+    var `matchedField`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSearchResult: FfiConverterRustBuffer<SearchResult> {
+    override fun read(buf: ByteBuffer): SearchResult {
+        return SearchResult(
+            FfiConverterTypeFeatureInfo.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SearchResult) = (
+            FfiConverterTypeFeatureInfo.allocationSize(value.`feature`) +
+            FfiConverterUInt.allocationSize(value.`score`) +
+            FfiConverterString.allocationSize(value.`matchedField`)
+    )
+
+    override fun write(value: SearchResult, buf: ByteBuffer) {
+            FfiConverterTypeFeatureInfo.write(value.`feature`, buf)
+            FfiConverterUInt.write(value.`score`, buf)
+            FfiConverterString.write(value.`matchedField`, buf)
+    }
+}
+
+
+
+/**
+ * Informações de aula/reserva ativa em um intervalo de ocupação.
+ */
+data class SlotInfo (
+    var `campusId`: kotlin.String, 
+    var `buildingId`: kotlin.String, 
+    var `roomId`: kotlin.String, 
+    var `roomCode`: kotlin.String, 
+    var `weekday`: kotlin.UInt, 
+    var `startTime`: kotlin.String, 
+    var `endTime`: kotlin.String, 
+    var `kind`: kotlin.String, 
+    var `label`: kotlin.String, 
+    var `title`: kotlin.String?, 
+    var `courseCodes`: List<kotlin.String>
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSlotInfo: FfiConverterRustBuffer<SlotInfo> {
+    override fun read(buf: ByteBuffer): SlotInfo {
+        return SlotInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SlotInfo) = (
+            FfiConverterString.allocationSize(value.`campusId`) +
+            FfiConverterString.allocationSize(value.`buildingId`) +
+            FfiConverterString.allocationSize(value.`roomId`) +
+            FfiConverterString.allocationSize(value.`roomCode`) +
+            FfiConverterUInt.allocationSize(value.`weekday`) +
+            FfiConverterString.allocationSize(value.`startTime`) +
+            FfiConverterString.allocationSize(value.`endTime`) +
+            FfiConverterString.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterOptionalString.allocationSize(value.`title`) +
+            FfiConverterSequenceString.allocationSize(value.`courseCodes`)
+    )
+
+    override fun write(value: SlotInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`campusId`, buf)
+            FfiConverterString.write(value.`buildingId`, buf)
+            FfiConverterString.write(value.`roomId`, buf)
+            FfiConverterString.write(value.`roomCode`, buf)
+            FfiConverterUInt.write(value.`weekday`, buf)
+            FfiConverterString.write(value.`startTime`, buf)
+            FfiConverterString.write(value.`endTime`, buf)
+            FfiConverterString.write(value.`kind`, buf)
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterOptionalString.write(value.`title`, buf)
+            FfiConverterSequenceString.write(value.`courseCodes`, buf)
     }
 }
 
@@ -3270,6 +4574,395 @@ public object FfiConverterTypeCampusError : FfiConverterRustBuffer<CampusExcepti
 
 
 
+/**
+ * Estado de digitalização interna de um prédio ou zona acadêmica.
+ */
+
+enum class IndoorStatus {
+    
+    FLOORPLAN,
+    PARTIAL_FLOORPLAN,
+    PROVISIONAL,
+    EXTERIOR_ONLY;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeIndoorStatus: FfiConverterRustBuffer<IndoorStatus> {
+    override fun read(buf: ByteBuffer) = try {
+        IndoorStatus.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: IndoorStatus) = 4UL
+
+    override fun write(value: IndoorStatus, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Camadas vetoriais ordenadas de baixo para cima conforme `layer_z_order` do contrato.
+ */
+
+enum class MapLayer {
+    
+    CAMPUS_GROUND,
+    CAMPUS_ZONE,
+    GREEN_AREA,
+    PARKING,
+    SPORTS,
+    WALKWAY,
+    BUILDING,
+    ROOM,
+    POI;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMapLayer: FfiConverterRustBuffer<MapLayer> {
+    override fun read(buf: ByteBuffer) = try {
+        MapLayer.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MapLayer) = 4UL
+
+    override fun write(value: MapLayer, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Estado de ocupação de uma sala em um instante no fuso `America/Sao_Paulo`.
+ */
+sealed class OccupancyStatus {
+    
+    data class Occupied(
+        val `slot`: SlotInfo) : OccupancyStatus() {
+        companion object
+    }
+    
+    object NoRegularClass : OccupancyStatus()
+    
+    
+    object NoData : OccupancyStatus()
+    
+    
+    object OutOfTerm : OccupancyStatus()
+    
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeOccupancyStatus : FfiConverterRustBuffer<OccupancyStatus>{
+    override fun read(buf: ByteBuffer): OccupancyStatus {
+        return when(buf.getInt()) {
+            1 -> OccupancyStatus.Occupied(
+                FfiConverterTypeSlotInfo.read(buf),
+                )
+            2 -> OccupancyStatus.NoRegularClass
+            3 -> OccupancyStatus.NoData
+            4 -> OccupancyStatus.OutOfTerm
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: OccupancyStatus) = when(value) {
+        is OccupancyStatus.Occupied -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterTypeSlotInfo.allocationSize(value.`slot`)
+            )
+        }
+        is OccupancyStatus.NoRegularClass -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is OccupancyStatus.NoData -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is OccupancyStatus.OutOfTerm -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: OccupancyStatus, buf: ByteBuffer) {
+        when(value) {
+            is OccupancyStatus.Occupied -> {
+                buf.putInt(1)
+                FfiConverterTypeSlotInfo.write(value.`slot`, buf)
+                Unit
+            }
+            is OccupancyStatus.NoRegularClass -> {
+                buf.putInt(2)
+                Unit
+            }
+            is OccupancyStatus.NoData -> {
+                buf.putInt(3)
+                Unit
+            }
+            is OccupancyStatus.OutOfTerm -> {
+                buf.putInt(4)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Tipos suportados para pontos de interesse (POIs) nos campi.
+ */
+
+enum class PoiType {
+    
+    TOILET,
+    FACULTY_OFFICE,
+    ENTRANCE,
+    DINING,
+    LIBRARY,
+    PARKING,
+    ACADEMIC;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePoiType: FfiConverterRustBuffer<PoiType> {
+    override fun read(buf: ByteBuffer) = try {
+        PoiType.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: PoiType) = 4UL
+
+    override fun write(value: PoiType, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Tipo geométrico primitivo achatado no `RenderBatch`.
+ */
+
+enum class RenderGeomKind {
+    
+    POLYGON,
+    POLYLINE,
+    POINT;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRenderGeomKind: FfiConverterRustBuffer<RenderGeomKind> {
+    override fun read(buf: ByteBuffer) = try {
+        RenderGeomKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RenderGeomKind) = 4UL
+
+    override fun write(value: RenderGeomKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Estado resumido de ocupação para estilização rápida na UI sem alocações por frame.
+ */
+
+enum class RenderOccupancyKind {
+    
+    NONE,
+    OCCUPIED,
+    NO_REGULAR_CLASS,
+    NO_DATA,
+    OUT_OF_TERM;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRenderOccupancyKind: FfiConverterRustBuffer<RenderOccupancyKind> {
+    override fun read(buf: ByteBuffer) = try {
+        RenderOccupancyKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RenderOccupancyKind) = 4UL
+
+    override fun write(value: RenderOccupancyKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * Resultado da resolução de encontro aula <-> mapa.
+ */
+sealed class Resolution {
+    
+    data class ExactRoom(
+        val `campusId`: kotlin.String, 
+        val `buildingId`: kotlin.String, 
+        val `roomId`: kotlin.String, 
+        val `floor`: kotlin.Int, 
+        val `cameraFocus`: CameraFocus) : Resolution() {
+        companion object
+    }
+    
+    data class BuildingFallback(
+        val `campusId`: kotlin.String, 
+        val `buildingId`: kotlin.String, 
+        val `cameraFocus`: CameraFocus) : Resolution() {
+        companion object
+    }
+    
+    object Unmapped : Resolution()
+    
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeResolution : FfiConverterRustBuffer<Resolution>{
+    override fun read(buf: ByteBuffer): Resolution {
+        return when(buf.getInt()) {
+            1 -> Resolution.ExactRoom(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterInt.read(buf),
+                FfiConverterTypeCameraFocus.read(buf),
+                )
+            2 -> Resolution.BuildingFallback(
+                FfiConverterString.read(buf),
+                FfiConverterString.read(buf),
+                FfiConverterTypeCameraFocus.read(buf),
+                )
+            3 -> Resolution.Unmapped
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: Resolution) = when(value) {
+        is Resolution.ExactRoom -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`campusId`)
+                + FfiConverterString.allocationSize(value.`buildingId`)
+                + FfiConverterString.allocationSize(value.`roomId`)
+                + FfiConverterInt.allocationSize(value.`floor`)
+                + FfiConverterTypeCameraFocus.allocationSize(value.`cameraFocus`)
+            )
+        }
+        is Resolution.BuildingFallback -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`campusId`)
+                + FfiConverterString.allocationSize(value.`buildingId`)
+                + FfiConverterTypeCameraFocus.allocationSize(value.`cameraFocus`)
+            )
+        }
+        is Resolution.Unmapped -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: Resolution, buf: ByteBuffer) {
+        when(value) {
+            is Resolution.ExactRoom -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`campusId`, buf)
+                FfiConverterString.write(value.`buildingId`, buf)
+                FfiConverterString.write(value.`roomId`, buf)
+                FfiConverterInt.write(value.`floor`, buf)
+                FfiConverterTypeCameraFocus.write(value.`cameraFocus`, buf)
+                Unit
+            }
+            is Resolution.BuildingFallback -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`campusId`, buf)
+                FfiConverterString.write(value.`buildingId`, buf)
+                FfiConverterTypeCameraFocus.write(value.`cameraFocus`, buf)
+                Unit
+            }
+            is Resolution.Unmapped -> {
+                buf.putInt(3)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
 
 enum class TimelineItemKind {
     
@@ -3368,6 +5061,102 @@ public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?>
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeCameraFocus: FfiConverterRustBuffer<CameraFocus?> {
+    override fun read(buf: ByteBuffer): CameraFocus? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeCameraFocus.read(buf)
+    }
+
+    override fun allocationSize(value: CameraFocus?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeCameraFocus.allocationSize(value)
+        }
+    }
+
+    override fun write(value: CameraFocus?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeCameraFocus.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeFeatureInfo: FfiConverterRustBuffer<FeatureInfo?> {
+    override fun read(buf: ByteBuffer): FeatureInfo? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeFeatureInfo.read(buf)
+    }
+
+    override fun allocationSize(value: FeatureInfo?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeFeatureInfo.allocationSize(value)
+        }
+    }
+
+    override fun write(value: FeatureInfo?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeFeatureInfo.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeMapHit: FfiConverterRustBuffer<MapHit?> {
+    override fun read(buf: ByteBuffer): MapHit? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeMapHit.read(buf)
+    }
+
+    override fun allocationSize(value: MapHit?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeMapHit.allocationSize(value)
+        }
+    }
+
+    override fun write(value: MapHit?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeMapHit.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeTimetableCell: FfiConverterRustBuffer<TimetableCell?> {
     override fun read(buf: ByteBuffer): TimetableCell? {
         if (buf.get().toInt() == 0) {
@@ -3422,6 +5211,122 @@ public object FfiConverterOptionalTypeAttendanceStatus: FfiConverterRustBuffer<A
         } else {
             buf.put(1)
             FfiConverterTypeAttendanceStatus.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypePoiType: FfiConverterRustBuffer<PoiType?> {
+    override fun read(buf: ByteBuffer): PoiType? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypePoiType.read(buf)
+    }
+
+    override fun allocationSize(value: PoiType?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypePoiType.allocationSize(value)
+        }
+    }
+
+    override fun write(value: PoiType?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypePoiType.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceUInt: FfiConverterRustBuffer<List<kotlin.UInt>> {
+    override fun read(buf: ByteBuffer): List<kotlin.UInt> {
+        val len = buf.getInt()
+        return List<kotlin.UInt>(len) {
+            FfiConverterUInt.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.UInt>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterUInt.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.UInt>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterUInt.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceInt: FfiConverterRustBuffer<List<kotlin.Int>> {
+    override fun read(buf: ByteBuffer): List<kotlin.Int> {
+        val len = buf.getInt()
+        return List<kotlin.Int>(len) {
+            FfiConverterInt.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.Int>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterInt.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.Int>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterInt.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceFloat: FfiConverterRustBuffer<List<kotlin.Float>> {
+    override fun read(buf: ByteBuffer): List<kotlin.Float> {
+        val len = buf.getInt()
+        return List<kotlin.Float>(len) {
+            FfiConverterFloat.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.Float>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterFloat.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.Float>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterFloat.write(it, buf)
         }
     }
 }
@@ -3600,6 +5505,34 @@ public object FfiConverterSequenceTypeAssessmentWithCourse: FfiConverterRustBuff
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeCampusMapSummary: FfiConverterRustBuffer<List<CampusMapSummary>> {
+    override fun read(buf: ByteBuffer): List<CampusMapSummary> {
+        val len = buf.getInt()
+        return List<CampusMapSummary>(len) {
+            FfiConverterTypeCampusMapSummary.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CampusMapSummary>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCampusMapSummary.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CampusMapSummary>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCampusMapSummary.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeCourseScheduleSlotItem: FfiConverterRustBuffer<List<CourseScheduleSlotItem>> {
     override fun read(buf: ByteBuffer): List<CourseScheduleSlotItem> {
         val len = buf.getInt()
@@ -3702,6 +5635,118 @@ public object FfiConverterSequenceTypeDisciplineSummaryCard: FfiConverterRustBuf
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeDisciplineSummaryCard.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeFloorLabel: FfiConverterRustBuffer<List<FloorLabel>> {
+    override fun read(buf: ByteBuffer): List<FloorLabel> {
+        val len = buf.getInt()
+        return List<FloorLabel>(len) {
+            FfiConverterTypeFloorLabel.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<FloorLabel>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeFloorLabel.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<FloorLabel>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeFloorLabel.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeRenderFeature: FfiConverterRustBuffer<List<RenderFeature>> {
+    override fun read(buf: ByteBuffer): List<RenderFeature> {
+        val len = buf.getInt()
+        return List<RenderFeature>(len) {
+            FfiConverterTypeRenderFeature.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<RenderFeature>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeRenderFeature.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<RenderFeature>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeRenderFeature.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeRoomOccupancyItem: FfiConverterRustBuffer<List<RoomOccupancyItem>> {
+    override fun read(buf: ByteBuffer): List<RoomOccupancyItem> {
+        val len = buf.getInt()
+        return List<RoomOccupancyItem>(len) {
+            FfiConverterTypeRoomOccupancyItem.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<RoomOccupancyItem>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeRoomOccupancyItem.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<RoomOccupancyItem>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeRoomOccupancyItem.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSearchResult: FfiConverterRustBuffer<List<SearchResult>> {
+    override fun read(buf: ByteBuffer): List<SearchResult> {
+        val len = buf.getInt()
+        return List<SearchResult>(len) {
+            FfiConverterTypeSearchResult.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SearchResult>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSearchResult.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SearchResult>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSearchResult.write(it, buf)
         }
     }
 }
@@ -3824,6 +5869,19 @@ public object FfiConverterSequenceTypeUfopCurriculumTemplate: FfiConverterRustBu
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_campus_core_fn_func_calculate_max_absences(
         FfiConverterUInt.lower(`workloadHours`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Valida um overlay GeoJSON contra um mapa base GeoJSON sem integrá-lo ao motor.
+         */
+    @Throws(CampusException::class) fun `validateOverlay`(`baseGeojson`: kotlin.String, `overlayGeojson`: kotlin.String): OverlayValidationReport {
+            return FfiConverterTypeOverlayValidationReport.lift(
+    uniffiRustCallWithError(CampusException) { _status ->
+    UniffiLib.INSTANCE.uniffi_campus_core_fn_func_validate_overlay(
+        FfiConverterString.lower(`baseGeojson`),FfiConverterString.lower(`overlayGeojson`),_status)
 }
     )
     }
