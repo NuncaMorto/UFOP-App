@@ -11,7 +11,7 @@ pub mod types;
 #[cfg(test)]
 mod tests;
 
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 use serde::Deserialize;
 
@@ -47,7 +47,6 @@ struct OverlayManifestEntry {
 }
 
 /// Motor vetorial offline 2D para os campi da UFOP e ocupação multi-campus 2026/2.
-#[derive(uniffi::Object)]
 pub struct CampusMapEngine {
     campuses: Vec<LoadedCampus>,
     spatial_indices: Vec<CampusSpatialIndex>,
@@ -92,13 +91,9 @@ impl CampusMapEngine {
         let idx = self.current_campus_idx();
         (&self.campuses[idx], &self.spatial_indices[idx])
     }
-}
 
-#[uniffi::export]
-impl CampusMapEngine {
     /// Carrega todos os 4 campi, seus overlays declarados em `campus_manifest.json` e a ocupação 2026/2 embutida.
-    #[uniffi::constructor]
-    pub fn new_bundled() -> Result<Arc<Self>, CampusError> {
+    pub fn new_bundled() -> Result<Self, CampusError> {
         let manifest: CampusManifestDoc =
             serde_json::from_str(CAMPUS_MANIFEST_JSON).map_err(|err| {
                 CampusError::InvalidInput(format!("Manifesto de campi inválido: {err}"))
@@ -121,27 +116,23 @@ impl CampusMapEngine {
 
         let occupancy = OccupancyIndex::from_json(OCCUPANCY_2026_2_JSON)?;
         let resolver = MeetingResolver::from_contract_json(MAP_SCHEMA_CONTRACT_JSON);
-        Ok(Arc::new(Self::from_loaded_parts(
-            loaded, occupancy, resolver,
-        )?))
+        Self::from_loaded_parts(loaded, occupancy, resolver)
     }
 
     /// Carrega um mapa base GeoJSON aplicando overlays plug-and-play (usando ocupação embutida 2026/2).
-    #[uniffi::constructor]
     pub fn load_with_overlays(
         base_geojson: String,
         overlays_geojson: Vec<String>,
-    ) -> Result<Arc<Self>, CampusError> {
+    ) -> Result<Self, CampusError> {
         Self::load_with_overlays_and_occupancy(base_geojson, overlays_geojson, None)
     }
 
     /// Carrega um mapa base GeoJSON com overlays e arquivo de ocupação customizado (ou embutido quando `None`).
-    #[uniffi::constructor]
     pub fn load_with_overlays_and_occupancy(
         base_geojson: String,
         overlays_geojson: Vec<String>,
         occupancy_json: Option<String>,
-    ) -> Result<Arc<Self>, CampusError> {
+    ) -> Result<Self, CampusError> {
         let overlay_refs: Vec<&str> = overlays_geojson.iter().map(String::as_str).collect();
         let campus = load_campus_with_overlays(&base_geojson, &overlay_refs)?;
         let occupancy = match occupancy_json.as_deref() {
@@ -150,11 +141,7 @@ impl CampusMapEngine {
             None => OccupancyIndex::from_json(OCCUPANCY_2026_2_JSON)?,
         };
         let resolver = MeetingResolver::from_contract_json(MAP_SCHEMA_CONTRACT_JSON);
-        Ok(Arc::new(Self::from_loaded_parts(
-            vec![campus],
-            occupancy,
-            resolver,
-        )?))
+        Self::from_loaded_parts(vec![campus], occupancy, resolver)
     }
 
     pub fn list_campuses(&self) -> Vec<CampusMapSummary> {
