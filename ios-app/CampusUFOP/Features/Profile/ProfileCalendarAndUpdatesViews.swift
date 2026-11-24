@@ -59,7 +59,7 @@ internal struct ProfileCalendarSectionView: View {
                                 .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                                 .padding(.horizontal, 12)
                                 .frame(minHeight: 34)
-                                .liquidGlassCapsule(selected: isSelected, accent: CampusTheme.mathBlue, interactive: true, highContrast: highContrast)
+                                .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: highContrast)
                         }
                         .buttonStyle(.plain)
                     }

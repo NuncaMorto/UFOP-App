@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import br.ufop.campus.ui.components.CampusDatePickerField
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.theme.StatusAbsentRed
+import br.ufop.campus.ui.theme.accessibleContentColorOn
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -147,7 +148,10 @@ internal fun DisciplineEditCourseDialog(
                 enabled = name.isNotBlank() && parsedWorkload != null,
                 modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
                 shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = accessibleContentColorOn(accentColor)
+                )
             ) {
                 Text("Salvar")
             }
@@ -260,7 +264,10 @@ internal fun DisciplineEditAbsencesDialog(
                 enabled = parsedDraft != null,
                 modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
                 shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = accessibleContentColorOn(accentColor)
+                )
             ) {
                 Text("Aplicar")
             }
@@ -373,7 +380,10 @@ internal fun DisciplineAddAssessmentFormCard(
                     modifier = Modifier.defaultMinSize(minHeight = secondaryControlHeight),
                     shape = RoundedCornerShape(22.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = accentColor,
+                        contentColor = accessibleContentColorOn(accentColor)
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
@@ -470,7 +480,7 @@ internal fun DisciplineDeleteCourseSection(
                         shape = RoundedCornerShape(22.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = StatusAbsentRed,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor = Color.White
                         )
                     ) {
                         Text("Confirmar remoção")

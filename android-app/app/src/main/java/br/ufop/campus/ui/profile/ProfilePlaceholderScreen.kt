@@ -63,7 +63,6 @@ import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
 import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.CampusWindowWidthClass
-import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
@@ -509,7 +508,7 @@ fun ProfilePlaceholderScreen(
             )
             SettingsMenuRow(
                 icon = Icons.AutoMirrored.Outlined.HelpOutline,
-                iconTint = DepartmentMathBlue,
+                iconTint = MaterialTheme.colorScheme.primary,
                 title = "FAQ & Ajuda",
                 subtitle = "Dúvidas frequentes e informações sobre o funcionamento offline",
                 onClick = { activeDestination = ProfileDestination.FAQ }

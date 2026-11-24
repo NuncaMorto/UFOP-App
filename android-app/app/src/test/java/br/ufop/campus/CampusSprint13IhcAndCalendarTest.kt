@@ -396,17 +396,18 @@ class CampusSprint13IhcAndCalendarTest {
         }
     }
 
-    // ── Regressão v1.9.5 & 7 cores ───────────────────────────────────────────────────────────────
+    // ── Regressão versão & 9 cores (incl. Rosa e Azul — Issue #13) ───────────────────────────────
 
     @Test
-    fun releaseVersionAndSevenAccentColors_preserveSprint13Contract() {
+    fun releaseVersionAndNineAccentColors_preserveContract() {
         assertEquals(BuildConfig.VERSION_NAME, CampusRepositoryHolder.CURRENT_APP_VERSION)
         assertTrue(Regex("""^\d+\.\d+\.\d+$""").matches(CampusRepositoryHolder.CURRENT_APP_VERSION))
         assertTrue(BuildConfig.VERSION_CODE > 0)
         assertEquals(
-            listOf("GREEN", "RED", "ORANGE", "PURPLE", "YELLOW", "CYAN", "BROWN"),
+            listOf("GREEN", "RED", "ORANGE", "PURPLE", "YELLOW", "CYAN", "BROWN", "PINK", "BLUE"),
             CampusAccentColor.entries.map { it.storageKey }
         )
-        assertFalse(CampusAccentColor.entries.any { it.storageKey.equals("BLUE", ignoreCase = true) })
+        assertTrue(CampusAccentColor.entries.any { it.storageKey == "PINK" })
+        assertTrue(CampusAccentColor.entries.any { it.storageKey == "BLUE" })
     }
 }

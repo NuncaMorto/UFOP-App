@@ -104,6 +104,7 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
+import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.parseHexColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskColor
@@ -1171,7 +1172,10 @@ fun DisciplineDetailBottomSheet(
                                     modifier = Modifier.defaultMinSize(minHeight = secondaryControlHeight),
                                     shape = RoundedCornerShape(22.dp),
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = accentColor,
+                                        contentColor = accessibleContentColorOn(accentColor)
+                                    )
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
@@ -1283,7 +1287,10 @@ fun DisciplineDetailBottomSheet(
                                                 modifier = Modifier.defaultMinSize(minHeight = secondaryControlHeight),
                                                 shape = RoundedCornerShape(22.dp),
                                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = accentColor,
+                                                    contentColor = accessibleContentColorOn(accentColor)
+                                                )
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Check,

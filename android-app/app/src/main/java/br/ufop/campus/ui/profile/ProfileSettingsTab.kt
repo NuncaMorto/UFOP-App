@@ -27,7 +27,6 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
@@ -79,6 +78,7 @@ import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.parseHexColor
 import kotlinx.coroutines.Dispatchers
@@ -94,7 +94,6 @@ private fun ProfilePersonalizationSubView(
 ) {
     val minTouchTarget = campusMinTouchTarget()
     val swatchMinHeight = if (LocalCampusAccessibility.current.settings.largeTouchTargets) 64.dp else 56.dp
-    val accessibleBlue = accessibleTextColor(DepartmentMathBlue, isDarkTheme, MaterialTheme.colorScheme.surface)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -208,7 +207,7 @@ private fun ProfilePersonalizationSubView(
                                                         Icon(
                                                             imageVector = Icons.Default.Check,
                                                             contentDescription = "Selecionada",
-                                                            tint = Color.White,
+                                                            tint = accessibleContentColorOn(swatchColor),
                                                             modifier = Modifier.size(18.dp)
                                                         )
                                                     }
@@ -246,33 +245,6 @@ private fun ProfilePersonalizationSubView(
                                     Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
-                        }
-                    }
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        color = DepartmentMathBlue.copy(alpha = 0.10f),
-                        border = BorderStroke(1.dp, DepartmentMathBlue.copy(alpha = 0.24f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Info,
-                                contentDescription = null,
-                                tint = accessibleBlue,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Text(
-                                text = "O azul é preservado exclusivamente para tags informativas, clima e departamentos para manter o contraste visual.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
@@ -442,7 +414,7 @@ internal fun ProfileSettingsTab(
             SettingsCategoryGroup(title = "Acadêmico & Matriz") {
                 SettingsMenuRow(
                     icon = Icons.Outlined.PictureAsPdf,
-                    iconTint = DepartmentMathBlue,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = "Documentos Acadêmicos (PDF)",
                     subtitle = "Enviar Atestado de Matrícula ou Histórico Escolar",
                     onClick = { onSelectSection(SettingsSection.DOCUMENTS_PDF) }
@@ -453,7 +425,7 @@ internal fun ProfileSettingsTab(
                 )
                 SettingsMenuRow(
                     icon = Icons.AutoMirrored.Outlined.MenuBook,
-                    iconTint = StatusAttendingGreen,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = "Matriz Curricular (2026/2)",
                     subtitle = matrixSubtitle,
                     onClick = onOpenCurriculumMatrix
@@ -463,7 +435,7 @@ internal fun ProfileSettingsTab(
             SettingsCategoryGroup(title = "Calendário de Referência") {
                 SettingsMenuRow(
                     icon = Icons.Outlined.CalendarMonth,
-                    iconTint = DepartmentMathBlue,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = "Calendário Acadêmico",
                     subtitle = "2026.2, 2027.1 e 2027.2 · ${profileSummary.calendarEvents.size} marcos ativos",
                     onClick = { onSelectSection(SettingsSection.ACADEMIC_CALENDAR) }
@@ -473,7 +445,7 @@ internal fun ProfileSettingsTab(
             SettingsCategoryGroup(title = "Dados & Suporte") {
                 SettingsMenuRow(
                     icon = Icons.Outlined.Storage,
-                    iconTint = DepartmentMathBlue,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = "Armazenamento & Compartilhamento",
                     subtitle = exportFolderLabel,
                     onClick = { onSelectSection(SettingsSection.STORAGE_SHARE) }
@@ -484,7 +456,7 @@ internal fun ProfileSettingsTab(
                 )
                 SettingsMenuRow(
                     icon = Icons.Outlined.SupportAgent,
-                    iconTint = DepartmentMathBlue,
+                    iconTint = MaterialTheme.colorScheme.primary,
                     title = "Feedback & Suporte",
                     subtitle = "Relatar bug, sugestão ou enviar prints de tela",
                     onClick = { onSelectSection(SettingsSection.FEEDBACK) }

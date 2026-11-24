@@ -23,7 +23,9 @@ enum class CampusAccentColor(
     PURPLE("PURPLE", "Roxo", "#6B3FA0"),
     YELLOW("YELLOW", "Amarelo", "#B58500"),
     CYAN("CYAN", "Ciano", "#00838F"),
-    BROWN("BROWN", "Marrom", "#6D4C41");
+    BROWN("BROWN", "Marrom", "#6D4C41"),
+    PINK("PINK", "Rosa", "#C2185B"),
+    BLUE("BLUE", "Azul", "#1D5BD6");
 
     companion object {
         fun fromKey(raw: String?): CampusAccentColor =
@@ -72,10 +74,10 @@ private fun buildLightColorScheme(
     primaryContainer = primaryContainer,
     onPrimaryContainer = onPrimaryContainer,
     inversePrimary = inversePrimary,
-    secondary = DepartmentMathBlue,
-    onSecondary = LightOnPrimary,
-    secondaryContainer = LightWeatherBadgeBg,
-    onSecondaryContainer = LightWeatherBadgeText,
+    secondary = primary,
+    onSecondary = onPrimary,
+    secondaryContainer = primaryContainer,
+    onSecondaryContainer = onPrimaryContainer,
     tertiary = DepartmentCompPurple,
     onTertiary = LightOnPrimary,
     background = if (highContrast) HighContrastLightBackground else LightBackground,
@@ -107,10 +109,10 @@ private fun buildDarkColorScheme(
     primaryContainer = primaryContainer,
     onPrimaryContainer = onPrimaryContainer,
     inversePrimary = inversePrimary,
-    secondary = DarkAccentBlue,
-    onSecondary = DarkOnPrimary,
-    secondaryContainer = DarkWeatherBadgeBg,
-    onSecondaryContainer = DarkWeatherBadgeText,
+    secondary = primary,
+    onSecondary = onPrimary,
+    secondaryContainer = primaryContainer,
+    onSecondaryContainer = onPrimaryContainer,
     tertiary = DepartmentCompPurple,
     onTertiary = DarkOnPrimary,
     background = if (highContrast) HighContrastDarkBackground else DarkBackground,
@@ -192,6 +194,22 @@ private fun campusColorSchemeFor(
                 inversePrimary = DarkInversePrimaryBrown,
                 highContrast = highContrast
             )
+            CampusAccentColor.PINK -> buildDarkColorScheme(
+                primary = DarkPrimaryPink,
+                onPrimary = DarkOnPrimaryPink,
+                primaryContainer = DarkPrimaryContainerPink,
+                onPrimaryContainer = DarkOnPrimaryContainerPink,
+                inversePrimary = DarkInversePrimaryPink,
+                highContrast = highContrast
+            )
+            CampusAccentColor.BLUE -> buildDarkColorScheme(
+                primary = DarkPrimaryBlue,
+                onPrimary = DarkOnPrimaryBlue,
+                primaryContainer = DarkPrimaryContainerBlue,
+                onPrimaryContainer = DarkOnPrimaryContainerBlue,
+                inversePrimary = DarkInversePrimaryBlue,
+                highContrast = highContrast
+            )
         }
     } else {
         when (accentColor) {
@@ -249,6 +267,22 @@ private fun campusColorSchemeFor(
                 primaryContainer = LightPrimaryContainerBrown,
                 onPrimaryContainer = LightOnPrimaryContainerBrown,
                 inversePrimary = LightInversePrimaryBrown,
+                highContrast = highContrast
+            )
+            CampusAccentColor.PINK -> buildLightColorScheme(
+                primary = LightPrimaryPink,
+                onPrimary = LightOnPrimaryPink,
+                primaryContainer = LightPrimaryContainerPink,
+                onPrimaryContainer = LightOnPrimaryContainerPink,
+                inversePrimary = LightInversePrimaryPink,
+                highContrast = highContrast
+            )
+            CampusAccentColor.BLUE -> buildLightColorScheme(
+                primary = LightPrimaryBlue,
+                onPrimary = LightOnPrimaryBlue,
+                primaryContainer = LightPrimaryContainerBlue,
+                onPrimaryContainer = LightOnPrimaryContainerBlue,
+                inversePrimary = LightInversePrimaryBlue,
                 highContrast = highContrast
             )
         }

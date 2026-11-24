@@ -64,9 +64,7 @@ import br.ufop.campus.core.uniffi.CampusMapSummary
 import br.ufop.campus.core.uniffi.FloorLabel
 import br.ufop.campus.core.uniffi.PoiType
 import br.ufop.campus.core.uniffi.SearchResult
-import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
-import br.ufop.campus.ui.theme.StatusAttendingGreen
 
 private data class MapPoiFilterChipSpec(
     val poiType: PoiType,
@@ -213,8 +211,6 @@ internal fun CampusMapFilterChipsRow(
     onTogglePoiFilter: (PoiType) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val freeAccent = if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -227,9 +223,6 @@ internal fun CampusMapFilterChipsRow(
             icon = Icons.Outlined.MeetingRoom,
             isSelected = isFreeRoomsEnabled,
             isDark = isDark,
-            selectedContainerColor = freeAccent.copy(alpha = if (isDark) 0.24f else 0.16f),
-            selectedBorderColor = freeAccent,
-            selectedContentColor = freeAccent,
             onClick = onToggleFreeRooms
         )
 

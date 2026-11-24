@@ -275,7 +275,7 @@ interface CampusCoreRepository {
     fun setTotalRequiredHours(hours: Int)
 
     // Sprint 11 APIs
-    /** Preferência de cor de destaque do app: "GREEN", "RED", "ORANGE", "PURPLE", "YELLOW", "CYAN" ou "BROWN". */
+    /** Preferência de cor de destaque do app: "GREEN", "RED", "ORANGE", "PURPLE", "YELLOW", "CYAN", "BROWN", "PINK" ou "BLUE". */
     fun getAccentColorPreference(): String
 
     /** Persiste a preferência de cor de destaque. */

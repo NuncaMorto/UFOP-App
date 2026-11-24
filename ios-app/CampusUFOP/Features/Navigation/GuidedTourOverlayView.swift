@@ -36,7 +36,7 @@ private let guidedTourSteps: [GuidedTourStepItem] = [
         tab: .profile,
         icon: "lock.shield.fill",
         title: "Segurança, Estilo & FAQ",
-        description: "Em Perfil você ativa Face ID / senha, acessibilidade, personalização com 7 cores, backup criptografado (.ufopbackup) e pode rever este tour a qualquer hora!"
+        description: "Em Perfil você ativa Face ID / senha, acessibilidade, personalização com 9 cores, backup criptografado (.ufopbackup) e pode rever este tour a qualquer hora!"
     )
 ]
 

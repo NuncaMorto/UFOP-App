@@ -24,7 +24,7 @@ val LightWeatherBadgeBg = Color(0xFFD9E9F9)
 val LightWeatherBadgeText = Color(0xFF1A436B)
 val LightWeatherSunAccent = Color(0xFFFFE066)
 
-// Light Mode — Additional Accent Palettes (Red, Orange, Purple, Yellow, Cyan, Brown)
+// Light Mode — Additional Accent Palettes (Red, Orange, Purple, Yellow, Cyan, Brown, Pink, Blue)
 val LightPrimaryRed = Color(0xFFB3261E)
 val LightPrimaryContainerRed = Color(0xFFFADAD6)
 val LightOnPrimaryContainerRed = Color(0xFF410E0B)
@@ -61,6 +61,20 @@ val LightOnPrimaryContainerBrown = Color(0xFF271B17)
 val LightInversePrimaryBrown = Color(0xFFD7CCC8)
 val LightOnPrimaryBrown = Color(0xFFFFFFFF)
 
+// Pink (Rosa vibrante #C2185B/#FFD8E4 — WCAG AA >= 5.5:1 no modo claro)
+val LightPrimaryPink = Color(0xFFC2185B)
+val LightPrimaryContainerPink = Color(0xFFFFD8E4)
+val LightOnPrimaryContainerPink = Color(0xFF3E001D)
+val LightInversePrimaryPink = Color(0xFFF48FB1)
+val LightOnPrimaryPink = Color(0xFFFFFFFF)
+
+// Blue (Azul acadêmico #1D5BD6/#D8E6FF — WCAG AA >= 5.6:1 no modo claro)
+val LightPrimaryBlue = Color(0xFF1D5BD6)
+val LightPrimaryContainerBlue = Color(0xFFD8E6FF)
+val LightOnPrimaryContainerBlue = Color(0xFF001B3F)
+val LightInversePrimaryBlue = Color(0xFF8AB4F8)
+val LightOnPrimaryBlue = Color(0xFFFFFFFF)
+
 // Dark Mode — Carbon Deep Charcoal
 val DarkBackground = Color(0xFF111315)
 val DarkSurface = Color(0xFF1B1E22)
@@ -83,7 +97,7 @@ val DarkTextSecondary = Color(0xFF9CA3AF)
 val DarkWeatherBadgeBg = Color(0xFF1E2D3D)
 val DarkWeatherBadgeText = Color(0xFF99C8F2)
 
-// Dark Mode — Additional Accent Palettes (Red, Orange, Purple, Yellow, Cyan, Brown)
+// Dark Mode — Additional Accent Palettes (Red, Orange, Purple, Yellow, Cyan, Brown, Pink, Blue)
 val DarkPrimaryRed = Color(0xFFCF443C)
 val DarkPrimaryContainerRed = Color(0xFF5C1B18)
 val DarkOnPrimaryContainerRed = Color(0xFFFFDAD6)
@@ -119,6 +133,20 @@ val DarkPrimaryContainerBrown = Color(0xFF4E342E)
 val DarkOnPrimaryContainerBrown = Color(0xFFD7CCC8)
 val DarkInversePrimaryBrown = Color(0xFF6D4C41)
 val DarkOnPrimaryBrown = Color(0xFF271B17)
+
+// Pink Dark Mode (#F48FB1 com texto escuro #3E001D garantindo WCAG >= 7.5:1)
+val DarkPrimaryPink = Color(0xFFF48FB1)
+val DarkPrimaryContainerPink = Color(0xFF631234)
+val DarkOnPrimaryContainerPink = Color(0xFFFFD8E4)
+val DarkInversePrimaryPink = Color(0xFFC2185B)
+val DarkOnPrimaryPink = Color(0xFF3E001D)
+
+// Blue Dark Mode (#8AB4F8 com texto escuro #001D3D garantindo WCAG >= 7.9:1)
+val DarkPrimaryBlue = Color(0xFF8AB4F8)
+val DarkPrimaryContainerBlue = Color(0xFF13386E)
+val DarkOnPrimaryContainerBlue = Color(0xFFD8E6FF)
+val DarkInversePrimaryBlue = Color(0xFF1D5BD6)
+val DarkOnPrimaryBlue = Color(0xFF001D3D)
 
 // High Contrast Mode Overrides (WCAG AAA >= 7:1)
 val HighContrastLightBackground = Color(0xFFFFFFFF)
@@ -182,6 +210,12 @@ fun contrastRatio(foreground: Color, background: Color): Double {
     val darker = minOf(l1, l2)
     return (lighter + 0.05) / (darker + 0.05)
 }
+
+/**
+ * Retorna branco ou carvão escuro garantindo contraste WCAG AA (>= 4.5:1) sobre [background].
+ */
+fun accessibleContentColorOn(background: Color): Color =
+    if (contrastRatio(Color.White, background) >= 4.5) Color.White else Color(0xFF111315)
 
 /**
  * Retorna uma cor de texto acessível para a superfície dada, interpolando na direção

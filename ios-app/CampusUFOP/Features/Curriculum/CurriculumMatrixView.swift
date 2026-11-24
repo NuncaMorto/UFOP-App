@@ -338,9 +338,9 @@ public struct CurriculumMatrixView: View {
                 } label: {
                     Label("+ Simular nota", systemImage: "slider.horizontal.3")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.mathBlue)
+                        .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme))
                         .frame(maxWidth: .infinity, minHeight: 44)
-                        .liquidGlassCapsule(selected: false, accent: CampusTheme.mathBlue, highContrast: highContrast)
+                        .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
                 }
                 .buttonStyle(.plain)
             }

@@ -218,7 +218,7 @@ private fun FilterDropdownChip(
         },
         shape = RoundedCornerShape(22.dp),
         color = if (isActive) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
         } else {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
         },
@@ -253,7 +253,11 @@ private fun FilterDropdownChip(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (isActive) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Ellipsis,
@@ -263,7 +267,11 @@ private fun FilterDropdownChip(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (isActive) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
         }
     }

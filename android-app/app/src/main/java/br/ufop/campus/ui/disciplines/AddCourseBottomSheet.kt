@@ -37,6 +37,7 @@ import br.ufop.campus.core.ffi.DepartmentColorOption
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.parseHexColor
 
@@ -256,7 +257,10 @@ fun AddCourseBottomSheet(
                     enabled = name.trim().isNotEmpty() && isCustomWorkloadValid,
                     modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
                     shape = RoundedCornerShape(22.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = accentColor,
+                        contentColor = accessibleContentColorOn(accentColor)
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,

@@ -123,8 +123,8 @@ internal struct OnboardingStep1View: View {
                         }
 
                         LiquidGlassPrimaryButton(
-                            tint: CampusTheme.mathBlue,
-                            foreground: .white,
+                            tint: accent,
+                            foreground: appearance.accentColor.onPrimary(for: colorScheme),
                             minHeight: appearance.accessibility.minTouchHeight
                         ) {
                             onContinueToSyllabi()
@@ -348,7 +348,7 @@ internal struct OnboardingStep3View: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
-                Text("Escolha tema claro ou escuro e uma das 7 cores de destaque. Você poderá alterar tudo em Perfil → Configurações.")
+                Text("Escolha tema claro ou escuro e uma das 9 cores de destaque. Você poderá alterar tudo em Perfil → Configurações.")
                     .font(.system(size: 14))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
             }

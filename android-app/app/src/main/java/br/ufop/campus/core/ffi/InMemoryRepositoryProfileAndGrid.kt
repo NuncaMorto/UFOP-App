@@ -134,6 +134,8 @@ internal fun normalizeAccentColorKey(raw: String?): String = when (raw?.trim()?.
     "YELLOW" -> "YELLOW"
     "CYAN" -> "CYAN"
     "BROWN" -> "BROWN"
+    "PINK" -> "PINK"
+    "BLUE" -> "BLUE"
     else -> "GREEN"
 }
 

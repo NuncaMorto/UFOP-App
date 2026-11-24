@@ -78,6 +78,7 @@ import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
+import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.parseHexColor
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -212,8 +213,8 @@ internal fun OnboardingStep1ProfileAndAttestation(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        color = DepartmentMathBlue.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, DepartmentMathBlue.copy(alpha = 0.30f))
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
     ) {
         Column(
             modifier = Modifier
@@ -225,7 +226,7 @@ internal fun OnboardingStep1ProfileAndAttestation(
                 text = "ATALHO · ATESTADO DE MATRÍCULA",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = DepartmentMathBlue
+                color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "Compatível com o Atestado de Matrícula em PDF (ex.: Minha UFOP) para preencher nome, matrícula, curso, disciplinas, prédios e grade horária. Disciplinas EAD são detectadas automaticamente e nenhum arquivo PDF fica salvo no aparelho.",
@@ -240,15 +241,15 @@ internal fun OnboardingStep1ProfileAndAttestation(
                     .defaultMinSize(minHeight = buttonMinHeight),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = DepartmentMathBlue,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 if (isImportingPdf) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -993,7 +994,7 @@ internal fun OnboardingStep3PersonalizationAndA11y(
         }
     }
 
-    // Card 2: Paleta com todas as 7 cores de destaque (sem Azul)
+    // Card 2: Paleta com todas as 9 cores de destaque
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -1070,7 +1071,7 @@ internal fun OnboardingStep3PersonalizationAndA11y(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Selecionada",
-                                        tint = Color.White,
+                                        tint = accessibleContentColorOn(swatch),
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }

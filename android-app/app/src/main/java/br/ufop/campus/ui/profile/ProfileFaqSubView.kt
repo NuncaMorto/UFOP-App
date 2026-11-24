@@ -71,7 +71,7 @@ private val PROFILE_FAQ_ITEMS = listOf(
     FaqAccordionItem(
         id = "personalization_a11y",
         question = "Onde ficam Personalização e Acessibilidade?",
-        answer = "Ambas ficam dentro de Perfil → Configurações → Aparência, Segurança & Acessibilidade. Em Personalização você escolhe Modo Claro/Escuro e uma das 7 cores de destaque (o azul é reservado para clima e tags). Em Acessibilidade há perfil rápido para TalkBack, escala de fonte até 145%, alto contraste, texto em negrito, redução de animações e alvos de toque de 56dp."
+        answer = "Ambas ficam dentro de Perfil → Configurações → Aparência, Segurança & Acessibilidade. Em Personalização você escolhe Modo Claro/Escuro e uma das 9 cores de destaque (incluindo rosa e azul). Em Acessibilidade há perfil rápido para TalkBack, escala de fonte até 145%, alto contraste, texto em negrito, redução de animações e alvos de toque de 56dp."
     ),
     FaqAccordionItem(
         id = "encrypted_backup_logout",

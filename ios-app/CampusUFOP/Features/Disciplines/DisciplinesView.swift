@@ -232,7 +232,7 @@ public struct DisciplinesView: View {
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                     .padding(.horizontal, 14)
                     .frame(minHeight: 40)
-                    .liquidGlassCapsule(selected: false, accent: CampusTheme.mathBlue, interactive: true, highContrast: hc)
+                    .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
                 }
                 .buttonStyle(.plain)
                 .minimumTouchTarget(minTouch)

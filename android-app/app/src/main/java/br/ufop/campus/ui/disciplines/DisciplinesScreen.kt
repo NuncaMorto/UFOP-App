@@ -193,8 +193,8 @@ fun DisciplinesScreen(
                                     }
                                     .semantics { role = Role.Button },
                                 shape = RoundedCornerShape(22.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                             ) {
                                 Row(
                                     modifier = Modifier

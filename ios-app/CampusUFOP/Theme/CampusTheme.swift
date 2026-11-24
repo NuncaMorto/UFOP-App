@@ -33,7 +33,7 @@ public extension Color {
     }
 }
 
-// MARK: - 7 Accent Palettes (v1.8.0+ Parity: Verde, Vermelho, Laranja, Roxo, Amarelo, Ciano, Marrom)
+// MARK: - 9 Accent Palettes (Verde, Vermelho, Laranja, Roxo, Amarelo, Ciano, Marrom, Rosa, Azul)
 
 public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Sendable {
     case green = "GREEN"
@@ -43,6 +43,8 @@ public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Send
     case yellow = "YELLOW"
     case cyan = "CYAN"
     case brown = "BROWN"
+    case pink = "PINK"
+    case blue = "BLUE"
 
     public var id: String { rawValue }
     public var storageKey: String { rawValue }
@@ -56,6 +58,8 @@ public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Send
         case .yellow: return "Amarelo"
         case .cyan: return "Ciano"
         case .brown: return "Marrom"
+        case .pink: return "Rosa"
+        case .blue: return "Azul"
         }
     }
 
@@ -75,6 +79,10 @@ public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Send
         case (.cyan, _): return Color(hex: 0x006874)
         case (.brown, .dark): return Color(hex: 0xD7CCC8)
         case (.brown, _): return Color(hex: 0x6D4C41)
+        case (.pink, .dark): return Color(hex: 0xF48FB1)
+        case (.pink, _): return Color(hex: 0xC2185B)
+        case (.blue, .dark): return Color(hex: 0x8AB4F8)
+        case (.blue, _): return Color(hex: 0x1D5BD6)
         }
     }
 
@@ -83,6 +91,8 @@ public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Send
         case (.yellow, _): return Color(hex: 0x1A1500)
         case (.cyan, .dark): return Color(hex: 0x002022)
         case (.brown, .dark): return Color(hex: 0x271B17)
+        case (.pink, .dark): return Color(hex: 0x3E001D)
+        case (.blue, .dark): return Color(hex: 0x001D3D)
         default: return .white
         }
     }
@@ -602,7 +612,7 @@ public extension View {
 
     func liquidGlassCapsule(
         selected: Bool = false,
-        accent: Color = CampusTheme.mathBlue,
+        accent: Color = CampusAccentColor.green.primary(for: .light),
         interactive: Bool = true,
         highContrast: Bool = false
     ) -> some View {

@@ -80,6 +80,14 @@ internal object WidgetAccentThemeHelper {
                 headerSubtitleColor = Color.parseColor("#D7CCC8"),
                 itemTimeColor = Color.parseColor("#EFEBE9")
             )
+            "PINK" -> WidgetAccentPalette(
+                headerSubtitleColor = Color.parseColor("#F48FB1"),
+                itemTimeColor = Color.parseColor("#FFD8E4")
+            )
+            "BLUE" -> WidgetAccentPalette(
+                headerSubtitleColor = Color.parseColor("#8AB4F8"),
+                itemTimeColor = Color.parseColor("#D8E6FF")
+            )
             else -> WidgetAccentPalette(
                 headerSubtitleColor = Color.parseColor("#A0B89C"),
                 itemTimeColor = Color.parseColor("#CBE6B1")
