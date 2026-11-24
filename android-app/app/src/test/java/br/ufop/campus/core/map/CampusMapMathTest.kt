@@ -25,6 +25,48 @@ class CampusMapMathTest {
     }
 
     @Test
+    fun clampZoomHandlesNonFiniteAndRangeBoundaries() {
+        assertEquals(1.2f, CampusMapMath.clampZoom(Float.NaN), 0.0001f)
+        assertEquals(1.2f, CampusMapMath.clampZoom(Float.POSITIVE_INFINITY), 0.0001f)
+        assertEquals(1.2f, CampusMapMath.clampZoom(Float.NEGATIVE_INFINITY), 0.0001f)
+
+        assertEquals(
+            CampusMapMath.MIN_ZOOM_DP_PER_METER,
+            CampusMapMath.clampZoom(-5.0f),
+            0.0001f
+        )
+        assertEquals(
+            CampusMapMath.MIN_ZOOM_DP_PER_METER,
+            CampusMapMath.clampZoom(0.01f),
+            0.0001f
+        )
+        assertEquals(
+            CampusMapMath.MAX_ZOOM_DP_PER_METER,
+            CampusMapMath.clampZoom(99.0f),
+            0.0001f
+        )
+        assertEquals(4.25f, CampusMapMath.clampZoom(4.25f), 0.0001f)
+    }
+
+    @Test
+    fun projectionClampsLowOrZeroDensityToSafeMinimum() {
+        val transform = MapViewportTransform(offsetX = 10f, offsetY = 20f, zoomDpPerMeter = 2.0f)
+
+        val zeroDensityPt = CampusMapMath.mapToScreen(4f, 6f, transform, density = 0f)
+        val negDensityPt = CampusMapMath.mapToScreen(4f, 6f, transform, density = -3f)
+        val minDensityPt = CampusMapMath.mapToScreen(4f, 6f, transform, density = 0.5f)
+
+        assertEquals(minDensityPt.x, zeroDensityPt.x, 0.0001f)
+        assertEquals(minDensityPt.y, zeroDensityPt.y, 0.0001f)
+        assertEquals(minDensityPt.x, negDensityPt.x, 0.0001f)
+        assertEquals(minDensityPt.y, negDensityPt.y, 0.0001f)
+
+        val back = CampusMapMath.screenToMap(zeroDensityPt.x, zeroDensityPt.y, transform, density = 0f)
+        assertEquals(4f, back.x, 0.001f)
+        assertEquals(6f, back.y, 0.001f)
+    }
+
+    @Test
     fun panAndZoomPreservesAnchorUnderCentroid() {
         val initial = MapViewportTransform(offsetX = 200f, offsetY = 150f, zoomDpPerMeter = 1.5f)
         val density = 2.0f
@@ -49,6 +91,40 @@ class CampusMapMathTest {
     }
 
     @Test
+    fun combinedPanAndZoomShiftsAnchorByPanDeltaAndClampsZoom() {
+        val initial = MapViewportTransform(offsetX = 100f, offsetY = 80f, zoomDpPerMeter = 10.0f)
+        val density = 2.0f
+        val centroidX = 300f
+        val centroidY = 250f
+        val anchorMap = CampusMapMath.screenToMap(centroidX, centroidY, initial, density)
+
+        val zoomedMax = CampusMapMath.applyPanAndZoom(
+            current = initial,
+            panDeltaX = 24f,
+            panDeltaY = -16f,
+            zoomFactor = 5.0f,
+            centroidX = centroidX,
+            centroidY = centroidY,
+            density = density
+        )
+        assertEquals(CampusMapMath.MAX_ZOOM_DP_PER_METER, zoomedMax.zoomDpPerMeter, 0.001f)
+        val anchorAfterScreen = CampusMapMath.mapToScreen(anchorMap.x, anchorMap.y, zoomedMax, density)
+        assertEquals(centroidX + 24f, anchorAfterScreen.x, 0.01f)
+        assertEquals(centroidY - 16f, anchorAfterScreen.y, 0.01f)
+
+        val zoomedMin = CampusMapMath.applyPanAndZoom(
+            current = zoomedMax,
+            panDeltaX = 0f,
+            panDeltaY = 0f,
+            zoomFactor = 0.001f,
+            centroidX = centroidX,
+            centroidY = centroidY,
+            density = 0.1f
+        )
+        assertEquals(CampusMapMath.MIN_ZOOM_DP_PER_METER, zoomedMin.zoomDpPerMeter, 0.001f)
+    }
+
+    @Test
     fun computeCameraTargetCentersFocusBoundsInViewport() {
         val bounds = MapRect2D(minX = -20f, minY = 140f, maxX = 20f, maxY = 180f)
         val target = CampusMapMath.computeCameraTarget(
@@ -66,7 +142,51 @@ class CampusMapMathTest {
     }
 
     @Test
-    fun secondaryLabelVisibilityRespectsProjectedPolygonWidth() {
+    fun computeCameraTargetHandlesNarrowWideAndDegenerateViewports() {
+        val wideBounds = MapRect2D(minX = 0f, minY = 0f, maxX = 200f, maxY = 40f)
+        val narrowViewport = CampusMapMath.computeCameraTarget(
+            bounds = wideBounds,
+            viewportWidthPx = 400f,
+            viewportHeightPx = 1200f,
+            density = 2.0f,
+            paddingDp = 20f
+        )
+        val wideViewport = CampusMapMath.computeCameraTarget(
+            bounds = wideBounds,
+            viewportWidthPx = 3000f,
+            viewportHeightPx = 600f,
+            density = 2.0f,
+            paddingDp = 20f
+        )
+
+        // Narrow portrait viewport must fit 200m horizontally: availW = 320px -> scale = 1.6 -> zoom = 0.8
+        assertEquals(0.8f, narrowViewport.zoomDpPerMeter, 0.001f)
+        val narrowCenter = CampusMapMath.mapToScreen(100f, 20f, narrowViewport, 2.0f)
+        assertEquals(200f, narrowCenter.x, 0.1f)
+        assertEquals(600f, narrowCenter.y, 0.1f)
+
+        // Wide landscape viewport is constrained vertically: availH = 520px over 40m -> scale = 13 -> zoom = 6.5
+        assertEquals(6.5f, wideViewport.zoomDpPerMeter, 0.001f)
+        val wideCenter = CampusMapMath.mapToScreen(100f, 20f, wideViewport, 2.0f)
+        assertEquals(1500f, wideCenter.x, 0.1f)
+        assertEquals(300f, wideCenter.y, 0.1f)
+
+        // Point-like bounds and tiny viewport stay finite and valid
+        val pointBounds = MapRect2D(minX = 12f, minY = 24f, maxX = 12f, maxY = 24f)
+        val tinyTarget = CampusMapMath.computeCameraTarget(
+            bounds = pointBounds,
+            viewportWidthPx = 0f,
+            viewportHeightPx = -10f,
+            density = 0f,
+            paddingDp = 36f
+        )
+        assertTrue(tinyTarget.zoomDpPerMeter.isFinite())
+        assertTrue(tinyTarget.offsetX.isFinite())
+        assertTrue(tinyTarget.offsetY.isFinite())
+    }
+
+    @Test
+    fun secondaryLabelVisibilityRespectsProjectedPolygonWidthAndBoundaries() {
         assertFalse(
             CampusMapMath.shouldShowSecondaryLabel(
                 bboxMinX = 0f,
@@ -83,6 +203,47 @@ class CampusMapMathTest {
                 zoomDpPerMeter = 2.0f,
                 density = 2.0f,
                 textWidthPx = 60f
+            )
+        )
+        // Zero or negative textWidthPx always returns false
+        assertFalse(
+            CampusMapMath.shouldShowSecondaryLabel(
+                bboxMinX = 0f,
+                bboxMaxX = 100f,
+                zoomDpPerMeter = 2.0f,
+                density = 2.0f,
+                textWidthPx = 0f
+            )
+        )
+        assertFalse(
+            CampusMapMath.shouldShowSecondaryLabel(
+                bboxMinX = 0f,
+                bboxMaxX = 100f,
+                zoomDpPerMeter = 2.0f,
+                density = 2.0f,
+                textWidthPx = -10f
+            )
+        )
+        // Exact boundary: width = 10m, scale = 2*2 = 4 -> 40px == 32px + 8px
+        assertTrue(
+            CampusMapMath.shouldShowSecondaryLabel(
+                bboxMinX = 5f,
+                bboxMaxX = 15f,
+                zoomDpPerMeter = 2.0f,
+                density = 2.0f,
+                textWidthPx = 32f,
+                marginPx = 8f
+            )
+        )
+        // Just under threshold (40px < 32.5px + 8px)
+        assertFalse(
+            CampusMapMath.shouldShowSecondaryLabel(
+                bboxMinX = 5f,
+                bboxMaxX = 15f,
+                zoomDpPerMeter = 2.0f,
+                density = 2.0f,
+                textWidthPx = 32.5f,
+                marginPx = 8f
             )
         )
     }

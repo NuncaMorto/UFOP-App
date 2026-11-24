@@ -31,17 +31,93 @@ data class CampusMapUiState(
     val errorMessage: String? = null
 )
 
+internal interface CampusMapEngineGateway : AutoCloseable {
+    fun listCampuses(): List<CampusMapSummary>
+    fun getActiveCampusId(): String
+    fun setActiveCampus(campusId: String): CampusMapSummary
+    fun getRenderBatch(floor: Int, timestampIso: String?): RenderBatch
+    fun hitTest(mapX: Float, mapY: Float, floor: Int, zoom: Float): MapHit?
+    fun getCameraFocus(featureId: String): CameraFocus?
+    fun getFeature(featureId: String): FeatureInfo?
+    fun getRoomOccupancy(roomId: String, timestampIso: String): OccupancyStatus
+    fun resolveMeeting(
+        courseCode: String,
+        section: String,
+        weekday: UInt,
+        startTime: String,
+        fallbackBuildingRaw: String
+    ): Resolution
+}
+
+private class NativeCampusMapEngineGateway(
+    private val delegate: CampusMapEngine
+) : CampusMapEngineGateway {
+    override fun listCampuses(): List<CampusMapSummary> = delegate.listCampuses()
+
+    override fun getActiveCampusId(): String = delegate.getActiveCampusId()
+
+    override fun setActiveCampus(campusId: String): CampusMapSummary =
+        delegate.setActiveCampus(campusId)
+
+    override fun getRenderBatch(floor: Int, timestampIso: String?): RenderBatch =
+        delegate.getRenderBatch(floor, timestampIso)
+
+    override fun hitTest(mapX: Float, mapY: Float, floor: Int, zoom: Float): MapHit? =
+        delegate.hitTest(mapX, mapY, floor, zoom)
+
+    override fun getCameraFocus(featureId: String): CameraFocus? =
+        delegate.getCameraFocus(featureId)
+
+    override fun getFeature(featureId: String): FeatureInfo? = delegate.getFeature(featureId)
+
+    override fun getRoomOccupancy(roomId: String, timestampIso: String): OccupancyStatus =
+        delegate.getRoomOccupancy(roomId, timestampIso)
+
+    override fun resolveMeeting(
+        courseCode: String,
+        section: String,
+        weekday: UInt,
+        startTime: String,
+        fallbackBuildingRaw: String
+    ): Resolution = delegate.resolveMeeting(
+        courseCode = courseCode,
+        section = section,
+        weekday = weekday,
+        startTime = startTime,
+        fallbackBuildingRaw = fallbackBuildingRaw
+    )
+
+    override fun close() = delegate.close()
+}
+
 /**
  * Controlador stateful do motor vetorial offline 2D (`CampusMapEngine`).
  * Gera o [RenderBatch] apenas em trocas discretas de campus, andar ou horário,
  * mantendo pan e zoom 100% livres de chamadas FFI por frame.
  */
-class CampusMapController(
-    initialTimestampIso: String? = null
+class CampusMapController private constructor(
+    initialTimestampIso: String?,
+    private val engineFactory: () -> CampusMapEngineGateway,
+    @Suppress("UNUSED_PARAMETER") marker: Boolean
 ) : AutoCloseable {
 
+    constructor(initialTimestampIso: String? = null) : this(
+        initialTimestampIso = initialTimestampIso,
+        engineFactory = { NativeCampusMapEngineGateway(CampusMapEngine.newBundled()) },
+        marker = true
+    )
+
+    internal constructor(
+        initialTimestampIso: String? = null,
+        engineFactory: () -> CampusMapEngineGateway
+    ) : this(
+        initialTimestampIso = initialTimestampIso,
+        engineFactory = engineFactory,
+        marker = true
+    )
+
     private val engineLock = Any()
-    private var nativeEngine: CampusMapEngine? = null
+    private var nativeEngine: CampusMapEngineGateway? = null
 
     private val _state = MutableStateFlow(
         CampusMapUiState(timestampIso = initialTimestampIso)
@@ -55,7 +131,7 @@ class CampusMapController(
     private fun loadBundledEngine(initialTimestampIso: String?) {
         synchronized(engineLock) {
             try {
-                val engine = CampusMapEngine.newBundled()
+                val engine = engineFactory()
                 nativeEngine = engine
                 val campuses = engine.listCampuses()
                 val activeId = engine.getActiveCampusId()
@@ -244,7 +320,7 @@ class CampusMapController(
         return current.renderBatch?.floorLabels.orEmpty()
     }
 
-    private fun applyCameraFocusLocked(engine: CampusMapEngine, focus: CameraFocus) {
+    private fun applyCameraFocusLocked(engine: CampusMapEngineGateway, focus: CameraFocus) {
         if (focus.campusId != _state.value.activeCampusId) {
             runCatching { engine.setActiveCampus(focus.campusId) }
         }
@@ -262,7 +338,7 @@ class CampusMapController(
     }
 
     private fun resolveOccupancyLocked(
-        engine: CampusMapEngine,
+        engine: CampusMapEngineGateway,
         feature: FeatureInfo?,
         timestampIso: String?
     ): OccupancyStatus? {
