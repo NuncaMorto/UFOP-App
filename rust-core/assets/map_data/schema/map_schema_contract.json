@@ -1,0 +1,109 @@
+{
+  "schema_version": "2.0.0",
+  "id_convention": {
+    "building_id_pattern": "^[A-Z0-9_]+$",
+    "room_id_format": "<BUILDING_CODE>_<ROOM_CODE>",
+    "room_id_pattern": "^[A-Z0-9]+_[A-Z0-9-]+$",
+    "zero_padding_rule": "Salas puramente numéricas de 1..99 em EM e ICEB usam 2 dígitos (EM_04, ICEB_07, ICEB_19); salas de 3+ dígitos ou alfanuméricas mantêm o código (BSA_106, BSA_205, ICEA_C103, ICEA_H102).",
+    "floor_decoupling_rule": "O andar NÃO entra no room_id; fica apenas em properties.floor. Ao substituir plantas mock por plantas reais, nenhum room_id ou vínculo de grade é quebrado.",
+    "excluded_fields": [
+      "capacity (explicitamente omitido para manter paridade entre todos os campi)"
+    ]
+  },
+  "indoor_overlay_architecture": {
+    "manifest": "maps/campus_manifest.json",
+    "override_rule": "Ao carregar um campus, se existir overlay em maps/indoor/<BUILDING_ID>.geojson, remover do base_map as features com is_mock=true cujo building_id e floor constem em replaces_mock_floors e inserir as features do overlay.",
+    "indoor_status_values": [
+      "floorplan",
+      "partial_floorplan",
+      "provisional",
+      "exterior_only"
+    ],
+    "ui_hint": "Exibir badge discreto 'Layout esquemático' quando a sala/andar selecionado tiver is_mock=true."
+  },
+  "location_resolution_order": [
+    "1. Lookup no occupancy_2026_2.json por (course_code, section, weekday, start_time) — resolve sala E prédio real mesmo quando difere do Atestado (ex.: BCC721-11: Atestado='ICEB', real='BSA_205' terça e 'BSA_106' quinta).",
+    "2. Se o usuário forneceu room manual, normalizar para <BUILDING_CODE>_<ROOM_CODE> e focar a sala + trocar para feature.floor.",
+    "3. Fallback no nível de prédio via tabela atestado_building_aliases (ex.: 'ESCOLA DE MINAS' -> 'EM', 'ICEB' -> 'ICEB').",
+    "4. Caso sem correspondência, retornar LocationMatch::Unmapped(raw_label) sem erro na UI."
+  ],
+  "atestado_building_aliases": {
+    "ICEB": "ICEB",
+    "ICEB I": "ICEB_I",
+    "ICEB II": "ICEB",
+    "ICEB III": "ICEB",
+    "INSTITUTO DE CIENCIAS EXATAS E BIOLOGICAS": "ICEB",
+    "ESCOLA DE MINAS": "EM",
+    "EM": "EM",
+    "LABORATORIOS DA ESCOLA DE MINAS": "LAB_EM",
+    "DEGEO": "DEGEO",
+    "DEMIN": "DEMIN",
+    "CMM": "CMM",
+    "BLOCO DE SALAS DE AULA": "BSA",
+    "BLOCO DE SALAS": "BSA",
+    "PAVILHAO DE AULAS": "BSA",
+    "PAVILHAO DE SALAS DE AULA": "BSA",
+    "BSA": "BSA",
+    "ESCOLA DE FARMACIA": "EFAR",
+    "EFAR": "EFAR",
+    "FARMACIA ESCOLA": "FARMACIA_ESCOLA",
+    "ESCOLA DE MEDICINA": "EMED",
+    "EMED": "EMED",
+    "ESCOLA DE NUTRICAO": "ENUT",
+    "ENUT": "ENUT",
+    "ESCOLA DE EDUCACAO FISICA": "EEF",
+    "CEDUFOP": "EEF",
+    "EEF": "EEF",
+    "EDTM": "EDTM_NORTE",
+    "ESCOLA DE DIREITO TURISMO E MUSEOLOGIA": "EDTM_NORTE",
+    "CEAD": "CEAD",
+    "NUPEB": "NUPEB",
+    "IFAC": "IFAC_MORRO",
+    "DEART": "IFAC_MORRO",
+    "DEMUS": "IFAC_MORRO",
+    "RU": "RU",
+    "RESTAURANTE UNIVERSITARIO": "RU",
+    "ICEA": "CAMPUS_ICEA",
+    "BLOCO A": "ICEA_A",
+    "BLOCO B": "ICEA_B",
+    "BLOCO C": "ICEA_C",
+    "BLOCO D": "ICEA_D",
+    "BLOCO E": "ICEA_E",
+    "BLOCO G": "ICEA_G",
+    "BLOCO H": "ICEA_H",
+    "ICHS": "CAMPUS_ICHS",
+    "ICSA": "CAMPUS_ICSA"
+  },
+  "layer_z_order": [
+    "campus_ground",
+    "campus_zone",
+    "green_area",
+    "parking",
+    "sports",
+    "walkway",
+    "building",
+    "room",
+    "poi"
+  ],
+  "poi_types": [
+    "toilet",
+    "faculty_office",
+    "entrance",
+    "dining",
+    "library",
+    "parking",
+    "academic"
+  ],
+  "occupancy_rules": {
+    "timezone": "America/Sao_Paulo",
+    "time_matching": "Usar comparação por intervalo [start, end) em minutos do dia (não assumir grade fixa de 50 min, pois OP usa blocos de 50 min e JM/ICEA usa blocos de 100 min como 15:25-17:05 e 18:50-20:30).",
+    "status_enum": [
+      "Occupied(SlotInfo)",
+      "NoRegularClass",
+      "NoData",
+      "OutOfTerm"
+    ],
+    "ui_free_label": "Sem aula regular agora",
+    "ui_no_data_label": "Sem grade cadastrada para este dia/prédio"
+  }
+}

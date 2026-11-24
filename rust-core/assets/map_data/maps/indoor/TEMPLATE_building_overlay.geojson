@@ -1,0 +1,67 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "schema_version": "2.0.0",
+    "campus_id": "OP_MC",
+    "building_id": "<BUILDING_ID_EX_EFAR_OU_ICEB>",
+    "replaces_mock_floors": [
+      0,
+      1
+    ],
+    "floor_status": {
+      "0": "floorplan",
+      "1": "floorplan"
+    },
+    "notes": "Template plug-and-play: ao adicionar este arquivo em maps/indoor/<BUILDING_ID>.geojson e registrá-lo em campus_manifest.json, o motor Rust substitui automaticamente salas is_mock=true dos andares listados."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "<BUILDING_ID>_<ROOM_CODE>",
+      "properties": {
+        "id": "<BUILDING_ID>_<ROOM_CODE>",
+        "layer": "room",
+        "parent_id": "<BUILDING_ID>",
+        "building_id": "<BUILDING_ID>",
+        "code": "<ROOM_CODE>",
+        "name": "Sala <ROOM_CODE> — <BUILDING_ID>",
+        "aliases": [
+          "<building_id> <room_code>",
+          "sala <room_code>"
+        ],
+        "category": "classroom",
+        "floor": 0,
+        "min_zoom": 1.8,
+        "is_mock": false,
+        "geometry_source": "floorplan"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -43.51,
+              -20.39
+            ],
+            [
+              -43.5099,
+              -20.39
+            ],
+            [
+              -43.5099,
+              -20.3901
+            ],
+            [
+              -43.51,
+              -20.3901
+            ],
+            [
+              -43.51,
+              -20.39
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

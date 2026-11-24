@@ -1,0 +1,65 @@
+{
+  "schema_version": "2.0.0",
+  "campuses": [
+    {
+      "campus_id": "OP_MC",
+      "name": "Campus Ouro Preto — Morro do Cruzeiro",
+      "base_map": "maps/morro_do_cruzeiro.geojson",
+      "occupancy_file": "schedule/occupancy_2026_2.json",
+      "indoor_overlays": [
+        {
+          "building_id": "EM",
+          "file": "maps/indoor/EM.geojson",
+          "status": "partial_floorplan",
+          "mapped_floors": [
+            1
+          ],
+          "provisional_floors": [
+            0
+          ]
+        },
+        {
+          "building_id": "ICEB",
+          "file": "maps/indoor/ICEB.geojson",
+          "status": "provisional",
+          "mapped_floors": [],
+          "provisional_floors": [
+            0,
+            1
+          ]
+        },
+        {
+          "building_id": "BSA",
+          "file": "maps/indoor/BSA.geojson",
+          "status": "provisional",
+          "mapped_floors": [],
+          "provisional_floors": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "campus_id": "JM_ICEA",
+      "name": "Campus João Monlevade — ICEA",
+      "base_map": "maps/icea_joao_monlevade.geojson",
+      "occupancy_file": "schedule/occupancy_2026_2.json",
+      "indoor_overlays": []
+    },
+    {
+      "campus_id": "MA_ICHS",
+      "name": "Campus Mariana — ICHS",
+      "base_map": "maps/ichs_mariana.geojson",
+      "occupancy_file": null,
+      "indoor_overlays": []
+    },
+    {
+      "campus_id": "MA_ICSA",
+      "name": "Campus Mariana — ICSA",
+      "base_map": "maps/icsa_mariana.geojson",
+      "occupancy_file": null,
+      "indoor_overlays": []
+    }
+  ]
+}
