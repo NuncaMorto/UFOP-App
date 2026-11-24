@@ -13,29 +13,21 @@ pub fn build_render_batch(
     active_floor: i32,
     timestamp_opt: Option<&str>,
 ) -> Result<RenderBatch, CampusError> {
-    let mut active_indices: Vec<usize> = campus
-        .features
-        .iter()
-        .enumerate()
-        .filter(|(_, feat)| match feat.info.layer {
-            MapLayer::Room | MapLayer::Poi => feat.info.floor.is_none_or(|f| f == active_floor),
-            _ => true,
-        })
-        .map(|(idx, _)| idx)
-        .collect();
-
-    active_indices.sort_by_key(|&idx| {
-        let feat = &campus.features[idx];
-        (feat.info.layer.z_order(), feat.info.id.as_str())
-    });
+    let parsed_ts = match timestamp_opt {
+        Some(ts) => Some(OccupancyIndex::parse_timestamp_sao_paulo(ts)?),
+        None => None,
+    };
 
     let mut coords: Vec<f32> = Vec::new();
     let mut ring_starts: Vec<u32> = Vec::new();
     let mut ring_counts: Vec<u32> = Vec::new();
-    let mut items: Vec<RenderFeature> = Vec::with_capacity(active_indices.len());
+    let mut items: Vec<RenderFeature> = Vec::with_capacity(campus.features.len());
 
-    for idx in active_indices {
-        let feat = &campus.features[idx];
+    // `campus.features` já chega pré-ordenado por `(layer.z_order(), id)` do assembler.
+    for feat in campus.features.iter().filter(|feat| match feat.info.layer {
+        MapLayer::Room | MapLayer::Poi => feat.info.floor.is_none_or(|f| f == active_floor),
+        _ => true,
+    }) {
         let ring_start_idx = ring_starts.len() as u32;
         let mut ring_count = 0u32;
         let mut point_x = feat.info.label_x;
@@ -83,14 +75,16 @@ pub fn build_render_batch(
             }
         };
 
-        let (occ_kind, occ_label) = match (feat.info.layer, timestamp_opt) {
-            (MapLayer::Room, Some(ts)) => {
-                let status = occupancy.get_room_occupancy(
+        let (occ_kind, occ_label) = match (feat.info.layer, parsed_ts) {
+            (MapLayer::Room, Some((date, weekday, minute_of_day))) => {
+                let status = occupancy.get_room_occupancy_at(
                     &feat.info.id,
                     feat.info.building_id.as_deref(),
                     true,
-                    ts,
-                )?;
+                    date,
+                    weekday,
+                    minute_of_day,
+                );
                 match status {
                     OccupancyStatus::Occupied { slot } => {
                         (RenderOccupancyKind::Occupied, Some(slot.label))

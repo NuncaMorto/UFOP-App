@@ -70,9 +70,11 @@ pub struct OccupancyIndex {
     pub term_end: NaiveDate,
     pub holidays: HashSet<NaiveDate>,
     pub coverage_weekdays: HashMap<String, HashSet<u32>>,
+    pub building_campus: HashMap<String, String>,
+    pub room_campus: HashMap<String, String>,
     pub known_buildings: Vec<String>,
     pub known_rooms: HashSet<String>,
-    pub by_room_weekday: HashMap<(String, u32), Vec<IndexedSlot>>,
+    pub by_weekday_room: HashMap<u32, HashMap<String, Vec<IndexedSlot>>>,
     pub by_course_weekday: HashMap<(String, u32), Vec<IndexedSlot>>,
 }
 
@@ -184,9 +186,11 @@ impl OccupancyIndex {
             term_end: NaiveDate::from_ymd_opt(2026, 12, 23).expect("valid date"),
             holidays: HashSet::new(),
             coverage_weekdays: HashMap::new(),
+            building_campus: HashMap::new(),
+            room_campus: HashMap::new(),
             known_buildings: Vec::new(),
             known_rooms: HashSet::new(),
-            by_room_weekday: HashMap::new(),
+            by_weekday_room: HashMap::new(),
             by_course_weekday: HashMap::new(),
         }
     }
@@ -216,16 +220,22 @@ impl OccupancyIndex {
         }
 
         let mut coverage_weekdays: HashMap<String, HashSet<u32>> = HashMap::new();
+        let mut building_campus: HashMap<String, String> = HashMap::new();
+        let mut room_campus: HashMap<String, String> = HashMap::new();
         let mut known_buildings: Vec<String> = Vec::with_capacity(doc.coverage.len());
         for (bid, cov) in doc.coverage {
             let clean_bid = bid.trim().to_ascii_uppercase();
+            let clean_cid = cov.campus_id.trim();
+            if !clean_cid.is_empty() {
+                building_campus.insert(clean_bid.clone(), clean_cid.to_string());
+            }
             known_buildings.push(clean_bid.clone());
             coverage_weekdays.insert(clean_bid, cov.covered_weekdays.into_iter().collect());
         }
         known_buildings.sort_by_key(|b| std::cmp::Reverse(b.len()));
 
         let mut known_rooms = HashSet::new();
-        let mut by_room_weekday: HashMap<(String, u32), Vec<IndexedSlot>> = HashMap::new();
+        let mut by_weekday_room: HashMap<u32, HashMap<String, Vec<IndexedSlot>>> = HashMap::new();
         let mut by_course_weekday: HashMap<(String, u32), Vec<IndexedSlot>> = HashMap::new();
 
         for slot in doc.slots {
@@ -236,6 +246,15 @@ impl OccupancyIndex {
                 continue;
             };
             known_rooms.insert(slot.room_id.clone());
+            let clean_cid = slot.campus_id.trim();
+            if !clean_cid.is_empty() {
+                room_campus
+                    .entry(slot.room_id.trim().to_ascii_uppercase())
+                    .or_insert_with(|| clean_cid.to_string());
+                building_campus
+                    .entry(slot.building_id.trim().to_ascii_uppercase())
+                    .or_insert_with(|| clean_cid.to_string());
+            }
 
             let course_codes: Vec<String> = slot
                 .courses
@@ -279,8 +298,10 @@ impl OccupancyIndex {
                 expanded_courses,
             };
 
-            by_room_weekday
-                .entry((indexed.raw.room_id.clone(), weekday))
+            by_weekday_room
+                .entry(weekday)
+                .or_default()
+                .entry(indexed.raw.room_id.clone())
                 .or_default()
                 .push(indexed.clone());
 
@@ -292,8 +313,10 @@ impl OccupancyIndex {
             }
         }
 
-        for list in by_room_weekday.values_mut() {
-            list.sort_by_key(|s| s.start_min);
+        for rooms in by_weekday_room.values_mut() {
+            for list in rooms.values_mut() {
+                list.sort_by_key(|s| s.start_min);
+            }
         }
 
         Ok(Self {
@@ -301,11 +324,33 @@ impl OccupancyIndex {
             term_end,
             holidays,
             coverage_weekdays,
+            building_campus,
+            room_campus,
             known_buildings,
             known_rooms,
-            by_room_weekday,
+            by_weekday_room,
             by_course_weekday,
         })
+    }
+
+    pub fn campus_for_building(&self, building_id: &str) -> Option<&str> {
+        let upper = building_id.trim().to_ascii_uppercase();
+        if upper.is_empty() {
+            return None;
+        }
+        self.building_campus.get(&upper).map(String::as_str)
+    }
+
+    pub fn campus_for_room_or_building(&self, room_or_building_id: &str) -> Option<&str> {
+        let upper = room_or_building_id.trim().to_ascii_uppercase();
+        if upper.is_empty() {
+            return None;
+        }
+        if let Some(campus) = self.room_campus.get(&upper) {
+            return Some(campus.as_str());
+        }
+        let bid = self.infer_building_id(room_or_building_id, None);
+        self.building_campus.get(&bid).map(String::as_str)
     }
 
     /// Converte timestamp (epoch em segundos/milissegundos ou ISO 8601) para `(NaiveDate, weekday 1..=7, minute_of_day)` em `America/Sao_Paulo`.
@@ -391,11 +436,62 @@ impl OccupancyIndex {
             return upper;
         }
         for known in &self.known_buildings {
-            if upper.starts_with(&format!("{known}_")) {
+            if upper
+                .strip_prefix(known.as_str())
+                .is_some_and(|rest| rest.starts_with('_'))
+            {
                 return known.clone();
             }
         }
         upper.split('_').next().unwrap_or(&upper).to_string()
+    }
+
+    pub fn get_room_occupancy_at(
+        &self,
+        room_id: &str,
+        mapped_building_id: Option<&str>,
+        room_exists_in_map: bool,
+        date: NaiveDate,
+        weekday: u32,
+        minute_of_day: u32,
+    ) -> OccupancyStatus {
+        if date < self.term_start
+            || date > self.term_end
+            || weekday == 7
+            || self.holidays.contains(&date)
+        {
+            return OccupancyStatus::OutOfTerm;
+        }
+
+        let building_id = self.infer_building_id(room_id, mapped_building_id);
+        let Some(covered_days) = self.coverage_weekdays.get(&building_id) else {
+            return OccupancyStatus::NoData;
+        };
+        if !covered_days.contains(&weekday) {
+            return OccupancyStatus::NoData;
+        }
+
+        let clean_room_id = room_id.trim();
+        let known_in_schedule = self.known_rooms.contains(clean_room_id);
+        if !room_exists_in_map && !known_in_schedule {
+            return OccupancyStatus::NoData;
+        }
+
+        if let Some(slots) = self
+            .by_weekday_room
+            .get(&weekday)
+            .and_then(|rooms| rooms.get(clean_room_id))
+        {
+            for slot in slots {
+                if minute_of_day >= slot.start_min && minute_of_day < slot.end_min {
+                    return OccupancyStatus::Occupied {
+                        slot: slot.info.clone(),
+                    };
+                }
+            }
+        }
+
+        OccupancyStatus::NoRegularClass
     }
 
     pub fn get_room_occupancy(
@@ -407,43 +503,14 @@ impl OccupancyIndex {
     ) -> Result<OccupancyStatus, CampusError> {
         let (date, weekday, minute_of_day) =
             Self::parse_timestamp_sao_paulo(timestamp_epoch_or_iso)?;
-
-        if date < self.term_start
-            || date > self.term_end
-            || weekday == 7
-            || self.holidays.contains(&date)
-        {
-            return Ok(OccupancyStatus::OutOfTerm);
-        }
-
-        let building_id = self.infer_building_id(room_id, mapped_building_id);
-        let Some(covered_days) = self.coverage_weekdays.get(&building_id) else {
-            return Ok(OccupancyStatus::NoData);
-        };
-        if !covered_days.contains(&weekday) {
-            return Ok(OccupancyStatus::NoData);
-        }
-
-        let clean_room_id = room_id.trim();
-        let known_in_schedule = self.known_rooms.contains(clean_room_id);
-        if !room_exists_in_map && !known_in_schedule {
-            return Ok(OccupancyStatus::NoData);
-        }
-
-        if let Some(slots) = self
-            .by_room_weekday
-            .get(&(clean_room_id.to_string(), weekday))
-        {
-            for slot in slots {
-                if minute_of_day >= slot.start_min && minute_of_day < slot.end_min {
-                    return Ok(OccupancyStatus::Occupied {
-                        slot: slot.info.clone(),
-                    });
-                }
-            }
-        }
-
-        Ok(OccupancyStatus::NoRegularClass)
+        Ok(self.get_room_occupancy_at(
+            room_id,
+            mapped_building_id,
+            room_exists_in_map,
+            date,
+            weekday,
+            minute_of_day,
+        ))
     }
 
     pub fn list_building_occupancy(
@@ -452,10 +519,18 @@ impl OccupancyIndex {
         rooms: &[(String, String, i32, bool)],
         timestamp_epoch_or_iso: &str,
     ) -> Result<Vec<RoomOccupancyItem>, CampusError> {
+        let (date, weekday, minute_of_day) =
+            Self::parse_timestamp_sao_paulo(timestamp_epoch_or_iso)?;
         let mut results = Vec::with_capacity(rooms.len());
         for (room_id, room_code, floor, is_mock) in rooms {
-            let status =
-                self.get_room_occupancy(room_id, Some(building_id), true, timestamp_epoch_or_iso)?;
+            let status = self.get_room_occupancy_at(
+                room_id,
+                Some(building_id),
+                true,
+                date,
+                weekday,
+                minute_of_day,
+            );
             results.push(RoomOccupancyItem {
                 room_id: room_id.clone(),
                 room_code: room_code.clone(),

@@ -76,6 +76,25 @@ pub fn focus_for_bounds(
     }
 }
 
+pub fn find_matching_slot_for_meeting<'a>(
+    occupancy: &'a OccupancyIndex,
+    course_code: &str,
+    section: &str,
+    weekday: u32,
+    start_time: &str,
+) -> Option<&'a IndexedSlot> {
+    let clean_course = course_code.trim().to_ascii_uppercase();
+    if clean_course.is_empty() {
+        return None;
+    }
+    let start_min = parse_hhmm_to_minutes(start_time)?;
+    let target_secs = expand_section_tokens(&[section.to_string()]);
+    let candidates = occupancy
+        .by_course_weekday
+        .get(&(clean_course.clone(), weekday))?;
+    pick_matching_slot(candidates, &clean_course, &target_secs, start_min)
+}
+
 impl MeetingResolver {
     pub fn from_contract_json(raw_json: &str) -> Self {
         let parsed: SchemaContractDoc =
@@ -96,23 +115,15 @@ impl MeetingResolver {
     pub fn resolve_meeting(
         &self,
         occupancy: &OccupancyIndex,
-        campuses: &[LoadedCampus],
+        campuses: &[&LoadedCampus],
         course_code: &str,
         section: &str,
         weekday: u32,
         start_time: &str,
         fallback_building_raw: &str,
     ) -> Resolution {
-        let clean_course = course_code.trim().to_ascii_uppercase();
-        let target_secs = expand_section_tokens(&[section.to_string()]);
-
-        if !clean_course.is_empty()
-            && let Some(start_min) = parse_hhmm_to_minutes(start_time)
-            && let Some(candidates) = occupancy
-                .by_course_weekday
-                .get(&(clean_course.clone(), weekday))
-            && let Some(matched_slot) =
-                pick_matching_slot(candidates, &clean_course, &target_secs, start_min)
+        if let Some(matched_slot) =
+            find_matching_slot_for_meeting(occupancy, course_code, section, weekday, start_time)
         {
             if let Some(focus) = find_feature_focus(campuses, &matched_slot.raw.room_id) {
                 return Resolution::ExactRoom {
@@ -148,7 +159,7 @@ impl MeetingResolver {
 
     fn resolve_building_candidate(
         &self,
-        campuses: &[LoadedCampus],
+        campuses: &[&LoadedCampus],
         raw_candidate: &str,
     ) -> Option<CameraFocus> {
         let norm_building = normalize_lookup_key(raw_candidate);
@@ -164,9 +175,9 @@ impl MeetingResolver {
         find_building_focus(campuses, &resolved_id)
     }
 
-    fn resolve_building_fallback(
+    pub fn resolve_building_fallback(
         &self,
-        campuses: &[LoadedCampus],
+        campuses: &[&LoadedCampus],
         fallback_building_raw: &str,
     ) -> Option<CameraFocus> {
         let trimmed = fallback_building_raw.trim();
@@ -263,7 +274,7 @@ fn focus_from_campus_feature(campus: &LoadedCampus, feat: &LoadedFeature) -> Cam
     )
 }
 
-pub fn find_feature_focus(campuses: &[LoadedCampus], feature_id: &str) -> Option<CameraFocus> {
+pub fn find_feature_focus(campuses: &[&LoadedCampus], feature_id: &str) -> Option<CameraFocus> {
     for campus in campuses {
         if let Some(feat) = campus
             .features
@@ -276,7 +287,7 @@ pub fn find_feature_focus(campuses: &[LoadedCampus], feature_id: &str) -> Option
     None
 }
 
-pub fn find_building_focus(campuses: &[LoadedCampus], building_id: &str) -> Option<CameraFocus> {
+pub fn find_building_focus(campuses: &[&LoadedCampus], building_id: &str) -> Option<CameraFocus> {
     let clean_id = building_id.trim();
     let norm_target = normalize_lookup_key(clean_id);
     if clean_id.is_empty() && norm_target.is_empty() {

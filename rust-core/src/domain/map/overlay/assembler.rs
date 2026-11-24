@@ -88,6 +88,13 @@ pub fn load_campus_with_overlays(
     }
 
     recompute_building_indoor_statuses(&mut features);
+    features.sort_by(|a, b| {
+        a.info
+            .layer
+            .z_order()
+            .cmp(&b.info.layer.z_order())
+            .then_with(|| a.info.id.cmp(&b.info.id))
+    });
 
     let mut available_floors: Vec<i32> = floor_set.into_iter().collect();
     available_floors.sort_unstable();

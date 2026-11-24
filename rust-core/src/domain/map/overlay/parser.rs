@@ -165,9 +165,10 @@ pub(super) fn parse_raw_feature(
     let Some(geom_raw) = feature.geometry.as_ref() else {
         return Ok(None);
     };
-    let Some(geometry) = project_geojson_geometry(geom_raw, projector) else {
+    let Some(projected_geometry) = project_geojson_geometry(geom_raw, projector) else {
         return Ok(None);
     };
+    let geometry = super::super::simplify::simplify_geometry_for_layer(layer, projected_geometry);
 
     let id = extract_feature_id(feature, props);
     if id.is_empty() {

@@ -647,18 +647,17 @@ fn resolve_meeting_handles_composite_building_fallbacks() {
     }
 
     // Garante que find_building_focus normaliza underscores/espaços ao casar id, code, name e aliases.
+    let loaded = engine.loaded_campuses();
     let bsa = engine.get_feature("BSA".to_string()).expect("BSA feature");
     let norm_name_with_underscore = bsa.name.to_ascii_uppercase().replace(' ', "_");
-    let by_name =
-        super::resolver::find_building_focus(&engine.campuses, &norm_name_with_underscore)
-            .expect("find_building_focus by underscore-normalized name");
+    let by_name = super::resolver::find_building_focus(&loaded, &norm_name_with_underscore)
+        .expect("find_building_focus by underscore-normalized name");
     assert_eq!(by_name.feature_id, "BSA");
 
     if let Some(spaced_alias) = bsa.aliases.iter().find(|a| a.contains(' ')) {
         let alias_with_underscore = spaced_alias.to_ascii_uppercase().replace(' ', "_");
-        let by_alias =
-            super::resolver::find_building_focus(&engine.campuses, &alias_with_underscore)
-                .expect("find_building_focus by underscore-normalized spaced alias");
+        let by_alias = super::resolver::find_building_focus(&loaded, &alias_with_underscore)
+            .expect("find_building_focus by underscore-normalized spaced alias");
         assert_eq!(by_alias.feature_id, "BSA");
     }
 }
@@ -758,4 +757,206 @@ fn list_building_occupancy_distinguishes_all_occupancy_statuses() {
             .all(|i| matches!(i.status, OccupancyStatus::OutOfTerm)),
         "BSA holiday should report OutOfTerm for all rooms"
     );
+}
+
+#[test]
+fn lazy_loading_materializes_only_active_campus_and_resolves_cross_campus_on_demand() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+    assert_eq!(engine.loaded_campus_ids(), vec!["OP_MC"]);
+
+    // list_campuses permanece leve e já enumera os 4 campi sem materializar os demais.
+    let summaries = engine.list_campuses();
+    let ids: Vec<&str> = summaries.iter().map(|c| c.campus_id.as_str()).collect();
+    assert_eq!(ids, vec!["OP_MC", "JM_ICEA", "MA_ICHS", "MA_ICSA"]);
+    assert_eq!(engine.loaded_campus_ids(), vec!["OP_MC"]);
+
+    // resolve_meeting com fallback em outro campus carrega sob demanda apenas até encontrar (JM_ICEA).
+    match engine.resolve_meeting(
+        "ZZZ999".to_string(),
+        "11".to_string(),
+        2,
+        "08:20".to_string(),
+        "ICEA".to_string(),
+    ) {
+        Resolution::BuildingFallback {
+            campus_id,
+            building_id,
+            ..
+        } => {
+            assert_eq!(campus_id, "JM_ICEA");
+            assert_eq!(building_id, "CAMPUS_ICEA");
+        }
+        other => panic!("Expected BuildingFallback to JM_ICEA, got {other:?}"),
+    }
+    assert_eq!(engine.loaded_campus_ids(), vec!["OP_MC", "JM_ICEA"]);
+
+    // Trocar campus para MA_ICHS materializa somente esse campus adicional.
+    let ichs_summary = engine
+        .set_active_campus("MA_ICHS".to_string())
+        .expect("switch to MA_ICHS");
+    assert_eq!(ichs_summary.campus_id, "MA_ICHS");
+    assert_eq!(
+        engine.loaded_campus_ids(),
+        vec!["OP_MC", "JM_ICEA", "MA_ICHS"]
+    );
+    let ichs_batch = engine
+        .get_render_batch(
+            ichs_summary.default_floor,
+            Some("2026-11-17T21:15:00-03:00".to_string()),
+        )
+        .expect("render batch MA_ICHS");
+    assert_eq!(ichs_batch.campus_id, "MA_ICHS");
+    assert!(!ichs_batch.items.is_empty());
+
+    // Consulta direta de sala em JM_ICEA num motor novo carrega somente JM_ICEA sem tocar Mariana.
+    let fresh_engine = CampusMapEngine::new_bundled().expect("fresh bundled engine");
+    assert_eq!(fresh_engine.loaded_campus_ids(), vec!["OP_MC"]);
+    let jm_occ = fresh_engine
+        .get_room_occupancy(
+            "ICEA_C103".to_string(),
+            "2026-11-16T16:00:00-03:00".to_string(),
+        )
+        .expect("ICEA_C103 occupancy");
+    assert!(matches!(jm_occ, OccupancyStatus::Occupied { .. }));
+    assert_eq!(fresh_engine.loaded_campus_ids(), vec!["OP_MC", "JM_ICEA"]);
+}
+
+#[test]
+fn render_batch_is_idempotent_presorted_and_matches_occupancy() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+    let ts = "2026-11-17T21:15:00-03:00".to_string();
+
+    let batch_a = engine
+        .get_render_batch(1, Some(ts.clone()))
+        .expect("first batch");
+    let batch_b = engine
+        .get_render_batch(1, Some(ts.clone()))
+        .expect("second batch");
+    assert_eq!(batch_a, batch_b);
+
+    // Verifica pré-ordenação estrita por (layer.z_order(), id).
+    for pair in batch_a.items.windows(2) {
+        let lhs = (pair[0].layer.z_order(), pair[0].id.as_str());
+        let rhs = (pair[1].layer.z_order(), pair[1].id.as_str());
+        assert!(lhs <= rhs, "batch order violated: {lhs:?} > {rhs:?}");
+    }
+
+    // Verifica paridade exata entre RenderBatch (com parse único) e get_room_occupancy individual.
+    let mut checked_rooms = 0usize;
+    for item in batch_a.items.iter().filter(|i| i.layer == MapLayer::Room) {
+        checked_rooms += 1;
+        let expected = engine
+            .get_room_occupancy(item.id.clone(), ts.clone())
+            .expect("room occupancy");
+        match expected {
+            OccupancyStatus::Occupied { slot } => {
+                assert_eq!(item.occupancy, RenderOccupancyKind::Occupied);
+                assert_eq!(item.occupancy_label.as_deref(), Some(slot.label.as_str()));
+            }
+            OccupancyStatus::NoRegularClass => {
+                assert_eq!(item.occupancy, RenderOccupancyKind::NoRegularClass);
+            }
+            OccupancyStatus::NoData => {
+                assert_eq!(item.occupancy, RenderOccupancyKind::NoData);
+            }
+            OccupancyStatus::OutOfTerm => {
+                assert_eq!(item.occupancy, RenderOccupancyKind::OutOfTerm);
+            }
+        }
+    }
+    assert!(checked_rooms > 0);
+
+    // Timestamp inválido deve falhar imediatamente antes do loop.
+    assert!(engine.get_render_batch(1, Some(String::new())).is_err());
+}
+
+#[test]
+fn simplify_reduces_external_redundancy_and_preserves_building_and_room_contours() {
+    use geo::{Coord, LineString, MultiPolygon, Polygon};
+
+    use super::projection::{ProjectedGeometry, point_to_segment_distance_sq};
+    use super::simplify::{MAX_SIMPLIFY_TOLERANCE_M, simplify_geometry_for_layer};
+
+    const { assert!(MAX_SIMPLIFY_TOLERANCE_M <= 0.35) };
+
+    // Polyline extensa em Walkway com pontos duplicados e quase colineares (<= 0.05m).
+    let walkway_pts = vec![
+        Coord { x: 0.0, y: 0.0 },
+        Coord { x: 0.0, y: 0.0 },
+        Coord { x: 25.0, y: 0.05 },
+        Coord { x: 50.0, y: 0.0 },
+        Coord { x: 50.0, y: 0.0001 },
+        Coord { x: 75.0, y: 12.0 },
+    ];
+    let walkway_geom = ProjectedGeometry::Polyline(vec![LineString::new(walkway_pts.clone())]);
+    let simplified_walkway = simplify_geometry_for_layer(MapLayer::Walkway, walkway_geom);
+    match simplified_walkway {
+        ProjectedGeometry::Polyline(lines) => {
+            assert_eq!(lines.len(), 1);
+            assert!(
+                lines[0].0.len() < walkway_pts.len(),
+                "expected walkway vertices to be reduced, got {}",
+                lines[0].0.len()
+            );
+            assert_eq!(lines[0].0.first().copied(), Some(Coord { x: 0.0, y: 0.0 }));
+            assert_eq!(lines[0].0.last().copied(), Some(Coord { x: 75.0, y: 12.0 }));
+        }
+        other => panic!("Expected Polyline, got {other:?}"),
+    }
+
+    // Polígono em GreenArea mantém anel fechado e distância máxima <= MAX_SIMPLIFY_TOLERANCE_M.
+    let green_ring = LineString::new(vec![
+        Coord { x: 0.0, y: 0.0 },
+        Coord { x: 10.0, y: 0.05 },
+        Coord { x: 20.0, y: 0.0 },
+        Coord { x: 20.0, y: 20.0 },
+        Coord { x: 10.0, y: 20.02 },
+        Coord { x: 0.0, y: 20.0 },
+        Coord { x: 0.0, y: 0.0 },
+    ]);
+    let green_poly = ProjectedGeometry::Polygon(MultiPolygon::new(vec![Polygon::new(
+        green_ring.clone(),
+        vec![],
+    )]));
+    match simplify_geometry_for_layer(MapLayer::GreenArea, green_poly) {
+        ProjectedGeometry::Polygon(mp) => {
+            let ext = &mp.0[0].exterior().0;
+            assert!(ext.len() < green_ring.0.len());
+            assert_eq!(ext.first(), ext.last());
+            assert!(ext.len() >= 4);
+            for orig in &green_ring.0 {
+                let mut best_sq = f64::INFINITY;
+                for seg in ext.windows(2) {
+                    let d_sq = point_to_segment_distance_sq(
+                        orig.x, orig.y, seg[0].x, seg[0].y, seg[1].x, seg[1].y,
+                    );
+                    best_sq = best_sq.min(d_sq);
+                }
+                assert!(best_sq.sqrt() <= MAX_SIMPLIFY_TOLERANCE_M + 1e-6);
+            }
+        }
+        other => panic!("Expected Polygon, got {other:?}"),
+    }
+
+    // Contornos de Building e Room devem permanecer 100% intactos (mesmos vértices exatos).
+    let room_ring = LineString::new(vec![
+        Coord { x: 0.0, y: 0.0 },
+        Coord { x: 5.0, y: 0.01 },
+        Coord { x: 10.0, y: 0.0 },
+        Coord { x: 10.0, y: 8.0 },
+        Coord { x: 0.0, y: 8.0 },
+        Coord { x: 0.0, y: 0.0 },
+    ]);
+    for preserved_layer in [MapLayer::Building, MapLayer::Room] {
+        let geom = ProjectedGeometry::Polygon(MultiPolygon::new(vec![Polygon::new(
+            room_ring.clone(),
+            vec![],
+        )]));
+        match simplify_geometry_for_layer(preserved_layer, geom) {
+            ProjectedGeometry::Polygon(mp) => {
+                assert_eq!(mp.0[0].exterior().0, room_ring.0);
+            }
+            other => panic!("Expected Polygon for {preserved_layer:?}, got {other:?}"),
+        }
+    }
 }
