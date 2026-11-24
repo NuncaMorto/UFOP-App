@@ -19,6 +19,7 @@ private struct PersistedCampusState: Codable {
     var isEadByCourseId: [String: Bool]
     var turmaByCourseId: [String: String]
     var dynamicGridCompletedByMatrix: [String: [String]]?
+    var friendSchedules: [FriendSchedule]?
 }
 
 public struct AgendaClassSpotlight: Equatable, Sendable {
@@ -68,7 +69,8 @@ public extension CampusStore {
             transcriptEntries: transcriptEntries,
             isEadByCourseId: isEadByCourseId,
             turmaByCourseId: turmaByCourseId,
-            dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix
+            dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix,
+            friendSchedules: friendSchedules
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -114,7 +116,8 @@ public extension CampusStore {
             transcriptEntries: transcriptEntries,
             isEadByCourseId: isEadByCourseId,
             turmaByCourseId: turmaByCourseId,
-            dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix
+            dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix,
+            friendSchedules: friendSchedules
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -150,6 +153,9 @@ public extension CampusStore {
         isEadByCourseId = [:]
         turmaByCourseId = [:]
         dynamicGridCompletedByMatrix = [:]
+        friendSchedules = []
+        selectedFriendScheduleId = nil
+        requestedTimetablePresentation = false
         guidedTourCompleted = false
         seedUFOP2026_2Data()
         ensureOfficialCalendarEventsLoaded()
@@ -172,6 +178,11 @@ public extension CampusStore {
         self.isEadByCourseId = snapshot.isEadByCourseId
         self.turmaByCourseId = snapshot.turmaByCourseId
         self.dynamicGridCompletedByMatrix = snapshot.dynamicGridCompletedByMatrix ?? [:]
+        self.friendSchedules = snapshot.friendSchedules ?? []
+        if let activeFriendId = selectedFriendScheduleId,
+           !self.friendSchedules.contains(where: { $0.id == activeFriendId }) {
+            self.selectedFriendScheduleId = nil
+        }
         rebuildAcademicActivitiesFromAssessments()
     }
 

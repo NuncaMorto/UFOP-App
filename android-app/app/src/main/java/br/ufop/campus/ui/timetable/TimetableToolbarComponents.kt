@@ -79,6 +79,7 @@ internal fun TimetableTopBar(
     onRequestRemoveFriend: (FriendScheduleInfo) -> Unit,
     onImportFile: () -> Unit,
     onOpenImportTextDialog: () -> Unit,
+    onOpenQrScanner: () -> Unit = {},
     onSelectSemester: (String) -> Unit,
     onShareGrade: () -> Unit,
     onToggleLandscape: () -> Unit,
@@ -166,7 +167,8 @@ internal fun TimetableTopBar(
                 onSelectFriend = onSelectFriend,
                 onRequestRemoveFriend = onRequestRemoveFriend,
                 onImportFile = onImportFile,
-                onOpenImportTextDialog = onOpenImportTextDialog
+                onOpenImportTextDialog = onOpenImportTextDialog,
+                onOpenQrScanner = onOpenQrScanner
             )
 
             // Seletor 2: Semestre (ex.: 2026.2 ▾)

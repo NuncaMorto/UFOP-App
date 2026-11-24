@@ -1,6 +1,8 @@
 package br.ufop.campus
 
+import android.content.Intent
 import android.graphics.Color as AndroidColor
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -22,13 +24,17 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import br.ufop.campus.core.curriculum.UfopCurriculumCatalog
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.core.ffi.IncomingGradePreview
+import br.ufop.campus.core.ffi.UfopGradeCodec
 import br.ufop.campus.core.security.AppLockManager
 import br.ufop.campus.core.security.SecurePdfProcessor
+import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.navigation.CampusNavigation
 import br.ufop.campus.ui.security.AppLockOverlay
@@ -44,6 +50,8 @@ class MainActivity : ComponentActivity() {
 
     private var isAppLockedState by mutableStateOf(false)
     private var lastBackgroundElapsedMs: Long = 0L
+    private var pendingIncomingGrade by mutableStateOf<IncomingGradePreview?>(null)
+    private var incomingGradeError by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -216,6 +224,10 @@ class MainActivity : ComponentActivity() {
                         saveableStateHolder.SaveableStateProvider(key = "campus_main_content") {
                             CampusNavigation(
                                 repository = repository,
+                                pendingIncomingGrade = if (isAppLockedState) null else pendingIncomingGrade,
+                                incomingGradeError = if (isAppLockedState) null else incomingGradeError,
+                                onConsumeIncomingGrade = { pendingIncomingGrade = null },
+                                onDismissIncomingGradeError = { incomingGradeError = null },
                                 onAppSecurityChanged = {
                                     syncWindowSecureFlag()
                                     if (!AppLockManager.isLockEnabled(applicationContext)) {
@@ -229,6 +241,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        if (savedInstanceState == null) {
+            handleIncomingIntent(intent)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -278,6 +300,77 @@ class MainActivity : ComponentActivity() {
         }
         runCatching {
             VidaAcademicaWidgetProvider.requestWidgetUpdate(applicationContext)
+        }
+    }
+
+    private fun handleIncomingIntent(incomingIntent: Intent?) {
+        if (incomingIntent == null) return
+        if ((incomingIntent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
+
+        when (incomingIntent.action) {
+            Intent.ACTION_VIEW -> {
+                val uri = incomingIntent.data ?: return
+                setIntent(Intent(Intent.ACTION_MAIN))
+                launchIncomingGradeLoad(uri = uri, inlineText = null, inlineSourceLabel = null)
+            }
+            Intent.ACTION_SEND -> {
+                val streamUri = IntentCompat.getParcelableExtra(
+                    incomingIntent,
+                    Intent.EXTRA_STREAM,
+                    Uri::class.java
+                )
+                if (streamUri != null) {
+                    setIntent(Intent(Intent.ACTION_MAIN))
+                    launchIncomingGradeLoad(uri = streamUri, inlineText = null, inlineSourceLabel = null)
+                    return
+                }
+                val sharedText = incomingIntent.getStringExtra(Intent.EXTRA_TEXT)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: return
+                setIntent(Intent(Intent.ACTION_MAIN))
+                launchIncomingGradeLoad(
+                    uri = null,
+                    inlineText = sharedText,
+                    inlineSourceLabel = "Texto compartilhado"
+                )
+            }
+        }
+    }
+
+    private fun launchIncomingGradeLoad(
+        uri: Uri?,
+        inlineText: String?,
+        inlineSourceLabel: String?
+    ) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val previewResult = runCatching {
+                val rawText: String
+                val sourceLabel: String
+                if (uri != null) {
+                    rawText = GradeExportStorage.readPayloadFromUriSafely(applicationContext, uri)
+                    sourceLabel = GradeExportStorage.resolveDisplayName(applicationContext, uri)
+                        ?: "Arquivo .ufopgrade"
+                } else {
+                    rawText = inlineText.orEmpty()
+                    sourceLabel = inlineSourceLabel ?: "Texto compartilhado"
+                }
+                UfopGradeCodec.parseAndValidatePreview(
+                    rawText = rawText,
+                    sourceLabel = sourceLabel
+                ).getOrThrow()
+            }
+            withContext(Dispatchers.Main) {
+                previewResult
+                    .onSuccess { preview ->
+                        incomingGradeError = null
+                        pendingIncomingGrade = preview
+                    }
+                    .onFailure { err ->
+                        pendingIncomingGrade = null
+                        incomingGradeError = err.message?.takeIf { it.isNotBlank() }
+                            ?: "Não foi possível ler o arquivo .ufopgrade recebido."
+                    }
+            }
         }
     }
 

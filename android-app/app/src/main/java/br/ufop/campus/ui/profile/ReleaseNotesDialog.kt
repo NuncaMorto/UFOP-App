@@ -55,10 +55,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.13",
-            title = "Grade Dinâmica para 48 Cursos da UFOP & Modularização",
+            version = "v1.9.14",
+            title = "Abertura Direta .ufopgrade, AirDrop, QR Code Offline & Mapa Mais Rápido",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Abertura direta de arquivos .ufopgrade recebidos pelo WhatsApp, Telegram, Arquivos ou AirDrop com confirmação segura antes de salvar em Grades de Amigos (respeitando o bloqueio por biometria/PIN).",
+                "Interoperabilidade total ufopgrade-v1 entre Android e iOS, com gerenciamento completo de Grades de Amigos e compartilhamento via AirDrop por aproximação (iOS 17+) na Grade Horária.",
+                "Compartilhamento e leitura via QR Code 100% offline (UFOPG1:) entre Android e iOS diretamente pela Grade Horária.",
+                "Otimizações de performance no Mapa 2D Offline com culling de viewport, cache de geometria/rótulos e carregamento sob demanda."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.13",
+            title = "Grade Dinâmica para 48 Cursos da UFOP & Modularização",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Grade Dinâmica Interativa liberada automaticamente para os 48 cursos com disciplinas detalhadas no catálogo UFOP (como Farmácia, entre outros), resolvida pelo curso real e semestre de ingresso do estudante.",
                 "Geração acíclica automática de pré-requisitos, requisitos mínimos de carga horária e slots de optativas/eletivas, preservando as matrizes históricas curadas de Eng. de Controle e Automação (2024/1 e 2026/1) e exibindo aviso claro nos 6 cursos ainda sem detalhamento.",

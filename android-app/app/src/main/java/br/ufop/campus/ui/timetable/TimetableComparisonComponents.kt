@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -70,7 +71,8 @@ internal fun GradeSelectorDropdown(
     onSelectFriend: (String) -> Unit,
     onRequestRemoveFriend: (FriendScheduleInfo) -> Unit,
     onImportFile: () -> Unit,
-    onOpenImportTextDialog: () -> Unit
+    onOpenImportTextDialog: () -> Unit,
+    onOpenQrScanner: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -256,6 +258,28 @@ internal fun GradeSelectorDropdown(
                 onClick = {
                     expanded = false
                     onImportFile()
+                }
+            )
+
+            DropdownMenuItem(
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.QrCodeScanner,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Ler QR Code",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onOpenQrScanner()
                 }
             )
 

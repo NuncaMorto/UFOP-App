@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,17 +44,25 @@ import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.ffi.FriendScheduleInfo
+import br.ufop.campus.core.ffi.IncomingGradePreview
+import br.ufop.campus.core.ffi.UfopGradeCodec
 import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TimetableModalScreen(
     repository: CampusCoreRepository,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null
+    onOpenLocationInMap: ((MapMeetingFocusRequest) -> Unit)? = null,
+    initialFriendId: String? = null,
+    onInitialFriendConsumed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
@@ -143,6 +152,9 @@ fun TimetableModalScreen(
 
     var showImportFriendDialog by remember { mutableStateOf(false) }
     var showShareDialog by remember { mutableStateOf(false) }
+    var showMyQrSheet by remember { mutableStateOf(false) }
+    var showQrScannerSheet by remember { mutableStateOf(false) }
+    var pendingIncomingPreview by remember { mutableStateOf<IncomingGradePreview?>(null) }
     var friendPendingRemoval by remember { mutableStateOf<FriendScheduleInfo?>(null) }
     var selectedCellDetail by remember { mutableStateOf<SelectedTimetableCellDetail?>(null) }
     var pendingExportJson by remember { mutableStateOf("") }
@@ -150,27 +162,49 @@ fun TimetableModalScreen(
     var feedbackBannerMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
+    LaunchedEffect(initialFriendId, friendSchedules) {
+        if (initialFriendId != null) {
+            selectedFriendId = initialFriendId
+            val importedFriend = friendSchedules.find { it.id == initialFriendId }
+            if (importedFriend != null && feedbackBannerMessage == null) {
+                val courseInfo = importedFriend.courseName
+                    .takeIf { it.isNotBlank() }
+                    ?.let { " · $it" }
+                    .orEmpty()
+                feedbackBannerMessage =
+                    "Grade de ${importedFriend.friendName}$courseInfo (${importedFriend.semester}) importada!"
+            }
+            onInitialFriendConsumed()
+        }
+    }
+
     // Launcher para importar arquivo .ufopgrade (OpenDocument)
     val openUfopGradeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            runCatching {
-                val jsonText = context.contentResolver.openInputStream(uri)
-                    ?.bufferedReader(Charsets.UTF_8)
-                    ?.use { it.readText() }
-                    ?.trim()
-                    .orEmpty()
-                require(jsonText.isNotEmpty()) { "O arquivo selecionado está vazio." }
-                repository.importFriendScheduleJson("", jsonText)
-            }.onSuccess { imported ->
-                selectedFriendId = imported.id
-                val courseInfo = imported.courseName.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
-                feedbackBannerMessage =
-                    "Grade de ${imported.friendName}$courseInfo (${imported.semester}) importada!"
-            }.onFailure { err ->
-                feedbackBannerMessage = err.message
-                    ?: "Não foi possível importar o arquivo .ufopgrade selecionado."
+            coroutineScope.launch {
+                val previewResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val rawPayload = GradeExportStorage.readPayloadFromUriSafely(context, uri)
+                        val displayName = GradeExportStorage.resolveDisplayName(context, uri)
+                        val sourceLabel = if (!displayName.isNullOrBlank()) {
+                            "Arquivo $displayName"
+                        } else {
+                            "Arquivo .ufopgrade"
+                        }
+                        UfopGradeCodec.parseAndValidatePreview(
+                            rawText = rawPayload,
+                            sourceLabel = sourceLabel
+                        ).getOrThrow()
+                    }
+                }
+                previewResult.onSuccess { preview ->
+                    pendingIncomingPreview = preview
+                }.onFailure { err ->
+                    feedbackBannerMessage = err.message
+                        ?: "Não foi possível importar o arquivo .ufopgrade selecionado."
+                }
             }
         }
     }
@@ -232,6 +266,7 @@ fun TimetableModalScreen(
                         )
                     },
                     onOpenImportTextDialog = { showImportFriendDialog = true },
+                    onOpenQrScanner = { showQrScannerSheet = true },
                     onSelectSemester = { semesterOption ->
                         selectedSemester = semesterOption
                         selectedFriendId = null
@@ -256,7 +291,69 @@ fun TimetableModalScreen(
                         minTouchTarget = minTouchTarget,
                         coroutineScope = coroutineScope,
                         onDismiss = { showShareDialog = false },
-                        onFeedback = { message -> feedbackBannerMessage = message }
+                        onFeedback = { message -> feedbackBannerMessage = message },
+                        onOpenMyQrCode = { showMyQrSheet = true }
+                    )
+                }
+
+                if (showMyQrSheet) {
+                    val bundleJsonForQr = remember(pendingExportJson, effectiveSemester, mutationVersion) {
+                        pendingExportJson.ifBlank {
+                            repository.exportMyGradeBundleJson(effectiveSemester)
+                        }
+                    }
+                    MyGradeQrSheet(
+                        studentName = studentProfile.fullName,
+                        semester = effectiveSemester,
+                        bundleJson = bundleJsonForQr,
+                        minTouchTarget = minTouchTarget,
+                        onDismiss = { showMyQrSheet = false },
+                        onCopiedFeedback = { message -> feedbackBannerMessage = message }
+                    )
+                }
+
+                if (showQrScannerSheet) {
+                    GradeQrScannerSheet(
+                        minTouchTarget = minTouchTarget,
+                        onQrScanned = { rawQr ->
+                            showQrScannerSheet = false
+                            UfopGradeCodec.parseAndValidatePreview(
+                                rawText = rawQr,
+                                sourceLabel = "QR Code"
+                            ).onSuccess { preview ->
+                                pendingIncomingPreview = preview
+                            }.onFailure { err ->
+                                feedbackBannerMessage = err.message
+                                    ?: "Não foi possível ler a grade do QR Code."
+                            }
+                        },
+                        onDismiss = { showQrScannerSheet = false }
+                    )
+                }
+
+                pendingIncomingPreview?.let { preview ->
+                    IncomingGradeConfirmSheet(
+                        preview = preview,
+                        minTouchTarget = minTouchTarget,
+                        onConfirmImport = {
+                            runCatching {
+                                repository.importFriendScheduleJson("", preview.rawJsonPayload)
+                            }.onSuccess { imported ->
+                                selectedFriendId = imported.id
+                                val courseInfo = imported.courseName
+                                    .takeIf { it.isNotBlank() }
+                                    ?.let { " · $it" }
+                                    .orEmpty()
+                                feedbackBannerMessage =
+                                    "Grade de ${imported.friendName}$courseInfo (${imported.semester}) importada!"
+                                pendingIncomingPreview = null
+                            }.onFailure { err ->
+                                feedbackBannerMessage = err.message
+                                    ?: "Não foi possível importar a grade recebida."
+                                pendingIncomingPreview = null
+                            }
+                        },
+                        onDismiss = { pendingIncomingPreview = null }
                     )
                 }
 
@@ -375,6 +472,7 @@ private fun TimetableFeedbackBanner(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
             .padding(bottom = 8.dp)
             .clickable(onClick = onDismiss),
         shape = RoundedCornerShape(16.dp),

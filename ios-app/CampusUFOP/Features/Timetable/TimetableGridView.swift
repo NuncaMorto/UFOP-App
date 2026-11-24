@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 public struct TimetableGridView: View {
     @Bindable public var store: CampusStore
@@ -13,8 +14,14 @@ public struct TimetableGridView: View {
     @State private var hideEmptyHours: Bool = true
     @State private var pendingTemplateConfirm: UfopCurriculumTemplate?
     @State private var selectedCell: TimetableSlotCell?
+    @State private var selectedFriendCell: TimetableSlotCell?
     @State private var activeCheckInDetail: ClassCheckInDetail?
     @State private var openedDisciplineDetail: DisciplineDetail?
+    @State private var qrSheetMode: GradeQrMode?
+    @State private var pendingIncomingGrade: IncomingGradePreview?
+    @State private var showFileImporter: Bool = false
+    @State private var importErrorMessage: String?
+    @State private var pendingRemoveFriend: FriendSchedule?
 
     public init(
         store: CampusStore,
@@ -35,6 +42,28 @@ public struct TimetableGridView: View {
     private var horizontalColWidth: CGFloat { isRegular ? 144 : 124 }
     private var cellSpacing: CGFloat { isRegular ? 10 : 8 }
 
+    private var activeFriend: FriendSchedule? {
+        guard let selectedId = store.selectedFriendScheduleId else { return nil }
+        return store.friendSchedules.first { $0.id == selectedId }
+    }
+
+    private var studentDisplayName: String {
+        let trimmed = store.studentProfile.fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Estudante UFOP" : trimmed
+    }
+
+    private var myBundleJson: String {
+        store.exportMyGradeBundleJson(semester: store.selectedSemesterFilter)
+    }
+
+    private var mySuggestedFilename: String {
+        UfopGradeCodec.suggestedFilename(forStudentName: studentDisplayName)
+    }
+
+    private var myShareTitle: String {
+        "Grade de \(studentDisplayName) · \(store.selectedSemesterFilter)"
+    }
+
     private var todayWeekdayShort: String? {
         let wd = Calendar.current.component(.weekday, from: Date())
         switch wd {
@@ -49,9 +78,12 @@ public struct TimetableGridView: View {
     }
 
     public var body: some View {
-        let timetable = store.currentWeeklyTimetable
+        let friend = activeFriend
+        let timetable = friend.map { store.weeklyTimetable(for: $0) } ?? store.currentWeeklyTimetable
         let filteredSlots: [TimetableSlotCell] = {
-            guard selectedFilter != "Todas" else { return timetable.slots }
+            guard friend == nil, selectedFilter != "Todas", selectedFilter != "Minha grade" else {
+                return timetable.slots
+            }
             let matchingIds = Set(
                 store.disciplines
                     .filter { $0.semester == store.selectedSemesterFilter && $0.department == selectedFilter }
@@ -66,39 +98,50 @@ public struct TimetableGridView: View {
             }
             return nonEmpty.isEmpty ? timetable.timeRanges : nonEmpty
         }()
-        let legendEntries = store.timetableLegendEntries(for: filteredSlots)
+        let legendEntries: [TimetableLegendEntry] = {
+            if let friend {
+                return store.timetableLegendEntries(for: friend, slots: filteredSlots)
+            }
+            return store.timetableLegendEntries(for: filteredSlots)
+        }()
 
         ZStack {
             LiquidGlassBackdrop(accent: resolvedAccent, highContrast: hc)
 
             VStack(spacing: 0) {
-                topBar(timetable: timetable)
+                topBar(timetable: timetable, activeFriend: friend)
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
                     .padding(.bottom, 10)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
-                        controlsBar(timetable: timetable)
+                        controlsBar(timetable: timetable, activeFriend: friend)
 
                         if filteredSlots.isEmpty {
-                            emptyTimetableCard
+                            emptyTimetableCard(isFriendMode: friend != nil)
                         } else if isHorizontalOrientation {
                             horizontalGridCard(
                                 weekdays: timetable.weekdays,
                                 timeRanges: displayedTimeRanges,
-                                slots: filteredSlots
+                                slots: filteredSlots,
+                                isFriendMode: friend != nil
                             )
                         } else {
                             verticalGridCard(
                                 weekdays: timetable.weekdays,
                                 timeRanges: displayedTimeRanges,
-                                slots: filteredSlots
+                                slots: filteredSlots,
+                                isFriendMode: friend != nil
                             )
                         }
 
                         if !legendEntries.isEmpty {
                             legendSection(entries: legendEntries)
+                        }
+
+                        if let friend {
+                            friendBottomCard(friend: friend)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -107,6 +150,16 @@ public struct TimetableGridView: View {
                 }
             }
         }
+        .background(
+            AirDropProximityBridge(
+                isActive: friend == nil,
+                jsonPayload: myBundleJson,
+                filename: mySuggestedFilename,
+                shareTitle: myShareTitle
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+        )
         .preferredColorScheme(appearance?.resolvedColorScheme)
         .sheet(item: $selectedCell) { cell in
             let isEad = store.isCourseEad(cell.disciplineId) || CampusStore.isEadText(cell.roomLabel)
@@ -139,6 +192,27 @@ public struct TimetableGridView: View {
                 }
             )
             .presentationDetents([.medium])
+        }
+        .sheet(item: $selectedFriendCell) { cell in
+            if let friend = activeFriend {
+                let isEad = CampusStore.isEadText(cell.roomLabel)
+                let matchedCourse = friend.courses.first { $0.courseId == cell.disciplineId }
+                FriendTimetableCellDetailSheet(
+                    cell: cell,
+                    friend: friend,
+                    course: matchedCourse,
+                    onOpenLocationInMap: (!isEad && onOpenLocationInMap != nil) ? {
+                        let req = friendMeetingRequest(for: cell, course: matchedCourse)
+                        selectedFriendCell = nil
+                        onClose()
+                        onOpenLocationInMap?(req)
+                    } : nil,
+                    onClose: {
+                        selectedFriendCell = nil
+                    }
+                )
+                .presentationDetents([.medium])
+            }
         }
         .sheet(item: $activeCheckInDetail) { detail in
             let isEad = store.isCourseEad(detail.disciplineId) || CampusStore.isEadText(detail.location)
@@ -181,6 +255,43 @@ public struct TimetableGridView: View {
                 }
             )
         }
+        .sheet(item: $qrSheetMode) { mode in
+            GradeQrCodeSheetView(
+                myBundleJson: myBundleJson,
+                studentDisplayName: studentDisplayName,
+                semesterLabel: store.selectedSemesterFilter,
+                initialMode: mode,
+                onScannedPreview: { preview in
+                    qrSheetMode = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        pendingIncomingGrade = preview
+                    }
+                },
+                onClose: {
+                    qrSheetMode = nil
+                }
+            )
+        }
+        .sheet(item: $pendingIncomingGrade) { preview in
+            IncomingGradeConfirmSheetView(
+                preview: preview,
+                onConfirm: {
+                    let imported = store.importFriendSchedule(from: preview)
+                    store.selectedFriendScheduleId = imported.id
+                    pendingIncomingGrade = nil
+                },
+                onCancel: {
+                    pendingIncomingGrade = nil
+                }
+            )
+        }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.ufopGrade, .json, .plainText, .data],
+            allowsMultipleSelection: false
+        ) { result in
+            handleFileImportResult(result)
+        }
         .confirmationDialog(
             "Aplicar modelo de grade?",
             isPresented: Binding(
@@ -201,11 +312,44 @@ public struct TimetableGridView: View {
         } message: {
             Text("Isso substituirá as disciplinas do semestre \(store.selectedSemesterFilter) pelo modelo de grade escolhido.")
         }
+        .confirmationDialog(
+            "Remover grade de amigo?",
+            isPresented: Binding(
+                get: { pendingRemoveFriend != nil },
+                set: { if !$0 { pendingRemoveFriend = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let friendToDelete = pendingRemoveFriend {
+                Button("Remover \(friendToDelete.friendName)", role: .destructive) {
+                    store.removeFriendSchedule(id: friendToDelete.id)
+                    pendingRemoveFriend = nil
+                }
+            }
+            Button("Cancelar", role: .cancel) {
+                pendingRemoveFriend = nil
+            }
+        } message: {
+            Text("A grade salva deste colega será removida do aplicativo.")
+        }
+        .alert(
+            "Não foi possível importar",
+            isPresented: Binding(
+                get: { importErrorMessage != nil },
+                set: { if !$0 { importErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                importErrorMessage = nil
+            }
+        } message: {
+            Text(importErrorMessage ?? "Arquivo .ufopgrade inválido.")
+        }
     }
 
     // MARK: - Top Bar
 
-    private func topBar(timetable: WeeklyTimetable) -> some View {
+    private func topBar(timetable: WeeklyTimetable, activeFriend: FriendSchedule?) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("SEMESTRE \(timetable.semester)")
@@ -213,9 +357,11 @@ public struct TimetableGridView: View {
                     .tracking(0.9)
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
-                Text("Grade Horária")
+                Text(activeFriend == nil ? "Grade Horária" : "Grade de \(activeFriend?.friendName ?? "")")
                     .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer()
@@ -235,80 +381,207 @@ public struct TimetableGridView: View {
         }
     }
 
-    // MARK: - Controls (Filter, Templates, Orientation, Hide Empty)
+    // MARK: - Controls (Owner, Filter, Templates, Share, QR, Orientation, Hide Empty)
 
-    private func controlsBar(timetable: WeeklyTimetable) -> some View {
+    private func controlsBar(timetable: WeeklyTimetable, activeFriend: FriendSchedule?) -> some View {
         let primary = resolvedAccent.primary(for: colorScheme)
         let templates = store.listUfopTemplates()
 
         return VStack(alignment: .leading, spacing: 10) {
             LiquidGlassGroup(spacing: 8) {
-                HStack(spacing: 8) {
-                    Menu {
-                        ForEach(timetable.availableFilters, id: \.self) { filter in
-                            Button {
-                                selectedFilter = filter
-                            } label: {
-                                if selectedFilter == filter {
-                                    Label(filter, systemImage: "checkmark")
-                                } else {
-                                    Text(filter)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ownerPickerMenu(primary: primary, activeFriend: activeFriend)
+
+                        if activeFriend == nil {
+                            Menu {
+                                ForEach(timetable.availableFilters, id: \.self) { filter in
+                                    Button {
+                                        selectedFilter = filter
+                                    } label: {
+                                        if selectedFilter == filter {
+                                            Label(filter, systemImage: "checkmark")
+                                        } else {
+                                            Text(filter)
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(selectedFilter)
-                                .font(.system(size: 12, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 38)
-                        .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
-                    }
-
-                    Menu {
-                        ForEach(templates) { tpl in
-                            Button {
-                                pendingTemplateConfirm = tpl
                             } label: {
-                                Text("\(tpl.code) · \(tpl.name)")
+                                HStack(spacing: 5) {
+                                    Text(selectedFilter)
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 38)
+                                .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
                             }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "wand.and.stars")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("Modelos")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 38)
-                        .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
-                    }
+                            .minimumTouchTarget(minTouch)
 
-                    Spacer(minLength: 4)
+                            Menu {
+                                ForEach(templates) { tpl in
+                                    Button {
+                                        pendingTemplateConfirm = tpl
+                                    } label: {
+                                        Text("\(tpl.code) · \(tpl.name)")
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "wand.and.stars")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("Modelos")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 38)
+                                .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                            }
+                            .minimumTouchTarget(minTouch)
+                        }
 
-                    // Vertical / Horizontal persisted toggle
-                    HStack(spacing: 4) {
-                        orientationButton(key: "vertical", icon: "rectangle.split.3x1", label: "Grade vertical")
-                        orientationButton(key: "horizontal", icon: "rectangle.split.1x2", label: "Grade horizontal")
+                        ShareLink(
+                            item: UfopGradeTransferable(
+                                jsonPayload: myBundleJson,
+                                suggestedFilename: mySuggestedFilename,
+                                displayTitle: myShareTitle
+                            ),
+                            preview: SharePreview(
+                                mySuggestedFilename,
+                                icon: Image(systemName: "calendar.badge.plus")
+                            )
+                        ) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Compartilhar")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Compartilhar minha grade em arquivo .ufopgrade")
+
+                        Button {
+                            qrSheetMode = activeFriend == nil ? .myQr : .scanQr
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "qrcode")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("QR Code")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Abrir QR Code da grade")
                     }
-                    .padding(3)
-                    .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
                 }
             }
 
-            Toggle(isOn: $hideEmptyHours) {
-                Text("Ocultar horários vazios")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            HStack(spacing: 12) {
+                Toggle(isOn: $hideEmptyHours) {
+                    Text("Ocultar horários vazios")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                }
+                .tint(primary)
+
+                HStack(spacing: 4) {
+                    orientationButton(key: "vertical", icon: "rectangle.split.3x1", label: "Grade vertical")
+                    orientationButton(key: "horizontal", icon: "rectangle.split.1x2", label: "Grade horizontal")
+                }
+                .padding(3)
+                .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
             }
-            .tint(primary)
         }
+    }
+
+    private func ownerPickerMenu(primary: Color, activeFriend: FriendSchedule?) -> some View {
+        Menu {
+            Button {
+                store.selectedFriendScheduleId = nil
+            } label: {
+                if activeFriend == nil {
+                    Label("Minha grade", systemImage: "checkmark")
+                } else {
+                    Label("Minha grade", systemImage: "person.fill")
+                }
+            }
+
+            if !store.friendSchedules.isEmpty {
+                Section("Grades de amigos") {
+                    ForEach(store.friendSchedules) { friend in
+                        Button {
+                            store.selectedFriendScheduleId = friend.id
+                        } label: {
+                            if friend.id == activeFriend?.id {
+                                Label("\(friend.friendName) (\(friend.semester))", systemImage: "checkmark")
+                            } else {
+                                Label("\(friend.friendName) (\(friend.semester))", systemImage: "person.crop.circle")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button {
+                showFileImporter = true
+            } label: {
+                Label("Importar arquivo (.ufopgrade)", systemImage: "doc.badge.plus")
+            }
+
+            Button {
+                qrSheetMode = .scanQr
+            } label: {
+                Label("Ler QR Code", systemImage: "qrcode.viewfinder")
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if let activeFriend {
+                    FriendAvatarCircleView(
+                        name: activeFriend.friendName,
+                        avatarBase64: activeFriend.avatarBase64,
+                        size: 20,
+                        accent: primary,
+                        onAccent: resolvedAccent.onPrimary(for: colorScheme)
+                    )
+                    Text(activeFriend.friendName)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Minha grade")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(
+                activeFriend == nil
+                    ? CampusTheme.accessibleTextColor(primary, scheme: colorScheme)
+                    : resolvedAccent.onPrimary(for: colorScheme)
+            )
+            .padding(.horizontal, 12)
+            .frame(minHeight: 38)
+            .liquidGlassCapsule(selected: activeFriend != nil, accent: primary, interactive: true, highContrast: hc)
+        }
+        .minimumTouchTarget(minTouch)
+        .accessibilityLabel("Selecionar grade exibida")
     }
 
     private func orientationButton(key: String, icon: String, label: String) -> some View {
@@ -333,7 +606,12 @@ public struct TimetableGridView: View {
 
     // MARK: - Vertical Grid (Time rows x Weekday columns)
 
-    private func verticalGridCard(weekdays: [String], timeRanges: [String], slots: [TimetableSlotCell]) -> some View {
+    private func verticalGridCard(
+        weekdays: [String],
+        timeRanges: [String],
+        slots: [TimetableSlotCell],
+        isFriendMode: Bool
+    ) -> some View {
         let primary = resolvedAccent.primary(for: colorScheme)
 
         return ScrollView(.horizontal, showsIndicators: false) {
@@ -363,7 +641,7 @@ public struct TimetableGridView: View {
 
                         ForEach(weekdays, id: \.self) { day in
                             let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
-                            gridCellView(cell: match, isTodayColumn: day == todayWeekdayShort)
+                            gridCellView(cell: match, isTodayColumn: day == todayWeekdayShort, isFriendMode: isFriendMode)
                                 .frame(width: verticalColWidth, height: 74)
                         }
                     }
@@ -376,7 +654,12 @@ public struct TimetableGridView: View {
 
     // MARK: - Horizontal Grid (Weekday rows x Time columns)
 
-    private func horizontalGridCard(weekdays: [String], timeRanges: [String], slots: [TimetableSlotCell]) -> some View {
+    private func horizontalGridCard(
+        weekdays: [String],
+        timeRanges: [String],
+        slots: [TimetableSlotCell],
+        isFriendMode: Bool
+    ) -> some View {
         let primary = resolvedAccent.primary(for: colorScheme)
 
         return ScrollView(.horizontal, showsIndicators: false) {
@@ -411,7 +694,7 @@ public struct TimetableGridView: View {
 
                         ForEach(timeRanges, id: \.self) { range in
                             let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
-                            gridCellView(cell: match, isTodayColumn: isToday)
+                            gridCellView(cell: match, isTodayColumn: isToday, isFriendMode: isFriendMode)
                                 .frame(width: horizontalColWidth, height: 74)
                         }
                     }
@@ -423,14 +706,20 @@ public struct TimetableGridView: View {
     }
 
     @ViewBuilder
-    private func gridCellView(cell: TimetableSlotCell?, isTodayColumn: Bool) -> some View {
+    private func gridCellView(cell: TimetableSlotCell?, isTodayColumn: Bool, isFriendMode: Bool) -> some View {
         if let cell {
             let deptColor = CampusTheme.departmentColor(for: cell.colorKey)
-            let isEad = store.isCourseEad(cell.disciplineId)
+            let isEad = isFriendMode
+                ? CampusStore.isEadText(cell.roomLabel)
+                : store.isCourseEad(cell.disciplineId)
             let roomSub = isEad ? "EAD" : (cell.roomLabel.isEmpty ? "Sem sala" : cell.roomLabel)
 
             Button {
-                selectedCell = cell
+                if isFriendMode {
+                    selectedFriendCell = cell
+                } else {
+                    selectedCell = cell
+                }
             } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(cell.disciplineShortName)
@@ -474,24 +763,125 @@ public struct TimetableGridView: View {
         }
     }
 
-    private var emptyTimetableCard: some View {
+    private func emptyTimetableCard(isFriendMode: Bool) -> some View {
         VStack(spacing: 8) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
-            Text("Sem horários cadastrados neste filtro")
+            Text(isFriendMode ? "Sem horários nesta grade compartilhada" : "Sem horários cadastrados neste filtro")
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-            Text("Adicione horários nas disciplinas ou escolha um modelo de grade acima.")
-                .font(.system(size: 13))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
-                .multilineTextAlignment(.center)
+            Text(
+                isFriendMode
+                    ? "O arquivo importado não possui horários cadastrados para este semestre."
+                    : "Adicione horários nas disciplinas ou escolha um modelo de grade acima."
+            )
+            .font(.system(size: 13))
+            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(24)
         .liquidGlassCard(cornerRadius: 20, highContrast: hc)
+    }
+
+    private func friendBottomCard(friend: FriendSchedule) -> some View {
+        let primary = resolvedAccent.primary(for: colorScheme)
+        let onPrimary = resolvedAccent.onPrimary(for: colorScheme)
+        let cleanCourse = friend.courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                FriendAvatarCircleView(
+                    name: friend.friendName,
+                    avatarBase64: friend.avatarBase64,
+                    size: 46,
+                    accent: primary,
+                    onAccent: onPrimary
+                )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(friend.friendName)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                    if !cleanCourse.isEmpty {
+                        Text(cleanCourse)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
+                            .lineLimit(1)
+                    }
+
+                    Text("\(friend.semester) · \(friend.courses.count) disciplina(s) · \(friend.slots.count) horário(s)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    store.selectedFriendScheduleId = nil
+                } label: {
+                    Label("Minha grade", systemImage: "person.fill")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(onPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+
+                Button(role: .destructive) {
+                    pendingRemoveFriend = friend
+                } label: {
+                    Label("Remover", systemImage: "trash")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(hex: 0xDC2626))
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .liquidGlassCapsule(selected: false, accent: Color(hex: 0xDC2626), interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+            }
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 20, tint: primary, highContrast: hc)
+    }
+
+    private func handleFileImportResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            importErrorMessage = error.localizedDescription
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            do {
+                let rawText = try UfopGradeCodec.readFileSafely(from: url)
+                let label = url.lastPathComponent.isEmpty ? "Arquivo .ufopgrade" : url.lastPathComponent
+                let preview = try UfopGradeCodec.parseAndValidatePreview(rawText, sourceLabel: label)
+                pendingIncomingGrade = preview
+            } catch {
+                importErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func friendMeetingRequest(for cell: TimetableSlotCell, course: FriendCourseEntry?) -> CampusMapMeetingRequest {
+        let weekdayMap: [String: UInt32] = ["SEG": 1, "TER": 2, "QUA": 3, "QUI": 4, "SEX": 5, "SÁB": 6, "DOM": 7]
+        let weekday = weekdayMap[cell.weekdayShort] ?? 1
+        let startTime = CampusStore.normalizeTimeString(
+            cell.timeRange.components(separatedBy: "–").first ?? ""
+        )
+        return CampusMapMeetingRequest(
+            courseCode: course?.code ?? "",
+            section: "",
+            weekday: weekday,
+            startTime: startTime,
+            fallbackBuildingRaw: cell.roomLabel
+        )
     }
 
     // MARK: - Legend Section
@@ -710,6 +1100,128 @@ private struct TimetableCellDetailSheet: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+            .padding(20)
+        }
+    }
+}
+
+// MARK: - Read-Only Friend Cell Detail Sheet
+
+private struct FriendTimetableCellDetailSheet: View {
+    let cell: TimetableSlotCell
+    let friend: FriendSchedule
+    let course: FriendCourseEntry?
+    let onOpenLocationInMap: (() -> Void)?
+    let onClose: () -> Void
+
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let accent = appearance?.accentColor ?? .green
+        let hc = appearance?.accessibility.highContrastMode ?? false
+        let deptColor = CampusTheme.departmentColor(for: cell.colorKey)
+        let isEad = CampusStore.isEadText(cell.roomLabel)
+        let roomDesc = isEad ? "A distância (EAD)" : (cell.roomLabel.isEmpty ? "Local não informado" : cell.roomLabel)
+        let badgeText = (course?.code.isEmpty == false) ? (course?.code ?? cell.weekdayShort) : cell.weekdayShort
+
+        ZStack {
+            LiquidGlassBackdrop(accent: accent, highContrast: hc)
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text(badgeText)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(CampusTheme.departmentSoftTint(for: cell.colorKey, scheme: colorScheme)))
+
+                    Text("Grade de \(friend.friendName)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .liquidGlassCapsule(selected: false, accent: deptColor, interactive: false, highContrast: hc)
+
+                    Spacer()
+
+                    Button {
+                        onClose()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .frame(width: 38, height: 38)
+                            .liquidGlassCapsule(selected: false, accent: deptColor, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Text(course?.name ?? cell.disciplineShortName)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("\(cell.weekdayShort) · \(cell.timeRange)", systemImage: "clock.fill")
+                        .font(.system(size: 14, weight: .semibold))
+
+                    if !isEad, let onOpenLocationInMap {
+                        Button {
+                            onOpenLocationInMap()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(accent.primary(for: colorScheme))
+
+                                Text(roomDesc)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+
+                                Spacer(minLength: 6)
+
+                                HStack(spacing: 4) {
+                                    Text("Ver no mapa")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundStyle(accent.primary(for: colorScheme))
+                            }
+                            .frame(minHeight: 36)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .campusHoverLift()
+                    } else {
+                        Label(roomDesc, systemImage: isEad ? "laptopcomputer" : "building.2.fill")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+
+                    Label("Modo somente leitura (grade de amigo)", systemImage: "eye")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                }
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .liquidGlassCard(cornerRadius: 16, tint: deptColor, highContrast: hc)
+
+                Spacer()
+
+                Button {
+                    onClose()
+                } label: {
+                    Text("Fechar")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .liquidGlassCapsule(selected: false, accent: deptColor, interactive: true, highContrast: hc)
+                }
+                .buttonStyle(.plain)
             }
             .padding(20)
         }

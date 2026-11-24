@@ -5,6 +5,7 @@ import Security
 import LocalAuthentication
 import PDFKit
 import SwiftUI
+import CoreTransferable
 import UniformTypeIdentifiers
 import Observation
 
@@ -514,10 +515,14 @@ public final class AppLockManager {
     }
 }
 
-// MARK: - SwiftUI FileDocument for Exporting .ufopbackup / .ufopgrade
+// MARK: - SwiftUI FileDocument & Transferable for Exporting .ufopbackup / .ufopgrade
+
+public extension UTType {
+    static let ufopGrade = UTType(exportedAs: "io.github.nuncamorto.vidaacademica.ufopgrade")
+}
 
 public struct UfopTextDocument: FileDocument {
-    public static var readableContentTypes: [UTType] { [.plainText, .data] }
+    public static var readableContentTypes: [UTType] { [.ufopGrade, .json, .plainText, .data] }
 
     public var text: String
 
@@ -536,5 +541,43 @@ public struct UfopTextDocument: FileDocument {
 
     public func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
+
+public struct UfopGradeTransferable: Transferable, Sendable {
+    public let jsonPayload: String
+    public let suggestedFilename: String
+    public let displayTitle: String
+
+    public init(
+        jsonPayload: String,
+        suggestedFilename: String,
+        displayTitle: String
+    ) {
+        self.jsonPayload = jsonPayload
+        self.suggestedFilename = suggestedFilename
+        self.displayTitle = displayTitle
+    }
+
+    private var safeFilename: String {
+        let basename = (suggestedFilename as NSString).lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolved = basename.isEmpty ? "grade_estudante_ufop.ufopgrade" : basename
+        if resolved.lowercased().hasSuffix(".ufopgrade") {
+            return resolved
+        }
+        return "\(resolved).ufopgrade"
+    }
+
+    public static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .ufopGrade) { item in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(item.safeFilename)
+            guard let data = item.jsonPayload.data(using: .utf8) else {
+                throw CocoaError(.fileWriteInapplicableStringEncoding)
+            }
+            try data.write(to: url, options: .atomic)
+            return SentTransferredFile(url)
+        }
     }
 }

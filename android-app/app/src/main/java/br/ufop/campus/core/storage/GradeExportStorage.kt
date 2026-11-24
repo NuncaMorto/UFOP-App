@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import java.io.ByteArrayOutputStream
@@ -75,13 +76,45 @@ object GradeExportStorage {
         )
     }
 
+    fun resolveDisplayName(context: Context, uri: Uri): String? {
+        val queried = runCatching {
+            context.contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0 && cursor.moveToFirst()) {
+                    cursor.getString(index)?.trim()?.takeIf { it.isNotEmpty() }
+                } else {
+                    null
+                }
+            }
+        }.getOrNull()
+        if (!queried.isNullOrEmpty()) {
+            return queried
+        }
+        return uri.lastPathSegment
+            ?.substringAfterLast('/')
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
     fun readPayloadFromUriSafely(
         context: Context,
         uri: Uri,
         maxBytes: Int = DEFAULT_READ_MAX_BYTES
     ): String {
         require(maxBytes > 0) { "Limite de leitura deve ser positivo." }
-        val inputStream = context.contentResolver.openInputStream(uri)
+        val resolvedStream = if (uri.scheme.equals("file", ignoreCase = true)) {
+            runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
+                ?: uri.path?.let { path -> File(path).takeIf { it.isFile }?.inputStream() }
+        } else {
+            context.contentResolver.openInputStream(uri)
+        }
+        val inputStream = resolvedStream
             ?: throw IllegalStateException("Não foi possível abrir o arquivo selecionado.")
         inputStream.use { stream ->
             val out = ByteArrayOutputStream()

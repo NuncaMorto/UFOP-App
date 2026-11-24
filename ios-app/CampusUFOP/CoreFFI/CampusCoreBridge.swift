@@ -46,6 +46,9 @@ public final class CampusStore {
     public internal(set) var academicActivities: [AcademicActivityItem] = []
     public internal(set) var campuses: [UfopCampusInfo] = []
     public internal(set) var calendarEvents: [AcademicCalendarEvent] = []
+    public internal(set) var friendSchedules: [FriendSchedule] = []
+    public var selectedFriendScheduleId: String? = nil
+    public var requestedTimetablePresentation: Bool = false
 
     /// Rastreia o status anteriormente salvo por item de agenda para garantir idempotência
     /// na transição entre `.attending`, `.absent` e `.cancelled`.

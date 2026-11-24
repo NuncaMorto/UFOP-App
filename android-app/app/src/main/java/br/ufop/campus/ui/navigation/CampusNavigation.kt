@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,8 +32,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.core.ffi.IncomingGradePreview
 import br.ufop.campus.core.map.CampusMapController
 import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.update.AppUpdateManager
@@ -129,6 +134,10 @@ enum class CampusTab(
 fun CampusNavigation(
     repository: CampusCoreRepository,
     modifier: Modifier = Modifier,
+    pendingIncomingGrade: IncomingGradePreview? = null,
+    incomingGradeError: String? = null,
+    onConsumeIncomingGrade: () -> Unit = {},
+    onDismissIncomingGradeError: () -> Unit = {},
     onAppSecurityChanged: () -> Unit = {},
     onExitApp: () -> Unit = {}
 ) {
@@ -138,6 +147,8 @@ fun CampusNavigation(
     var showDynamicGridModal by rememberSaveable { mutableStateOf(false) }
     var showReleaseNotesDialog by rememberSaveable { mutableStateOf(false) }
     var checkedAutoReleaseNotes by rememberSaveable { mutableStateOf(false) }
+    var pendingTimetableFriendId by rememberSaveable { mutableStateOf<String?>(null) }
+    var incomingImportErrorBanner by remember { mutableStateOf<String?>(null) }
 
     val isDark = LocalCampusThemeController.current.isDark
     val a11y = LocalCampusAccessibility.current.settings
@@ -404,7 +415,9 @@ fun CampusNavigation(
                 br.ufop.campus.ui.timetable.TimetableModalScreen(
                     repository = repository,
                     onDismiss = { showTimetableModal = false },
-                    onOpenLocationInMap = openMeetingInMap
+                    onOpenLocationInMap = openMeetingInMap,
+                    initialFriendId = pendingTimetableFriendId,
+                    onInitialFriendConsumed = { pendingTimetableFriendId = null }
                 )
             }
 
@@ -463,6 +476,94 @@ fun CampusNavigation(
                     state = appUpdateState,
                     onDismiss = { AppUpdateManager.closeUpdateDialog() }
                 )
+            }
+
+            if (studentProfile.onboardingCompleted && pendingIncomingGrade != null) {
+                val incomingTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
+                br.ufop.campus.ui.timetable.IncomingGradeConfirmSheet(
+                    preview = pendingIncomingGrade,
+                    minTouchTarget = incomingTouchTarget,
+                    onConfirmImport = {
+                        runCatching {
+                            repository.importFriendScheduleJson("", pendingIncomingGrade.rawJsonPayload)
+                        }.onSuccess { imported ->
+                            pendingTimetableFriendId = imported.id
+                            selectedTab = CampusTab.DISCIPLINES
+                            showTimetableModal = true
+                            onConsumeIncomingGrade()
+                        }.onFailure { err ->
+                            incomingImportErrorBanner = err.message
+                                ?: "Não foi possível importar a grade recebida."
+                            onConsumeIncomingGrade()
+                        }
+                    },
+                    onDismiss = onConsumeIncomingGrade
+                )
+            }
+
+            val activeIncomingError = incomingGradeError ?: incomingImportErrorBanner
+            if (studentProfile.onboardingCompleted && activeIncomingError != null) {
+                val errorCloseTouchTarget = if (a11y.largeTouchTargets) 56.dp else 48.dp
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                    shadowElevation = 6.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Não foi possível abrir a grade",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = activeIncomingError,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                incomingImportErrorBanner = null
+                                onDismissIncomingGradeError()
+                            },
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = errorCloseTouchTarget, minHeight = errorCloseTouchTarget)
+                                .semantics { contentDescription = "Fechar aviso de erro" }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Fechar",
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

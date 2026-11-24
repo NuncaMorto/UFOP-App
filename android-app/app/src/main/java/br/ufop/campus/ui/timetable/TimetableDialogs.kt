@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +55,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.FriendScheduleInfo
+import br.ufop.campus.core.ffi.UfopGradeCodec
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
@@ -72,7 +74,8 @@ internal fun ShareGradeDialog(
     minTouchTarget: Dp,
     coroutineScope: CoroutineScope,
     onDismiss: () -> Unit,
-    onFeedback: (String) -> Unit
+    onFeedback: (String) -> Unit,
+    onOpenMyQrCode: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isExportingGrade by remember { mutableStateOf(false) }
@@ -149,7 +152,7 @@ internal fun ShareGradeDialog(
                         enabled = !isExportingGrade,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp),
+                            .defaultMinSize(minHeight = minTouchTarget),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         if (isExportingGrade) {
@@ -236,7 +239,7 @@ internal fun ShareGradeDialog(
                             enabled = !isExportingGrade,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp),
+                                .defaultMinSize(minHeight = minTouchTarget),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(
@@ -269,7 +272,7 @@ internal fun ShareGradeDialog(
                             enabled = !isExportingGrade,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp),
+                                .defaultMinSize(minHeight = minTouchTarget),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Icon(
@@ -286,6 +289,32 @@ internal fun ShareGradeDialog(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
+                    }
+
+                    FilledTonalButton(
+                        onClick = {
+                            onDismiss()
+                            onOpenMyQrCode()
+                        },
+                        enabled = !isExportingGrade,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = minTouchTarget),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.QrCode2,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "QR Code",
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
 
@@ -398,7 +427,7 @@ internal fun ImportFriendGradeDialog(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp),
+                            .defaultMinSize(minHeight = minTouchTarget),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Icon(
@@ -424,7 +453,7 @@ internal fun ImportFriendGradeDialog(
                         enabled = friendJsonInput.isNotEmpty(),
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp),
+                            .defaultMinSize(minHeight = minTouchTarget),
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Icon(
@@ -452,8 +481,8 @@ internal fun ImportFriendGradeDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 140.dp, max = 210.dp),
-                    label = { Text("Conteúdo .ufopgrade ou JSON") },
-                    placeholder = { Text("{\"format\":\"ufopgrade-v1\",\"friendName\":\"...\"}") },
+                    label = { Text("Conteúdo .ufopgrade, JSON ou QR") },
+                    placeholder = { Text("{\"format\":\"ufopgrade-v1\",\"friendName\":\"...\"} ou UFOPG1:...") },
                     minLines = 6,
                     maxLines = 10,
                     textStyle = MaterialTheme.typography.bodySmall.copy(
@@ -465,15 +494,20 @@ internal fun ImportFriendGradeDialog(
                 if (friendJsonInput.isNotBlank()) {
                     val trimmedPayload = friendJsonInput.trim()
                     val looksLikeJson = trimmedPayload.startsWith("{") && trimmedPayload.endsWith("}")
-                    val statusColor = if (looksLikeJson) {
+                    val looksLikeQrCode = trimmedPayload.startsWith(UfopGradeCodec.QR_PREFIX)
+                    val recognizedFormat = looksLikeJson || looksLikeQrCode
+                    val statusColor = if (recognizedFormat) {
                         StatusAttendingGreen
                     } else {
                         MaterialTheme.colorScheme.primary
                     }
-                    val statusText = if (looksLikeJson) {
-                        "✓ Conteúdo carregado (${friendJsonInput.length} caracteres · formato JSON detectado)"
-                    } else {
-                        "✓ Conteúdo carregado (${friendJsonInput.length} caracteres · confira se o JSON está completo)"
+                    val statusText = when {
+                        looksLikeQrCode ->
+                            "✓ Código QR UFOP detectado (${friendJsonInput.length} caracteres)"
+                        looksLikeJson ->
+                            "✓ Conteúdo carregado (${friendJsonInput.length} caracteres · formato JSON detectado)"
+                        else ->
+                            "✓ Conteúdo carregado (${friendJsonInput.length} caracteres · confira se o JSON ou código QR está completo)"
                     }
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -522,12 +556,24 @@ internal fun ImportFriendGradeDialog(
                             val cleanName = friendNameInput.trim()
                             val cleanJson = friendJsonInput.trim()
                             if (cleanJson.isEmpty()) {
-                                importFriendError = "Cole o texto da grade compartilhada."
+                                importFriendError = "Cole o texto ou código QR da grade compartilhada."
                             } else {
                                 runCatching {
+                                    val payloadToImport = UfopGradeCodec.parseAndValidatePreview(
+                                        rawText = cleanJson,
+                                        sourceLabel = "Texto colado"
+                                    ).fold(
+                                        onSuccess = { preview -> preview.rawJsonPayload },
+                                        onFailure = { err ->
+                                            if (cleanJson.startsWith(UfopGradeCodec.QR_PREFIX)) {
+                                                throw err
+                                            }
+                                            cleanJson
+                                        }
+                                    )
                                     repository.importFriendScheduleJson(
                                         friendName = cleanName,
-                                        jsonPayload = cleanJson
+                                        jsonPayload = payloadToImport
                                     )
                                 }.onSuccess { imported ->
                                     onImported(imported)

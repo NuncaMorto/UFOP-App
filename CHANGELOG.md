@@ -10,6 +10,17 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.14 — Abertura Direta .ufopgrade, AirDrop, QR Code Offline & Mapa Otimizado
+
+- **Android (`1.9.14` · Beta) & iOS (`1.9.14`):**
+  - **Abertura direta de arquivos `.ufopgrade` (`ufopgrade-v1`):** toque em arquivos recebidos pelo WhatsApp, Telegram, Arquivos ou AirDrop para pré-visualizar nome, curso, foto, semestre e quantidade de disciplinas/horários antes de importar para **Grades de Amigos** (com fila segura caso o Bloqueio do App esteja ativo) e interoperabilidade total `ufopgrade-v1` com Grades de Amigos persistidas também no iOS.
+  - **AirDrop por aproximação (iOS 17+) & QR Code 100% offline (Android ↔ iOS):** compartilhe sua grade encostando dois iPhones com a Grade Horária aberta ou gere/leia o **QR Code compacto (`UFOPG1:`)** totalmente offline entre Android e iOS.
+  - **Performance do Mapa 2D:** culling de viewport, cache de geometria/rótulos, simplificação adaptativa e carregamento sob demanda no núcleo Rust e nas telas de mapa Android e iOS.
+
+<!-- versionCode: 31 -->
+
+---
+
 ## v1.9.13 — Grade Dinâmica para Todos os Cursos da UFOP + Modularização
 
 - **Android (`1.9.13` · Beta) & iOS (`1.9.13`):**

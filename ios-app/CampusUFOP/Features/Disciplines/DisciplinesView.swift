@@ -155,6 +155,20 @@ public struct DisciplinesView: View {
                 }
             )
         }
+        .onAppear {
+            consumePendingTimetableRequest()
+        }
+        .onChange(of: viewModel.store.requestedTimetablePresentation) { _, requested in
+            if requested {
+                consumePendingTimetableRequest()
+            }
+        }
+    }
+
+    private func consumePendingTimetableRequest() {
+        guard viewModel.store.requestedTimetablePresentation else { return }
+        viewModel.store.requestedTimetablePresentation = false
+        viewModel.openTimetable()
     }
 
     private var selectedDisciplineBinding: Binding<DisciplineDetail?> {

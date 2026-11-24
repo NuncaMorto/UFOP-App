@@ -179,3 +179,81 @@ public struct StudentProfile: Equatable, Codable, Sendable {
         self.onboardingCompleted = onboardingCompleted
     }
 }
+
+// MARK: - Friend Shared Schedules (.ufopgrade / QR UFOPG1)
+
+public struct FriendCourseEntry: Identifiable, Codable, Equatable, Sendable {
+    public let courseId: String
+    public let code: String
+    public let name: String
+    public let departmentId: String
+
+    public var id: String { courseId }
+
+    public init(
+        courseId: String,
+        code: String,
+        name: String,
+        departmentId: String
+    ) {
+        self.courseId = courseId
+        self.code = code
+        self.name = name
+        self.departmentId = departmentId
+    }
+}
+
+public struct FriendSlotEntry: Identifiable, Codable, Equatable, Sendable {
+    public let slotId: String
+    public let courseId: String
+    public let dayOfWeek: Int
+    public let startTime: String
+    public let endTime: String
+    public let shortLocation: String
+
+    public var id: String { slotId }
+
+    public init(
+        slotId: String,
+        courseId: String,
+        dayOfWeek: Int,
+        startTime: String,
+        endTime: String,
+        shortLocation: String
+    ) {
+        self.slotId = slotId
+        self.courseId = courseId
+        self.dayOfWeek = dayOfWeek
+        self.startTime = startTime
+        self.endTime = endTime
+        self.shortLocation = shortLocation
+    }
+}
+
+public struct FriendSchedule: Identifiable, Codable, Equatable, Sendable {
+    public let id: String
+    public let friendName: String
+    public let courseName: String
+    public let semester: String
+    public let avatarBase64: String?
+    public let courses: [FriendCourseEntry]
+    public let slots: [FriendSlotEntry]
+
+    public init(
+        id: String,
+        friendName: String,
+        courseName: String,
+        semester: String,
+        avatarBase64: String? = nil,
+        courses: [FriendCourseEntry],
+        slots: [FriendSlotEntry]
+    ) {
+        self.id = id
+        self.friendName = friendName
+        self.courseName = courseName
+        self.semester = semester
+        self.avatarBase64 = avatarBase64
+        self.courses = courses
+        self.slots = slots
+    }
+}

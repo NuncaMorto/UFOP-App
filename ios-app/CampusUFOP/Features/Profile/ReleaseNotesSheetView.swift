@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.13"
+    public static let currentVersionString = "1.9.14"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.13",
-            title: "Grade Dinâmica para 48 Cursos da UFOP & Modularização",
+            version: "v1.9.14",
+            title: "Abertura Direta .ufopgrade, AirDrop, QR Code Offline & Mapa Mais Rápido",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Abertura direta de arquivos .ufopgrade recebidos pelo WhatsApp, Telegram, Arquivos ou AirDrop com confirmação segura antes de salvar em Grades de Amigos (respeitando o bloqueio por senha e Face ID / Touch ID).",
+                "Interoperabilidade total ufopgrade-v1 entre iOS e Android, com Grades de Amigos na Grade Horária e AirDrop por aproximação (iOS 17+).",
+                "Compartilhamento e leitura via QR Code 100% offline (UFOPG1:) entre iOS e Android diretamente pela Grade Horária.",
+                "Otimizações de performance no Mapa 2D Offline com culling de viewport, cache de geometria/rótulos e carregamento sob demanda."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.13",
+            title: "Grade Dinâmica para 48 Cursos da UFOP & Modularização",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Grade Dinâmica Interativa liberada automaticamente para os 48 cursos com disciplinas detalhadas no catálogo UFOP (como Farmácia, entre outros), resolvida pelo curso real e semestre de ingresso.",
                 "Construção acíclica automática de pré-requisitos, carga horária mínima e slots optativos/eletivos, preservando as versões históricas curadas de Automação (2024/1 e 2026/1) e nota informativa para os 6 cursos pendentes.",
