@@ -9,27 +9,39 @@ import java.io.File
 
 /**
  * Bridge FFI / Stateful Engine Repository para o CAMPUS (UFOP).
- * Instancia o [br.ufop.campus.core.uniffi.CampusEngine] nativo via UniFFI/JNA quando a biblioteca
- * `campus_core` está disponível no runtime e cai automaticamente para o [InMemoryCampusRepository]
- * quando executada sem biblioteca nativa (ex.: Compose Previews ou testes unitários JVM).
+ *
+ * Mantém o repositório criptografado [InMemoryCampusRepository] (`campus_ufop_state.json`,
+ * AES-256-GCM) como fonte única de verdade para os dados acadêmicos no Android — garantindo
+ * paridade com o `CampusStore` do iOS e evitando *split-brain* com as APIs dos Sprints 6–14 ou
+ * perda aparente de dados em `campus_ufop.db` quando a biblioteca nativa `libcampus_core.so` está
+ * empacotada para o motor do Mapa 2D Offline ([br.ufop.campus.core.uniffi.CampusMapEngine]).
+ *
+ * O motor nativo SQLite ([br.ufop.campus.core.uniffi.CampusEngine]) permanece desabilitado por
+ * padrão (`useNativeAcademicEngine = false`) e pode ser ativado explicitamente apenas para testes
+ * isolados da ponte legada.
  */
 class CampusEngineBridgeRepository(
     private val dbPath: String? = null,
     private val stateFile: File? = null,
-    private val onStatePersisted: (() -> Unit)? = null
+    private val onStatePersisted: (() -> Unit)? = null,
+    useNativeAcademicEngine: Boolean = false
 ) : CampusCoreRepository {
 
     private val lock = Any()
     private val _mutationVersion = MutableStateFlow(0L)
     override val mutationVersion: StateFlow<Long> = _mutationVersion.asStateFlow()
 
-    private var uniffiEngine: br.ufop.campus.core.uniffi.CampusEngine? = try {
-        if (dbPath != null) {
-            br.ufop.campus.core.uniffi.CampusEngine.newEmpty(dbPath)
-        } else {
-            br.ufop.campus.core.uniffi.CampusEngine.newInMemoryEmpty()
+    private var uniffiEngine: br.ufop.campus.core.uniffi.CampusEngine? = if (useNativeAcademicEngine) {
+        try {
+            if (dbPath != null) {
+                br.ufop.campus.core.uniffi.CampusEngine.newEmpty(dbPath)
+            } else {
+                br.ufop.campus.core.uniffi.CampusEngine.newInMemoryEmpty()
+            }
+        } catch (_: Throwable) {
+            null
         }
-    } catch (_: Throwable) {
+    } else {
         null
     }
 

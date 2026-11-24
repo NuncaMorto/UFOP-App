@@ -1568,6 +1568,75 @@ class CampusPersistenceAndParsersTest {
         assertEquals("", targetBridge.getLastSeenReleaseVersion())
     }
 
+    @Test
+    fun bridgeRepositoryUsesEncryptedStateAsSingleSourceOfTruthWhenDbPathProvided() {
+        val stateFile = File(tempFolder.root, "campus_ufop_state.json")
+        val dbFile = File(tempFolder.root, "campus_ufop.db")
+
+        val seedRepo = InMemoryCampusRepository(stateFile = stateFile)
+        seedRepo.saveStudentProfile(
+            StudentProfile(
+                fullName = "Aluno UFOP",
+                activeSemester = "2026.2",
+                onboardingCompleted = true
+            )
+        )
+        val course = seedRepo.createCourse(
+            semester = "2026.2",
+            departmentId = "decom",
+            name = "Estrutura de Dados",
+            professor = "Prof. Ana",
+            workloadHours = 60,
+            colorOverrideHex = null
+        )
+        seedRepo.addScheduleSlot(
+            courseId = course.courseId,
+            dayOfWeek = 1,
+            startTime = "08:00",
+            endTime = "09:40",
+            building = "ICEB",
+            room = "205",
+            shortLocation = "ICEB · 205"
+        )
+        seedRepo.createCommitment(
+            title = "Monitoria BCC202",
+            description = "Sala 205",
+            commitmentDate = "2026-11-24",
+            startTime = "14:00",
+            endTime = "15:00",
+            location = "ICEB",
+            weatherTempC = null
+        )
+        seedRepo.createAssessment(
+            courseId = course.courseId,
+            title = "Prova 1",
+            kind = "Prova",
+            dueDate = "2026-11-30",
+            dueTime = "08:00"
+        )
+
+        val bridge = CampusEngineBridgeRepository(
+            dbPath = dbFile.absolutePath,
+            stateFile = stateFile
+        )
+        assertFalse(bridge.isNativeCoreActive)
+        assertEquals("Aluno UFOP", bridge.getStudentProfile().fullName)
+        assertEquals(1, bridge.listDisciplines("2026.2", null).size)
+        assertEquals(1, bridge.listCourseSlots(course.courseId).size)
+        assertEquals(
+            1,
+            bridge.getWeeklyTimetable("2026.2").rows
+                .flatMap { it.cellsByDay.values.filterNotNull() }
+                .count { it.courseId == course.courseId }
+        )
+        assertTrue(bridge.getAgendaDay("2026-11-24").items.any { it.title == "Monitoria BCC202" })
+        assertEquals(1, bridge.listAllAssessments("2026.2", null).size)
+
+        bridge.updateCourseAbsences(course.courseId, 2)
+        assertEquals(2, bridge.getDisciplineDetail(course.courseId).summary.currentAbsences)
+        assertEquals(2, bridge.listDisciplines("2026.2", null).first().currentAbsences)
+    }
+
     private class InMemorySharedPreferences : SharedPreferences {
         private val data = linkedMapOf<String, Any?>()
         var commitCount: Int = 0
