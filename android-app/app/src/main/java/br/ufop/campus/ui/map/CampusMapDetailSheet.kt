@@ -74,9 +74,9 @@ internal fun CampusMapDetailSheet(
             .fillMaxWidth()
             .heightIn(max = 320.dp),
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.95f else 0.97f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.96f else 0.98f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 8.dp
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier
@@ -293,9 +293,9 @@ internal fun FreeRoomsSummaryCard(
             .widthIn(max = 520.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.94f else 0.97f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.96f else 0.98f),
         border = BorderStroke(1.dp, freeAccent.copy(alpha = 0.45f)),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier.padding(14.dp),

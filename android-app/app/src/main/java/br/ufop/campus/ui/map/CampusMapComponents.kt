@@ -163,7 +163,7 @@ internal fun FloorSelectorBar(
                         MaterialTheme.colorScheme.outlineVariant
                     }
                 ),
-                shadowElevation = 2.dp
+                shadowElevation = 0.dp
             ) {
                 Text(
                     text = item.label,
@@ -201,7 +201,7 @@ internal fun SelectedFeatureSheetCard(
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(

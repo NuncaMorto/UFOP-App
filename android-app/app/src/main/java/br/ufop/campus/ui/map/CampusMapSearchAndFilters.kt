@@ -100,7 +100,7 @@ internal fun CampusMapSearchBar(
             .fillMaxWidth()
             .heightIn(min = barHeight),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.90f else 0.95f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.95f else 0.97f),
         border = BorderStroke(
             width = if (isFocused) 1.5.dp else 1.dp,
             color = if (isFocused) {
@@ -109,7 +109,7 @@ internal fun CampusMapSearchBar(
                 MaterialTheme.colorScheme.outlineVariant
             }
         ),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
@@ -252,9 +252,9 @@ internal fun CampusMapSearchResultsCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.94f else 0.97f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.96f else 0.98f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 8.dp
+        shadowElevation = 3.dp
     ) {
         if (results.isEmpty()) {
             Text(
@@ -385,7 +385,7 @@ internal fun MapCompactPillChip(
             shape = CircleShape,
             color = containerColor,
             border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor),
-            shadowElevation = if (isSelected) 3.dp else 1.dp
+            shadowElevation = 0.dp
         ) {
             Row(
                 modifier = Modifier

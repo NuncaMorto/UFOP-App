@@ -247,4 +247,78 @@ class CampusMapMathTest {
             )
         )
     }
+
+    @Test
+    fun visibleMapRectAndCullingHelpersWorkAccurately() {
+        val transform = MapViewportTransform(offsetX = 100f, offsetY = 200f, zoomDpPerMeter = 2.0f)
+        val density = 2.0f
+        // scale = 4 px/m; screen (0,0)..(800, 1200) -> map (-25, -50)..(175, 250), plus 40px (=10m) margin
+        val rect = CampusMapMath.visibleMapRect(
+            viewportWidthPx = 800f,
+            viewportHeightPx = 1200f,
+            transform = transform,
+            density = density,
+            marginPx = 40f
+        )
+        assertEquals(-35f, rect.minX, 0.01f)
+        assertEquals(-60f, rect.minY, 0.01f)
+        assertEquals(185f, rect.maxX, 0.01f)
+        assertEquals(260f, rect.maxY, 0.01f)
+
+        assertTrue(CampusMapMath.bboxIntersects(0f, 0f, 10f, 10f, rect))
+        assertTrue(CampusMapMath.bboxIntersects(-50f, -80f, -35f, -59f, rect))
+        assertFalse(CampusMapMath.bboxIntersects(-80f, 0f, -36f, 20f, rect))
+        assertFalse(CampusMapMath.bboxIntersects(186f, 0f, 220f, 20f, rect))
+        assertFalse(CampusMapMath.bboxIntersects(0f, 261f, 20f, 300f, rect))
+
+        assertTrue(CampusMapMath.pointInRect(0f, 0f, rect))
+        assertFalse(CampusMapMath.pointInRect(-40f, 0f, rect, marginM = 2f))
+        assertTrue(CampusMapMath.pointInRect(-40f, 0f, rect, marginM = 6f))
+        assertTrue(
+            CampusMapMath.rectsIntersect(
+                MapRect2D(-50f, -50f, -30f, -30f),
+                rect
+            )
+        )
+    }
+
+    @Test
+    fun zoomDashBucketIsStableWithinSmallChangesAndUpdatesOnZoomSteps() {
+        val b1 = CampusMapMath.zoomDashBucket(4.00f)
+        val b2 = CampusMapMath.zoomDashBucket(4.02f)
+        val b3 = CampusMapMath.zoomDashBucket(8.00f)
+        assertEquals(b1, b2)
+        assertTrue(b3 != b1)
+    }
+
+    @Test
+    fun labelCollisionBufferPreventsOverlapSupportsResetAndGrowsCapacity() {
+        val buffer = LabelCollisionBuffer(initialCapacity = 8)
+        assertTrue(buffer.tryPlace(100f, 100f, 180f, 120f, paddingPx = 4f))
+        assertEquals(1, buffer.placedCount)
+
+        // Overlapping directly or within paddingPx must be rejected
+        assertFalse(buffer.tryPlace(120f, 110f, 200f, 130f, paddingPx = 4f))
+        assertFalse(buffer.tryPlace(182f, 100f, 240f, 120f, paddingPx = 4f))
+
+        // Far enough (>= 4px gap) succeeds
+        assertTrue(buffer.tryPlace(185f, 100f, 240f, 120f, paddingPx = 4f))
+        assertEquals(2, buffer.placedCount)
+
+        // Degenerate or non-finite boxes are rejected
+        assertFalse(buffer.tryPlace(10f, 10f, 10f, 20f))
+        assertFalse(buffer.tryPlace(Float.NaN, 10f, 30f, 20f))
+
+        // Reset clears count without reallocating and allows reuse of same region
+        buffer.reset()
+        assertEquals(0, buffer.placedCount)
+        assertTrue(buffer.tryPlace(100f, 100f, 180f, 120f, paddingPx = 4f))
+
+        // Growing beyond initial capacity works cleanly
+        for (i in 1..20) {
+            val y = i * 40f
+            assertTrue(buffer.tryPlace(500f, y, 560f, y + 20f, paddingPx = 2f))
+        }
+        assertEquals(21, buffer.placedCount)
+    }
 }

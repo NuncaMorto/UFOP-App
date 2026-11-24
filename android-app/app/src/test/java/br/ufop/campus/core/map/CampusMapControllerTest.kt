@@ -18,6 +18,7 @@ import br.ufop.campus.core.uniffi.Resolution
 import br.ufop.campus.core.uniffi.RoomOccupancyItem
 import br.ufop.campus.core.uniffi.SearchResult
 import br.ufop.campus.core.uniffi.SlotInfo
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -781,5 +782,87 @@ class CampusMapControllerTest {
         controller.selectFloor(1)
         controller.close()
         assertEquals(callsBeforeAfterClose, fake.renderBatchCalls)
+    }
+
+    @Test
+    fun geometryRevisionAndCanvasSliceStayIsolatedAcrossOccupancySearchAndFilters() {
+        val fake = FakeCampusMapEngineGateway()
+        fake.renderItemsOverride = listOf(
+            makeRenderRoom("r1", "101", RenderOccupancyKind.NO_REGULAR_CLASS)
+        )
+        val controller = CampusMapController(
+            initialTimestampIso = "2026-09-01T10:00:00-03:00",
+            engineFactory = { fake }
+        )
+
+        val initialCanvas = controller.canvasState.value
+        val initialRev = initialCanvas.geometryRevision
+
+        // Digitar busca altera apenas topHudState, mantendo canvasState intacto
+        controller.updateSearchQuery("ICEB")
+        assertEquals(initialCanvas, controller.canvasState.value)
+        assertTrue(controller.topHudState.value.searchResults.isNotEmpty())
+
+        // Atualizar ocupação/timestamp no mesmo andar preserva geometryRevision sem reconstruir paths
+        fake.renderItemsOverride = listOf(
+            makeRenderRoom("r1", "101", RenderOccupancyKind.OCCUPIED)
+        )
+        controller.updateTimestamp("2026-09-01T14:00:00-03:00")
+        assertEquals(initialRev, controller.canvasState.value.geometryRevision)
+
+        // Troca de andar e troca de campus incrementam geometryRevision
+        controller.selectFloor(1)
+        val revFloor1 = controller.canvasState.value.geometryRevision
+        assertTrue(revFloor1 > initialRev)
+
+        controller.selectCampus("JM_ICEA")
+        val revIcea = controller.canvasState.value.geometryRevision
+        assertTrue(revIcea > revFloor1)
+        controller.close()
+    }
+
+    @Test
+    fun asyncModeDebouncesRapidSearchCancelsStaleWorkAndStopsOnTabExit() {
+        val fake = FakeCampusMapEngineGateway()
+        val controller = CampusMapController(
+            initialTimestampIso = "2026-09-01T10:00:00-03:00",
+            engineFactory = { fake },
+            workDispatcher = Dispatchers.Default,
+            searchDebounceMs = 80L
+        )
+
+        waitUntil(timeoutMs = 3000L) {
+            !controller.state.value.isLoading && controller.state.value.isNativeAvailable
+        }
+
+        controller.updateSearchQuery("I")
+        controller.updateSearchQuery("IC")
+        controller.updateSearchQuery("ICE")
+        controller.updateSearchQuery("ICEB")
+        assertEquals("ICEB", controller.topHudState.value.searchQuery)
+
+        waitUntil(timeoutMs = 3000L) {
+            controller.topHudState.value.searchResults.isNotEmpty()
+        }
+        assertEquals(1, fake.searchCalls.size)
+        assertEquals("ICEB", fake.searchCalls.single().first)
+
+        // Sair da aba MAP cancela debounce pendente antes de chamar FFI
+        controller.updateSearchQuery("Sala")
+        controller.onMapTabActiveChanged(false)
+        Thread.sleep(160L)
+        assertEquals(1, fake.searchCalls.size)
+
+        controller.close()
+    }
+
+    private fun waitUntil(timeoutMs: Long, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!condition()) {
+            if (System.currentTimeMillis() >= deadline) {
+                throw AssertionError("Timed out waiting for async controller condition")
+            }
+            Thread.sleep(10L)
+        }
     }
 }

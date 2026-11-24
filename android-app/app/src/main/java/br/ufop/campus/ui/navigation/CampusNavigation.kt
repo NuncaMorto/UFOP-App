@@ -199,7 +199,7 @@ fun CampusNavigation(
         showTimetableModal = false
         showDynamicGridModal = false
         val controller = ensureMapController()
-        controller.resolveMeeting(
+        controller.resolveMeetingAsync(
             courseCode = request.courseCode,
             section = request.section,
             weekday = request.weekday,
@@ -273,6 +273,7 @@ fun CampusNavigation(
         if (selectedTab == CampusTab.MAP && mapController == null) {
             ensureMapController()
         }
+        mapController?.onMapTabActiveChanged(selectedTab == CampusTab.MAP)
         if (selectedTab != CampusTab.DISCIPLINES && showTimetableModal) {
             showTimetableModal = false
         }

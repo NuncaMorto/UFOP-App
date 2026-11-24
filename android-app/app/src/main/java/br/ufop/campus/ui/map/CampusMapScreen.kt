@@ -42,22 +42,8 @@ fun CampusMapScreen(
     startBarClearanceDp: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
-    val uiState by controller.state.collectAsState()
     val isDark = LocalCampusThemeController.current.isDark
     val hudStartPadding = maxOf(12.dp, startBarClearanceDp)
-    val floorItems = remember(
-        uiState.activeCampusId,
-        uiState.activeFloor,
-        uiState.selectedFeature,
-        uiState.renderBatch
-    ) {
-        controller.availableFloorsForUi()
-    }
-    val activeFloorLabel = remember(uiState.activeFloor, floorItems) {
-        resolveFloorDisplayLabel(uiState.activeFloor, floorItems)
-    }
-    val attribution = uiState.renderBatch?.attribution
-        ?: uiState.campuses.firstOrNull { it.campusId == uiState.activeCampusId }?.attribution
 
     Box(modifier = modifier.fillMaxSize()) {
         CampusMapCanvas(
@@ -66,137 +52,174 @@ fun CampusMapScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = hudStartPadding, top = 12.dp, end = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            CampusMapSearchBar(
-                query = uiState.searchQuery,
-                hasActiveFilters = uiState.activePoiFilter != null || uiState.isFreeRoomsModeEnabled,
+        CampusMapTopHud(
+            controller = controller,
+            hudStartPadding = hudStartPadding,
+            isDark = isDark,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        CampusMapBottomHud(
+            controller = controller,
+            hudStartPadding = hudStartPadding,
+            bottomBarClearanceDp = bottomBarClearanceDp,
+            isDark = isDark,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+}
+
+@Composable
+private fun CampusMapTopHud(
+    controller: CampusMapController,
+    hudStartPadding: Dp,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val topState by controller.topHudState.collectAsState()
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = hudStartPadding, top = 12.dp, end = 12.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        CampusMapSearchBar(
+            query = topState.searchQuery,
+            hasActiveFilters = topState.activePoiFilter != null || topState.isFreeRoomsModeEnabled,
+            isDark = isDark,
+            onQueryChange = controller::updateSearchQuery,
+            onClearAll = {
+                controller.clearSearchAndFilters()
+                controller.setFreeRoomsMode(false)
+            }
+        )
+
+        if (topState.campuses.isNotEmpty()) {
+            CampusSelectorChipsRow(
+                campuses = topState.campuses,
+                activeCampusId = topState.activeCampusId,
                 isDark = isDark,
-                onQueryChange = controller::updateSearchQuery,
-                onClearAll = {
-                    controller.clearSearchAndFilters()
-                    controller.setFreeRoomsMode(false)
+                onSelectCampus = controller::selectCampus
+            )
+        }
+
+        CampusMapFilterChipsRow(
+            isFreeRoomsEnabled = topState.isFreeRoomsModeEnabled,
+            activePoiFilter = topState.activePoiFilter,
+            isDark = isDark,
+            onToggleFreeRooms = {
+                if (!topState.isFreeRoomsModeEnabled) {
+                    controller.clearSelection()
                 }
-            )
+                controller.toggleFreeRoomsMode()
+            },
+            onTogglePoiFilter = controller::togglePoiFilter
+        )
 
-            if (uiState.campuses.isNotEmpty()) {
-                CampusSelectorChipsRow(
-                    campuses = uiState.campuses,
-                    activeCampusId = uiState.activeCampusId,
-                    isDark = isDark,
-                    onSelectCampus = controller::selectCampus
-                )
-            }
-
-            CampusMapFilterChipsRow(
-                isFreeRoomsEnabled = uiState.isFreeRoomsModeEnabled,
-                activePoiFilter = uiState.activePoiFilter,
+        if (topState.searchResults.isNotEmpty() || topState.searchQuery.isNotBlank()) {
+            CampusMapSearchResultsCard(
+                results = topState.searchResults,
+                searchQuery = topState.searchQuery,
+                activeFloor = topState.activeFloor,
+                floorLabels = topState.availableFloors,
                 isDark = isDark,
-                onToggleFreeRooms = {
-                    if (!uiState.isFreeRoomsModeEnabled) {
-                        controller.clearSelection()
-                    }
-                    controller.toggleFreeRoomsMode()
-                },
-                onTogglePoiFilter = controller::togglePoiFilter
+                onSelectResult = controller::selectSearchResult
             )
+        }
 
-            if (uiState.searchResults.isNotEmpty() || uiState.searchQuery.isNotBlank()) {
-                CampusMapSearchResultsCard(
-                    results = uiState.searchResults,
-                    searchQuery = uiState.searchQuery,
-                    activeFloor = uiState.activeFloor,
-                    floorLabels = floorItems,
+        topState.resolutionNotice?.let { notice ->
+            MapResolutionNoticeBanner(
+                message = notice,
+                isDark = isDark,
+                onDismiss = controller::clearResolutionNotice
+            )
+        }
+    }
+}
+
+@Composable
+private fun CampusMapBottomHud(
+    controller: CampusMapController,
+    hudStartPadding: Dp,
+    bottomBarClearanceDp: Dp,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val bottomState by controller.bottomHudState.collectAsState()
+    val activeFloorLabel = remember(bottomState.activeFloor, bottomState.availableFloors) {
+        resolveFloorDisplayLabel(bottomState.activeFloor, bottomState.availableFloors)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = hudStartPadding, end = 12.dp, bottom = bottomBarClearanceDp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (bottomState.availableFloors.isNotEmpty()) {
+            FloorSelectorBar(
+                floors = bottomState.availableFloors,
+                activeFloor = bottomState.activeFloor,
+                onSelectFloor = controller::selectFloor
+            )
+        }
+
+        val selected = bottomState.selectedFeature
+        when {
+            selected != null -> {
+                CampusMapDetailSheet(
+                    feature = selected,
+                    occupancy = bottomState.selectedOccupancy,
+                    buildingOccupancy = bottomState.selectedBuildingOccupancy,
+                    floorLabels = bottomState.availableFloors,
                     isDark = isDark,
-                    onSelectResult = controller::selectSearchResult
+                    onSelectRoomId = controller::focusFeature,
+                    onDismiss = controller::clearSelection
                 )
             }
-
-            uiState.resolutionNotice?.let { notice ->
-                MapResolutionNoticeBanner(
-                    message = notice,
+            !bottomState.isNativeAvailable && !bottomState.isLoading -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Text(
+                        text = bottomState.errorMessage ?: "Motor vetorial offline pronto para carga nativa.",
+                        modifier = Modifier.padding(14.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            bottomState.isFreeRoomsModeEnabled -> {
+                FreeRoomsSummaryCard(
+                    freeRooms = bottomState.freeRoomsOnActiveFloor,
+                    summary = bottomState.floorOccupancySummary,
+                    activeFloorLabel = activeFloorLabel,
                     isDark = isDark,
-                    onDismiss = controller::clearResolutionNotice
+                    onSelectRoomId = controller::focusFeature,
+                    onCloseMode = { controller.setFreeRoomsMode(false) }
                 )
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(start = hudStartPadding, end = 12.dp, bottom = bottomBarClearanceDp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (floorItems.isNotEmpty()) {
-                FloorSelectorBar(
-                    floors = floorItems,
-                    activeFloor = uiState.activeFloor,
-                    onSelectFloor = controller::selectFloor
+        if (!bottomState.attribution.isNullOrBlank()) {
+            Surface(
+                modifier = Modifier.align(Alignment.End),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.84f else 0.90f)
+            ) {
+                Text(
+                    text = bottomState.attribution.orEmpty(),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-
-            val selected = uiState.selectedFeature
-            when {
-                selected != null -> {
-                    CampusMapDetailSheet(
-                        feature = selected,
-                        occupancy = uiState.selectedOccupancy,
-                        buildingOccupancy = uiState.selectedBuildingOccupancy,
-                        floorLabels = floorItems,
-                        isDark = isDark,
-                        onSelectRoomId = controller::focusFeature,
-                        onDismiss = controller::clearSelection
-                    )
-                }
-                !uiState.isNativeAvailable -> {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Text(
-                            text = uiState.errorMessage ?: "Motor vetorial offline pronto para carga nativa.",
-                            modifier = Modifier.padding(14.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                uiState.isFreeRoomsModeEnabled -> {
-                    FreeRoomsSummaryCard(
-                        freeRooms = uiState.freeRoomsOnActiveFloor,
-                        summary = uiState.floorOccupancySummary,
-                        activeFloorLabel = activeFloorLabel,
-                        isDark = isDark,
-                        onSelectRoomId = controller::focusFeature,
-                        onCloseMode = { controller.setFreeRoomsMode(false) }
-                    )
-                }
-            }
-
-            if (!attribution.isNullOrBlank()) {
-                Surface(
-                    modifier = Modifier.align(Alignment.End),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.72f else 0.80f)
-                ) {
-                    Text(
-                        text = attribution,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }
@@ -211,9 +234,9 @@ private fun MapResolutionNoticeBanner(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (isDark) 0.92f else 0.96f),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (isDark) 0.95f else 0.97f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 4.dp
+        shadowElevation = 1.dp
     ) {
         Row(
             modifier = Modifier

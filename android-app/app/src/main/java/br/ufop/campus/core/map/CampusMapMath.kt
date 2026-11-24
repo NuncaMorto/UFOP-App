@@ -1,7 +1,9 @@
 package br.ufop.campus.core.map
 
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.round
 
 /**
  * Transformações matemáticas puras entre coordenadas métricas do mapa (metros relativos
@@ -131,5 +133,112 @@ object CampusMapMath {
         val scale = clampZoom(zoomDpPerMeter) * density.coerceAtLeast(0.5f)
         val polyScreenWidthPx = (bboxMaxX - bboxMinX) * scale
         return polyScreenWidthPx >= (textWidthPx + marginPx)
+    }
+
+    /** Calcula o retângulo visível do mapa em metros com margem de folga em pixels. */
+    fun visibleMapRect(
+        viewportWidthPx: Float,
+        viewportHeightPx: Float,
+        transform: MapViewportTransform,
+        density: Float,
+        marginPx: Float = 48f
+    ): MapRect2D {
+        val safeW = max(1f, viewportWidthPx)
+        val safeH = max(1f, viewportHeightPx)
+        val safeMargin = max(0f, marginPx)
+        val topLeft = screenToMap(-safeMargin, -safeMargin, transform, density)
+        val bottomRight = screenToMap(safeW + safeMargin, safeH + safeMargin, transform, density)
+        return MapRect2D(
+            minX = min(topLeft.x, bottomRight.x),
+            minY = min(topLeft.y, bottomRight.y),
+            maxX = max(topLeft.x, bottomRight.x),
+            maxY = max(topLeft.y, bottomRight.y)
+        )
+    }
+
+    fun rectsIntersect(a: MapRect2D, b: MapRect2D): Boolean =
+        a.maxX >= b.minX && a.minX <= b.maxX && a.maxY >= b.minY && a.minY <= b.maxY
+
+    fun bboxIntersects(
+        minX: Float,
+        minY: Float,
+        maxX: Float,
+        maxY: Float,
+        viewport: MapRect2D
+    ): Boolean =
+        maxX >= viewport.minX && minX <= viewport.maxX && maxY >= viewport.minY && minY <= viewport.maxY
+
+    fun pointInRect(
+        x: Float,
+        y: Float,
+        rect: MapRect2D,
+        marginM: Float = 0f
+    ): Boolean =
+        x >= (rect.minX - marginM) &&
+            x <= (rect.maxX + marginM) &&
+            y >= (rect.minY - marginM) &&
+            y <= (rect.maxY + marginM)
+
+    /** Quantiza o fator de escala em buckets discretos para reutilizar `PathEffect` durante pan/zoom. */
+    fun zoomDashBucket(pxPerMeter: Float): Int {
+        val safeScale = if (pxPerMeter.isFinite()) max(0.1f, pxPerMeter) else 1.0f
+        return round(ln(safeScale.toDouble()) * 8.0).toInt()
+    }
+}
+
+/**
+ * Buffer reutilizável (zero alocações por frame) para evitar sobreposição de rótulos no Canvas.
+ */
+class LabelCollisionBuffer(initialCapacity: Int = 64) {
+    private var bounds = FloatArray(initialCapacity.coerceAtLeast(8) * 4)
+
+    var placedCount: Int = 0
+        private set
+
+    fun reset() {
+        placedCount = 0
+    }
+
+    fun tryPlace(
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float,
+        paddingPx: Float = 4f
+    ): Boolean {
+        if (!left.isFinite() || !top.isFinite() || !right.isFinite() || !bottom.isFinite()) {
+            return false
+        }
+        if (right <= left || bottom <= top) {
+            return false
+        }
+        val pad = max(0f, paddingPx)
+        val pLeft = left - pad
+        val pTop = top - pad
+        val pRight = right + pad
+        val pBottom = bottom + pad
+
+        for (i in 0 until placedCount) {
+            val base = i * 4
+            if (pRight > bounds[base] &&
+                pLeft < bounds[base + 2] &&
+                pBottom > bounds[base + 1] &&
+                pTop < bounds[base + 3]
+            ) {
+                return false
+            }
+        }
+
+        val needed = (placedCount + 1) * 4
+        if (needed > bounds.size) {
+            bounds = bounds.copyOf(bounds.size * 2)
+        }
+        val base = placedCount * 4
+        bounds[base] = left
+        bounds[base + 1] = top
+        bounds[base + 2] = right
+        bounds[base + 3] = bottom
+        placedCount += 1
+        return true
     }
 }
