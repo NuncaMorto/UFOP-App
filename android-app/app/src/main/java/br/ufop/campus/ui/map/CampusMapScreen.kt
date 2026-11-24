@@ -39,10 +39,12 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 fun CampusMapScreen(
     controller: CampusMapController,
     bottomBarClearanceDp: Dp,
+    startBarClearanceDp: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val uiState by controller.state.collectAsState()
     val isDark = LocalCampusThemeController.current.isDark
+    val hudStartPadding = maxOf(12.dp, startBarClearanceDp)
     val floorItems = remember(
         uiState.activeCampusId,
         uiState.activeFloor,
@@ -69,7 +71,7 @@ fun CampusMapScreen(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(12.dp),
+                .padding(start = hudStartPadding, top = 12.dp, end = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             CampusMapSearchBar(
@@ -130,7 +132,7 @@ fun CampusMapScreen(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(start = 12.dp, end = 12.dp, bottom = bottomBarClearanceDp),
+                .padding(start = hudStartPadding, end = 12.dp, bottom = bottomBarClearanceDp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (floorItems.isNotEmpty()) {

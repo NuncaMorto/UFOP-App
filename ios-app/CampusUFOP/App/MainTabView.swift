@@ -84,24 +84,28 @@ public struct MainTabView: View {
 
         Group {
             if horizontalSizeClass == .regular {
-                NavigationSplitView {
-                    List(CampusTab.allCases, id: \.self, selection: Binding<CampusTab?>(
-                        get: { activeTabBinding.wrappedValue },
-                        set: { newValue in
-                            if let newValue {
-                                if newValue == .map {
-                                    _ = ensureMapBridge()
-                                }
-                                activeTabBinding.wrappedValue = newValue
-                            }
-                        }
-                    )) { tab in
-                        Label(tab.title, systemImage: activeTabBinding.wrappedValue == tab ? tab.selectedSystemImage : tab.systemImage)
-                            .tag(tab)
+                ZStack(alignment: .leading) {
+                    if activeTabBinding.wrappedValue != .map {
+                        LiquidGlassBackdrop(accent: accentObj, highContrast: hc)
                     }
-                    .navigationTitle("Vida Acadêmica")
-                } detail: {
+
                     tabDetailContent(for: activeTabBinding.wrappedValue)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.leading, activeTabBinding.wrappedValue == .map ? 0 : 96)
+
+                    FloatingCampusTabBarView(
+                        selectedTab: activeTabBinding,
+                        accent: accent,
+                        onPrimary: onPrimary,
+                        highContrast: hc,
+                        reduceMotion: reduceMotion,
+                        minTouch: minTouch,
+                        axis: .vertical,
+                        onBeforeSelectMap: {
+                            _ = ensureMapBridge()
+                        }
+                    )
+                    .padding(.leading, 12)
                 }
             } else {
                 ZStack(alignment: .bottom) {

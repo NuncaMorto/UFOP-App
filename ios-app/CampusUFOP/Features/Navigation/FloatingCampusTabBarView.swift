@@ -9,6 +9,7 @@ public struct FloatingCampusTabBarView: View {
     public let highContrast: Bool
     public let reduceMotion: Bool
     public let minTouch: CGFloat
+    public let axis: Axis
     public let onBeforeSelectMap: (() -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
@@ -21,6 +22,7 @@ public struct FloatingCampusTabBarView: View {
         highContrast: Bool = false,
         reduceMotion: Bool = false,
         minTouch: CGFloat = 48,
+        axis: Axis = .horizontal,
         onBeforeSelectMap: (() -> Void)? = nil
     ) {
         self._selectedTab = selectedTab
@@ -29,15 +31,24 @@ public struct FloatingCampusTabBarView: View {
         self.highContrast = highContrast
         self.reduceMotion = reduceMotion
         self.minTouch = minTouch
+        self.axis = axis
         self.onBeforeSelectMap = onBeforeSelectMap
     }
 
     public var body: some View {
         LiquidGlassGroup(spacing: 10) {
-            HStack(spacing: 10) {
-                primaryTabsCapsule
+            if axis == .vertical {
+                VStack(spacing: 10) {
+                    verticalPrimaryTabsCapsule
 
-                mapFloatingCircleButton
+                    mapFloatingCircleButton
+                }
+            } else {
+                HStack(spacing: 10) {
+                    primaryTabsCapsule
+
+                    mapFloatingCircleButton
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -48,35 +59,7 @@ public struct FloatingCampusTabBarView: View {
     private var primaryTabsCapsule: some View {
         HStack(spacing: 2) {
             ForEach(CampusTab.primaryTabs, id: \.self) { tab in
-                let isSelected = selectedTab == tab
-                Button {
-                    selectTab(tab)
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: isSelected ? tab.selectedSystemImage : tab.systemImage)
-                            .font(.system(size: 18, weight: isSelected ? .semibold : .medium))
-
-                        Text(tab.title)
-                            .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .allowsTightening(true)
-                    }
-                    .foregroundStyle(foregroundColor(isSelected: isSelected))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background {
-                        if isSelected {
-                            Capsule(style: .continuous)
-                                .fill(highlightFillColor)
-                                .matchedGeometryEffect(id: "floatingTabHighlight", in: tabHighlightNamespace)
-                        }
-                    }
-                    .contentShape(Capsule(style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .campusHoverLift()
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                tabItemButton(for: tab)
             }
         }
         .padding(.horizontal, 6)
@@ -84,6 +67,51 @@ public struct FloatingCampusTabBarView: View {
         .frame(height: 64)
         .frame(maxWidth: .infinity)
         .modifier(FloatingBarGlassSurface(shape: Capsule(style: .continuous), highContrast: highContrast))
+    }
+
+    private var verticalPrimaryTabsCapsule: some View {
+        VStack(spacing: 4) {
+            ForEach(CampusTab.primaryTabs, id: \.self) { tab in
+                tabItemButton(for: tab)
+                    .frame(height: 58)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 6)
+        .frame(width: 72)
+        .modifier(FloatingBarGlassSurface(shape: Capsule(style: .continuous), highContrast: highContrast))
+    }
+
+    private func tabItemButton(for tab: CampusTab) -> some View {
+        let isSelected = selectedTab == tab
+        return Button {
+            selectTab(tab)
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: isSelected ? tab.selectedSystemImage : tab.systemImage)
+                    .font(.system(size: 18, weight: isSelected ? .semibold : .medium))
+
+                Text(tab.title)
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
+            }
+            .foregroundStyle(foregroundColor(isSelected: isSelected))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                if isSelected {
+                    Capsule(style: .continuous)
+                        .fill(highlightFillColor)
+                        .matchedGeometryEffect(id: "floatingTabHighlight", in: tabHighlightNamespace)
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .campusHoverLift()
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     // MARK: - Botão Circular Flutuante Dedicado ao Mapa
@@ -202,7 +230,7 @@ private struct FloatingBarGlassSurface<S: InsettableShape>: ViewModifier {
     }
 }
 
-#Preview("FloatingCampusTabBarView") {
+#Preview("FloatingCampusTabBarView - Horizontal") {
     ZStack(alignment: .bottom) {
         LiquidGlassBackdrop(accent: .green, highContrast: false)
         FloatingCampusTabBarView(
@@ -211,5 +239,17 @@ private struct FloatingBarGlassSurface<S: InsettableShape>: ViewModifier {
         )
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+    }
+}
+
+#Preview("FloatingCampusTabBarView - Vertical") {
+    ZStack(alignment: .leading) {
+        LiquidGlassBackdrop(accent: .green, highContrast: false)
+        FloatingCampusTabBarView(
+            selectedTab: .constant(.agenda),
+            accent: CampusAccentColor.green.primary(for: .light),
+            axis: .vertical
+        )
+        .padding(.leading, 12)
     }
 }

@@ -113,7 +113,7 @@ public struct ProfileView: View {
                                 }
                                 .padding(.trailing, 20)
                                 .padding(.top, 18)
-                                .padding(.bottom, 108)
+                                .padding(.bottom, 32)
                                 .campusReadableWidth(860)
                             }
                         }

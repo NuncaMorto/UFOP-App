@@ -62,6 +62,9 @@ data class CampusAdaptiveLayoutInfo(
     val bottomContentPaddingDp: Int
         get() = if (useNavigationRail) 28 else 136
 
+    val verticalIslandClearanceDp: Int
+        get() = if (useNavigationRail) 96 else 0
+
     fun disciplineGridColumns(hasSideDetailOpen: Boolean = false): Int = when (widthClass) {
         CampusWindowWidthClass.COMPACT -> 2
         CampusWindowWidthClass.MEDIUM -> 3

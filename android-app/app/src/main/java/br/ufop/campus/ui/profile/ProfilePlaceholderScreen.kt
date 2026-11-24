@@ -71,6 +71,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal fun shouldShowProfileDetailBackButton(
+    useTwoPaneLayout: Boolean,
+    hasSettingsSubSection: Boolean
+): Boolean = !useTwoPaneLayout || hasSettingsSubSection
+
 @Composable
 fun ProfilePlaceholderScreen(
     modifier: Modifier
@@ -159,9 +164,17 @@ fun ProfilePlaceholderScreen(
         }
     }
 
-    BackHandler(enabled = activeDestination != null) {
-        if (activeDestination == ProfileDestination.SETTINGS && activeSettingsSection != null) {
+    val isBackHandlerEnabled = if (adaptive.useTwoPaneLayout) {
+        activeSettingsSection != null ||
+            (activeDestination != null && activeDestination != ProfileDestination.METRICS_CRE)
+    } else {
+        activeDestination != null
+    }
+    BackHandler(enabled = isBackHandlerEnabled) {
+        if (activeSettingsSection != null) {
             activeSettingsSection = null
+        } else if (adaptive.useTwoPaneLayout) {
+            activeDestination = ProfileDestination.METRICS_CRE
         } else {
             activeDestination = null
         }
@@ -461,12 +474,14 @@ fun ProfilePlaceholderScreen(
         )
 
         // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, Atualizações, FAQ & Ajuda, Sair da conta)
+        val rightDestination = activeDestination ?: ProfileDestination.METRICS_CRE
         SettingsCategoryGroup(title = "Central do Perfil") {
             SettingsMenuRow(
                 icon = Icons.Outlined.Analytics,
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Métricas & CRE",
                 subtitle = "CRE ${formatScore(creReport.overallCre, 2)} · ${profileSummary.totalAbsences}/${profileSummary.totalMaxAbsences} faltas · ${creReport.completedHours}/${creReport.totalRequiredHours}h",
+                isSelected = adaptive.useTwoPaneLayout && rightDestination == ProfileDestination.METRICS_CRE,
                 onClick = { activeDestination = ProfileDestination.METRICS_CRE }
             )
             HorizontalDivider(
@@ -489,6 +504,7 @@ fun ProfilePlaceholderScreen(
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Configurações",
                 subtitle = "Personalização, segurança, acessibilidade, campus, PDFs, tour guiado e suporte",
+                isSelected = adaptive.useTwoPaneLayout && rightDestination == ProfileDestination.SETTINGS,
                 onClick = { activeDestination = ProfileDestination.SETTINGS }
             )
             HorizontalDivider(
@@ -500,6 +516,7 @@ fun ProfilePlaceholderScreen(
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Atualizações",
                 subtitle = "Checar novas versões no GitHub e histórico de patches (v${CampusRepositoryHolder.CURRENT_APP_VERSION})",
+                isSelected = adaptive.useTwoPaneLayout && rightDestination == ProfileDestination.UPDATES,
                 onClick = { activeDestination = ProfileDestination.UPDATES }
             )
             HorizontalDivider(
@@ -511,6 +528,7 @@ fun ProfilePlaceholderScreen(
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "FAQ & Ajuda",
                 subtitle = "Dúvidas frequentes e informações sobre o funcionamento offline",
+                isSelected = adaptive.useTwoPaneLayout && rightDestination == ProfileDestination.FAQ,
                 onClick = { activeDestination = ProfileDestination.FAQ }
             )
             HorizontalDivider(
@@ -683,17 +701,24 @@ fun ProfilePlaceholderScreen(
                     .weight(0.62f)
                     .fillMaxHeight()
             ) {
-                if (rightDestination == ProfileDestination.SETTINGS && activeSettingsSection != null) {
+                val hasSettingsSubSection =
+                    rightDestination == ProfileDestination.SETTINGS && activeSettingsSection != null
+                val showDetailBackButton = shouldShowProfileDetailBackButton(
+                    useTwoPaneLayout = true,
+                    hasSettingsSubSection = hasSettingsSubSection
+                )
+                if (hasSettingsSubSection) {
                     SettingsSubViewHeader(
                         title = activeSettingsSection!!.title,
                         backLabel = "Voltar para Configurações",
+                        showBackButton = showDetailBackButton,
                         onBack = { activeSettingsSection = null }
                     )
                 } else {
                     SettingsSubViewHeader(
                         title = rightDestination.title,
-                        backLabel = "Voltar para Métricas & CRE",
-                        onBack = { activeDestination = ProfileDestination.METRICS_CRE }
+                        showBackButton = showDetailBackButton,
+                        onBack = {}
                     )
                 }
 

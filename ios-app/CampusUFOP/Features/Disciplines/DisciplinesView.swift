@@ -60,7 +60,7 @@ public struct DisciplinesView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
-                    .padding(.bottom, 108)
+                    .padding(.bottom, isRegular ? 32 : 108)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
 

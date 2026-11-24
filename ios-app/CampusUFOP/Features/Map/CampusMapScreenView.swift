@@ -20,6 +20,7 @@ public struct CampusMapScreenView: View {
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
     private var accentColor: Color { (appearance?.accentColor ?? .green).primary(for: colorScheme) }
     private var bottomBarInset: CGFloat { isRegular ? 16 : 88 }
+    private var leadingBarInset: CGFloat { isRegular ? 96 : 12 }
 
     private var activeFloorDisplayLabel: String {
         let floors = bridge.availableFloorsForUi()
@@ -40,7 +41,8 @@ public struct CampusMapScreenView: View {
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
+            .padding(.leading, leadingBarInset)
+            .padding(.trailing, 12)
             .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 0) {
@@ -49,7 +51,8 @@ public struct CampusMapScreenView: View {
                     .frame(maxWidth: isRegular ? 520 : .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
+            .padding(.leading, leadingBarInset)
+            .padding(.trailing, 12)
             .padding(.bottom, bottomBarInset)
         }
     }

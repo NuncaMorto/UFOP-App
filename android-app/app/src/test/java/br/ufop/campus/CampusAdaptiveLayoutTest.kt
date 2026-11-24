@@ -1,5 +1,6 @@
 package br.ufop.campus
 
+import br.ufop.campus.ui.profile.shouldShowProfileDetailBackButton
 import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.CampusWindowHeightClass
 import br.ufop.campus.ui.theme.CampusWindowWidthClass
@@ -170,5 +171,48 @@ class CampusAdaptiveLayoutTest {
             isInMultiWindowMode = false
         )
         assertFalse(tablet.shouldForceScreenOrientation)
+    }
+
+    @Test
+    fun verticalIslandClearanceDp_appliesOnlyWhenNavigationRailIsActive() {
+        val compact = computeCampusAdaptiveLayout(widthDp = 390, heightDp = 844, smallestWidthDp = 390)
+        assertEquals(0, compact.verticalIslandClearanceDp)
+
+        val compactUpper = computeCampusAdaptiveLayout(widthDp = 599, heightDp = 800, smallestWidthDp = 390)
+        assertEquals(0, compactUpper.verticalIslandClearanceDp)
+
+        val medium = computeCampusAdaptiveLayout(widthDp = 600, heightDp = 960, smallestWidthDp = 600)
+        assertEquals(96, medium.verticalIslandClearanceDp)
+
+        val expanded = computeCampusAdaptiveLayout(widthDp = 1024, heightDp = 768, smallestWidthDp = 768)
+        assertEquals(96, expanded.verticalIslandClearanceDp)
+    }
+
+    @Test
+    fun shouldShowProfileDetailBackButton_hidesRedundantBackInTwoPaneRootOnly() {
+        assertTrue(
+            shouldShowProfileDetailBackButton(
+                useTwoPaneLayout = false,
+                hasSettingsSubSection = false
+            )
+        )
+        assertTrue(
+            shouldShowProfileDetailBackButton(
+                useTwoPaneLayout = false,
+                hasSettingsSubSection = true
+            )
+        )
+        assertFalse(
+            shouldShowProfileDetailBackButton(
+                useTwoPaneLayout = true,
+                hasSettingsSubSection = false
+            )
+        )
+        assertTrue(
+            shouldShowProfileDetailBackButton(
+                useTwoPaneLayout = true,
+                hasSettingsSubSection = true
+            )
+        )
     }
 }

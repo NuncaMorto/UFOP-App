@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -410,16 +411,32 @@ internal fun SettingsMenuRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    isSelected: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
     val isDark = LocalCampusThemeController.current.isDark
     val minTouchTarget = campusMinTouchTarget()
-    val accessibleTint = accessibleTextColor(iconTint, isDark, MaterialTheme.colorScheme.surface)
+    val rowBackground = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+    } else {
+        Color.Transparent
+    }
+    val accessibleTint = accessibleTextColor(
+        iconTint,
+        isDark,
+        if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = minTouchTarget)
+            .background(rowBackground)
+            .semantics {
+                if (isSelected) {
+                    selected = true
+                }
+            }
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -447,15 +464,23 @@ internal fun SettingsMenuRow(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -467,7 +492,11 @@ internal fun SettingsMenuRow(
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                 contentDescription = "Abrir",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -477,7 +506,8 @@ internal fun SettingsMenuRow(
 internal fun SettingsSubViewHeader(
     title: String,
     backLabel: String = "Voltar",
-    onBack: () -> Unit
+    showBackButton: Boolean = true,
+    onBack: () -> Unit = {}
 ) {
     val a11y = LocalCampusAccessibility.current.settings
     val minTouchTarget = campusMinTouchTarget()
@@ -490,46 +520,48 @@ internal fun SettingsSubViewHeader(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 20.dp, vertical = if (showBackButton) 12.dp else 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Surface(
-                    onClick = onBack,
-                    modifier = if (a11y.largeTouchTargets) {
-                        Modifier
-                            .heightIn(min = minTouchTarget)
-                            .widthIn(min = minTouchTarget)
-                    } else {
-                        Modifier
-                            .minimumInteractiveComponentSize()
-                            .heightIn(min = 36.dp)
-                    },
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = 12.dp,
-                            vertical = if (a11y.largeTouchTargets) 10.dp else 6.dp
-                        ),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                if (showBackButton) {
+                    Surface(
+                        onClick = onBack,
+                        modifier = if (a11y.largeTouchTargets) {
+                            Modifier
+                                .heightIn(min = minTouchTarget)
+                                .widthIn(min = minTouchTarget)
+                        } else {
+                            Modifier
+                                .minimumInteractiveComponentSize()
+                                .heightIn(min = 36.dp)
+                        },
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = backLabel,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = backLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                        Row(
+                            modifier = Modifier.padding(
+                                horizontal = 12.dp,
+                                vertical = if (a11y.largeTouchTargets) 10.dp else 6.dp
+                            ),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = backLabel,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = backLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
 
