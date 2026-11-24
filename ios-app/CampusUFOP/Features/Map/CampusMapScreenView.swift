@@ -55,6 +55,9 @@ public struct CampusMapScreenView: View {
             .padding(.trailing, 12)
             .padding(.bottom, bottomBarInset)
         }
+        .onDisappear {
+            bridge.cancelPendingBackgroundWork()
+        }
     }
 
     // MARK: - HUD Superior (Busca, Campus, Filtros, Resultados & Aviso de Resolução)
@@ -146,7 +149,7 @@ public struct CampusMapScreenView: View {
                     onSelectRoom: { bridge.focusFeature($0) },
                     onDismiss: { bridge.setFreeRoomsMode(false) }
                 )
-            } else if !bridge.isNativeAvailable {
+            } else if !bridge.isNativeAvailable && !bridge.isLoading {
                 MapUnavailablePlaceholderCard(
                     errorMessage: bridge.errorMessage,
                     highContrast: hc

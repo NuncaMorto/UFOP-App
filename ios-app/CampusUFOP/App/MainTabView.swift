@@ -210,12 +210,8 @@ public struct MainTabView: View {
         if let existing = mapBridge {
             return existing
         }
-        let bridge = CampusMapBridge()
         let initialCampusId = mappedCampusEngineId(from: store.activeCampus)
-        if initialCampusId != bridge.activeCampusId {
-            bridge.selectCampus(initialCampusId)
-            bridge.consumePendingFocus()
-        }
+        let bridge = CampusMapBridge(initialCampusId: initialCampusId)
         mapBridge = bridge
         return bridge
     }
@@ -236,7 +232,7 @@ public struct MainTabView: View {
 
     public func openMeetingInMap(_ request: CampusMapMeetingRequest) {
         let bridge = ensureMapBridge()
-        _ = bridge.resolveMeeting(
+        bridge.resolveMeetingAsync(
             courseCode: request.courseCode,
             section: request.section,
             weekday: request.weekday,

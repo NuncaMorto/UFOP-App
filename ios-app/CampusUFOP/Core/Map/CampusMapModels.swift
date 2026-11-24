@@ -470,4 +470,85 @@ public enum CampusMapTransformMath {
         let polyScreenWidth = CGFloat(bboxMaxX - bboxMinX) * clampZoom(zoomPtPerMeter)
         return polyScreenWidth >= (textWidthPt + marginPt)
     }
+
+    public static func visibleMapRect(
+        viewportSize: CGSize,
+        transform: CampusMapViewportTransform,
+        marginPt: CGFloat = 48
+    ) -> CampusMapRect2D {
+        let safeW = max(1, viewportSize.width)
+        let safeH = max(1, viewportSize.height)
+        let safeMargin = max(0, marginPt)
+        let topLeft = screenToMap(
+            screenPoint: CGPoint(x: -safeMargin, y: -safeMargin),
+            transform: transform
+        )
+        let bottomRight = screenToMap(
+            screenPoint: CGPoint(x: safeW + safeMargin, y: safeH + safeMargin),
+            transform: transform
+        )
+        return CampusMapRect2D(
+            minX: min(topLeft.x, bottomRight.x),
+            minY: min(topLeft.y, bottomRight.y),
+            maxX: max(topLeft.x, bottomRight.x),
+            maxY: max(topLeft.y, bottomRight.y)
+        )
+    }
+
+    public static func rectsIntersect(_ a: CampusMapRect2D, _ b: CampusMapRect2D) -> Bool {
+        a.maxX >= b.minX && a.minX <= b.maxX && a.maxY >= b.minY && a.minY <= b.maxY
+    }
+
+    public static func bboxIntersects(
+        minX: Float,
+        minY: Float,
+        maxX: Float,
+        maxY: Float,
+        viewport: CampusMapRect2D
+    ) -> Bool {
+        maxX >= viewport.minX && minX <= viewport.maxX && maxY >= viewport.minY && minY <= viewport.maxY
+    }
+
+    public static func pointInRect(
+        x: Float,
+        y: Float,
+        rect: CampusMapRect2D,
+        marginM: Float = 0
+    ) -> Bool {
+        x >= (rect.minX - marginM) &&
+            x <= (rect.maxX + marginM) &&
+            y >= (rect.minY - marginM) &&
+            y <= (rect.maxY + marginM)
+    }
+}
+
+public struct CampusLabelCollisionChecker {
+    private var placedRects: [CGRect]
+
+    public init(initialCapacity: Int = 64) {
+        self.placedRects = []
+        self.placedRects.reserveCapacity(max(8, initialCapacity))
+    }
+
+    public mutating func reset() {
+        placedRects.removeAll(keepingCapacity: true)
+    }
+
+    public mutating func tryPlace(_ rect: CGRect, padding: CGFloat = 4) -> Bool {
+        guard rect.width > 0,
+              rect.height > 0,
+              rect.minX.isFinite,
+              rect.minY.isFinite,
+              rect.width.isFinite,
+              rect.height.isFinite else {
+            return false
+        }
+        let pad = max(0, padding)
+        let padded = rect.insetBy(dx: -pad, dy: -pad)
+        for existing in placedRects where padded.intersects(existing) {
+            return false
+        }
+        placedRects.append(rect)
+        return true
+    }
 }

@@ -2,26 +2,12 @@ import SwiftUI
 
 // MARK: - Renderizador Canvas 2D Offline Nativo (iOS / SwiftUI)
 
-private struct CachedMapPathItem: Identifiable {
-    let feature: CampusRenderFeature
-    let path: Path
-    var id: String { feature.id }
-}
-
 public struct CampusMapCanvasView: View {
     @Bindable public var bridge: CampusMapBridge
     public let showBuiltInHud: Bool
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
-
-    @State private var transform = CampusMapViewportTransform()
-    @State private var lastDragTranslation: CGSize = .zero
-    @State private var lastMagnification: CGFloat = 1.0
-    @State private var viewportSize: CGSize = CGSize(width: 390, height: 640)
-    @State private var cachedBatchKey: String = ""
-    @State private var cachedPaths: [CachedMapPathItem] = []
-    @State private var hasAppliedInitialFit: Bool = false
 
     public init(bridge: CampusMapBridge, showBuiltInHud: Bool = true) {
         self.bridge = bridge
@@ -35,59 +21,34 @@ public struct CampusMapCanvasView: View {
 
     public var body: some View {
         let palette = MapCanvasPalette.resolve(for: colorScheme, highContrast: hc)
-        let floorItems = bridge.availableFloorsForUi()
 
         ZStack(alignment: .bottom) {
-            GeometryReader { geo in
-                Canvas { context, _ in
-                    drawBatch(in: context, palette: palette)
+            CampusMapInteractiveCanvasView(
+                renderBatch: bridge.renderBatch,
+                geometryRevision: bridge.geometryRevision,
+                selectedFeatureId: bridge.selectedFeature?.id,
+                isFreeRoomsModeEnabled: bridge.isFreeRoomsModeEnabled,
+                activePoiFilter: bridge.activePoiFilter,
+                pendingFocus: bridge.pendingFocus,
+                palette: palette,
+                accentColor: accentColor,
+                isDark: colorScheme == .dark,
+                reduceMotion: reduceMotion,
+                onTapMap: { mapX, mapY, zoom in
+                    bridge.onMapTap(mapX: mapX, mapY: mapY, zoom: zoom)
+                },
+                onConsumePendingFocus: {
+                    bridge.consumePendingFocus()
                 }
-                .background(palette.background)
-                .contentShape(Rectangle())
-                .gesture(combinedPanZoomGesture)
-                .simultaneousGesture(
-                    SpatialTapGesture()
-                        .onEnded { value in
-                            let (mx, my) = CampusMapTransformMath.screenToMap(
-                                screenPoint: value.location,
-                                transform: transform
-                            )
-                            _ = bridge.handleTap(
-                                mapX: mx,
-                                mapY: my,
-                                zoom: Float(transform.zoomPtPerMeter)
-                            )
-                        }
-                )
-                .onAppear {
-                    viewportSize = geo.size
-                    rebuildPathCacheIfNeeded()
-                    applyInitialFitOrPendingFocus()
-                }
-                .onChange(of: geo.size) { _, newSize in
-                    viewportSize = newSize
-                    applyInitialFitOrPendingFocus()
-                }
-                .onChange(of: batchCacheToken) { _, _ in
-                    rebuildPathCacheIfNeeded()
-                    applyInitialFitOrPendingFocus()
-                }
-                .onChange(of: bridge.pendingFocus) { _, newFocus in
-                    if let focus = newFocus, viewportSize.width > 10, viewportSize.height > 10 {
-                        hasAppliedInitialFit = true
-                        animateToFocus(focus)
-                        bridge.consumePendingFocus()
-                    }
-                }
-            }
+            )
 
             if showBuiltInHud {
                 MapHudOverlayView(
-                    floors: floorItems,
+                    floors: bridge.availableFloorsForUi(),
                     activeFloor: bridge.activeFloor,
                     selectedFeature: bridge.selectedFeature,
                     selectedOccupancy: bridge.selectedOccupancy,
-                    isNativeAvailable: bridge.isNativeAvailable,
+                    isNativeAvailable: bridge.isNativeAvailable && !bridge.isLoading,
                     errorMessage: bridge.errorMessage,
                     accentColor: accentColor,
                     minTouch: minTouch,
@@ -98,10 +59,77 @@ public struct CampusMapCanvasView: View {
             }
         }
     }
+}
 
-    private var batchCacheToken: String {
-        guard let b = bridge.renderBatch else { return "empty" }
-        return "\(b.campusId)|\(b.activeFloor)|\(b.items.count)|\(bridge.renderBatchRevision)|\(bridge.timestampIso ?? "")"
+private struct CampusMapInteractiveCanvasView: View {
+    let renderBatch: CampusRenderBatch?
+    let geometryRevision: Int
+    let selectedFeatureId: String?
+    let isFreeRoomsModeEnabled: Bool
+    let activePoiFilter: CampusPoiType?
+    let pendingFocus: CampusCameraFocus?
+    let palette: MapCanvasPalette
+    let accentColor: Color
+    let isDark: Bool
+    let reduceMotion: Bool
+    let onTapMap: (Float, Float, Float) -> Void
+    let onConsumePendingFocus: () -> Void
+
+    @State private var transform = CampusMapViewportTransform()
+    @State private var lastDragTranslation: CGSize = .zero
+    @State private var lastMagnification: CGFloat = 1.0
+    @State private var viewportSize: CGSize = CGSize(width: 390, height: 640)
+    @State private var cachedGeometryRevision: Int = -1
+    @State private var cachedGeometry: CampusMapGeometryCache? = nil
+    @State private var cachedLabelRevision: Int = -1
+    @State private var cachedLabelIsDark: Bool? = nil
+    @State private var cachedLabels: CampusMapLabelCache? = nil
+    @State private var hasAppliedInitialFit: Bool = false
+
+    var body: some View {
+        GeometryReader { geo in
+            Canvas { context, size in
+                drawBatch(in: context, size: size)
+            }
+            .background(palette.background)
+            .contentShape(Rectangle())
+            .gesture(combinedPanZoomGesture)
+            .simultaneousGesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        let (mx, my) = CampusMapTransformMath.screenToMap(
+                            screenPoint: value.location,
+                            transform: transform
+                        )
+                        onTapMap(mx, my, Float(transform.zoomPtPerMeter))
+                    }
+            )
+            .onAppear {
+                viewportSize = geo.size
+                rebuildGeometryCacheIfNeeded()
+                rebuildLabelCacheIfNeeded()
+                applyInitialFitOrPendingFocus()
+            }
+            .onChange(of: geo.size) { _, newSize in
+                viewportSize = newSize
+                applyInitialFitOrPendingFocus()
+            }
+            .onChange(of: geometryRevision) { _, _ in
+                rebuildGeometryCacheIfNeeded()
+                rebuildLabelCacheIfNeeded()
+                applyInitialFitOrPendingFocus()
+            }
+            .onChange(of: isDark) { _, _ in
+                rebuildLabelCacheIfNeeded()
+            }
+            .onChange(of: pendingFocus) { _, newFocus in
+                if let focus = newFocus, viewportSize.width > 10, viewportSize.height > 10 {
+                    hasAppliedInitialFit = true
+                    animateToFocus(focus)
+                    onConsumePendingFocus()
+                }
+            }
+        }
     }
 
     private var combinedPanZoomGesture: some Gesture {
@@ -137,7 +165,7 @@ public struct CampusMapCanvasView: View {
             )
     }
 
-    public func animateToFocus(_ focus: CampusCameraFocus) {
+    private func animateToFocus(_ focus: CampusCameraFocus) {
         let target = CampusMapTransformMath.computeCameraTarget(
             bounds: focus.bounds,
             viewportSize: viewportSize
@@ -154,7 +182,7 @@ public struct CampusMapCanvasView: View {
     private func applyInitialFitOrPendingFocus() {
         guard viewportSize.width > 10, viewportSize.height > 10 else { return }
 
-        if let focus = bridge.pendingFocus {
+        if let focus = pendingFocus {
             let target = CampusMapTransformMath.computeCameraTarget(
                 bounds: focus.bounds,
                 viewportSize: viewportSize
@@ -167,11 +195,11 @@ public struct CampusMapCanvasView: View {
                 }
             }
             hasAppliedInitialFit = true
-            bridge.consumePendingFocus()
+            onConsumePendingFocus()
             return
         }
 
-        guard !hasAppliedInitialFit, let batch = bridge.renderBatch else { return }
+        guard !hasAppliedInitialFit, let batch = renderBatch else { return }
         transform = CampusMapTransformMath.computeCameraTarget(
             bounds: batch.bounds,
             viewportSize: viewportSize
@@ -179,52 +207,39 @@ public struct CampusMapCanvasView: View {
         hasAppliedInitialFit = true
     }
 
-    private func rebuildPathCacheIfNeeded() {
-        let token = batchCacheToken
-        guard token != cachedBatchKey else { return }
-        cachedBatchKey = token
-        guard let batch = bridge.renderBatch else {
-            cachedPaths = []
+    private func rebuildGeometryCacheIfNeeded() {
+        guard cachedGeometryRevision != geometryRevision || (renderBatch != nil && cachedGeometry == nil) else {
             return
         }
-        cachedPaths = batch.items.map { item in
-            CachedMapPathItem(
-                feature: item,
-                path: buildLocalPath(item: item, batch: batch)
-            )
+        cachedGeometryRevision = geometryRevision
+        guard let batch = renderBatch else {
+            cachedGeometry = nil
+            return
         }
+        cachedGeometry = CampusMapGeometryCache.build(from: batch)
     }
 
-    private func buildLocalPath(item: CampusRenderFeature, batch: CampusRenderBatch) -> Path {
-        var path = Path()
-        guard item.geomKind != .point else { return path }
-        let startRing = Int(item.ringStartIdx)
-        let endRing = min(startRing + Int(item.ringCount), batch.ringStarts.count)
-        guard startRing < endRing else { return path }
-
-        for rIdx in startRing..<endRing {
-            let vStart = Int(batch.ringStarts[rIdx])
-            let vCount = Int(batch.ringCounts[rIdx])
-            guard vCount >= 2, (vStart + vCount) * 2 <= batch.coords.count else { continue }
-            let x0 = CGFloat(batch.coords[vStart * 2])
-            let y0 = CGFloat(batch.coords[vStart * 2 + 1])
-            path.move(to: CGPoint(x: x0, y: y0))
-            for k in 1..<vCount {
-                let x = CGFloat(batch.coords[(vStart + k) * 2])
-                let y = CGFloat(batch.coords[(vStart + k) * 2 + 1])
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-            if item.geomKind == .polygon {
-                path.closeSubpath()
-            }
+    private func rebuildLabelCacheIfNeeded() {
+        guard cachedLabelRevision != geometryRevision || cachedLabelIsDark != isDark || (renderBatch != nil && cachedLabels == nil) else {
+            return
         }
-        return path
+        cachedLabelRevision = geometryRevision
+        cachedLabelIsDark = isDark
+        guard let batch = renderBatch else {
+            cachedLabels = nil
+            return
+        }
+        cachedLabels = CampusMapLabelCache.build(from: batch, palette: palette)
     }
 
-    private func drawBatch(in context: GraphicsContext, palette: MapCanvasPalette) {
-        let zoom = transform.zoomPtPerMeter
-        let freeMode = bridge.isFreeRoomsModeEnabled
-        let poiFilter = bridge.activePoiFilter
+    private func drawBatch(in context: GraphicsContext, size: CGSize) {
+        guard let geometry = cachedGeometry else { return }
+        let zoom = CampusMapTransformMath.clampZoom(transform.zoomPtPerMeter)
+        let visibleRect = CampusMapTransformMath.visibleMapRect(
+            viewportSize: size,
+            transform: transform,
+            marginPt: 48
+        )
         let matrix = CGAffineTransform(
             a: zoom,
             b: 0,
@@ -233,171 +248,388 @@ public struct CampusMapCanvasView: View {
             tx: transform.offsetX,
             ty: transform.offsetY
         )
+        let batchItems = renderBatch?.items
 
-        for entry in cachedPaths {
-            let item = entry.feature
-            guard Float(zoom) >= item.minZoom else { continue }
-            let isSelected = bridge.selectedFeature?.id == item.id
-            let matchesPoi = poiFilter.map { matchesPoiFilter(item, filter: $0) } ?? false
+        context.drawLayer { layerCtx in
+            layerCtx.concatenate(matrix)
 
-            switch item.geomKind {
-            case .polygon:
-                let screenPath = entry.path.applying(matrix)
-                let fill = fillColor(
-                    for: item,
-                    isSelected: isSelected,
-                    freeMode: freeMode,
-                    matchesPoi: matchesPoi,
-                    palette: palette
-                )
-                context.fill(screenPath, with: .color(fill), style: FillStyle(eoFill: true))
-
-                let stroke = strokeColor(
-                    for: item,
-                    isSelected: isSelected,
-                    freeMode: freeMode,
-                    matchesPoi: matchesPoi,
-                    palette: palette
-                )
-                let lineWidth: CGFloat = {
-                    if isSelected { return 2.8 }
-                    if freeMode && item.layer == .room && item.occupancy == .noRegularClass { return 2.0 }
-                    if matchesPoi { return 2.2 }
-                    return item.layer == .room ? 1.0 : 1.3
-                }()
-                if item.isMock && item.layer == .room {
-                    context.stroke(
-                        screenPath,
-                        with: .color(stroke),
-                        style: StrokeStyle(lineWidth: lineWidth, dash: [5, 3.5])
-                    )
-                } else {
-                    context.stroke(screenPath, with: .color(stroke), lineWidth: lineWidth)
-                }
-
-            case .polyline:
-                let screenPath = entry.path.applying(matrix)
-                context.stroke(
-                    screenPath,
-                    with: .color(palette.walkwayStroke),
-                    style: StrokeStyle(lineWidth: max(1.0, zoom * 1.4), lineCap: .round, lineJoin: .round)
-                )
-
-            case .point:
-                let pt = CampusMapTransformMath.mapToScreen(
-                    mapX: CGFloat(item.pointX),
-                    mapY: CGFloat(item.pointY),
-                    transform: transform
-                )
-                if matchesPoi {
-                    let haloRadius: CGFloat = isSelected ? 14 : 11.5
-                    let halo = Path(ellipseIn: CGRect(
-                        x: pt.x - haloRadius,
-                        y: pt.y - haloRadius,
-                        width: haloRadius * 2,
-                        height: haloRadius * 2
-                    ))
-                    context.fill(halo, with: .color(accentColor.opacity(0.28)))
-                }
-                let radius: CGFloat = isSelected ? 8.0 : (matchesPoi ? 7.0 : 5.5)
-                let dot = Path(ellipseIn: CGRect(
-                    x: pt.x - radius,
-                    y: pt.y - radius,
-                    width: radius * 2,
-                    height: radius * 2
-                ))
-                let dotFill = matchesPoi ? accentColor : palette.poiFill
-                let dotStroke: Color = isSelected ? palette.selectedStroke : .white
-                context.fill(dot, with: .color(dotFill))
-                context.stroke(dot, with: .color(dotStroke), lineWidth: isSelected ? 2.5 : 1.5)
+            if let ground = geometry.groundBatch {
+                drawStaticLayerBatch(ground, in: &layerCtx, visibleRect: visibleRect, zoom: zoom)
             }
-        }
-
-        // Rótulos em tamanho fixo de fonte (sem escalar no zoom), ocultando secundários menores que o polígono.
-        for entry in cachedPaths {
-            let item = entry.feature
-            guard Float(zoom) >= item.minZoom else { continue }
-            guard item.layer == .building || item.layer == .campusZone || item.layer == .room || item.layer == .poi else {
-                continue
-            }
-            guard !item.primaryLabel.isEmpty else { continue }
-
-            let pt = CampusMapTransformMath.mapToScreen(
-                mapX: CGFloat(item.labelX),
-                mapY: CGFloat(item.labelY),
-                transform: transform
+            drawDynamicVectorItems(
+                geometry.groundOverflow,
+                in: &layerCtx,
+                batchItems: batchItems,
+                visibleRect: visibleRect,
+                zoom: zoom
             )
 
-            let primaryText = Text(item.primaryLabel)
-                .font(.system(size: item.layer == .room ? 10 : 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(palette.labelColor)
-            let resolvedPrimary = context.resolve(primaryText)
-            let primarySize = resolvedPrimary.measure(in: CGSize(width: 220, height: 40))
+            drawDynamicVectorItems(
+                geometry.campusZones,
+                in: &layerCtx,
+                batchItems: batchItems,
+                visibleRect: visibleRect,
+                zoom: zoom
+            )
 
-            if item.layer == .room {
-                let fits = CampusMapTransformMath.shouldShowSecondaryLabel(
-                    bboxMinX: item.bboxMinX,
-                    bboxMaxX: item.bboxMaxX,
-                    zoomPtPerMeter: zoom,
-                    textWidthPt: primarySize.width
+            for staticBatch in geometry.overlayStaticBatches {
+                drawStaticLayerBatch(staticBatch, in: &layerCtx, visibleRect: visibleRect, zoom: zoom)
+            }
+            drawDynamicVectorItems(
+                geometry.overlayStaticOverflow,
+                in: &layerCtx,
+                batchItems: batchItems,
+                visibleRect: visibleRect,
+                zoom: zoom
+            )
+
+            if let wPath = geometry.walkwayPath,
+               let wBounds = geometry.walkwayBounds,
+               CampusMapTransformMath.rectsIntersect(wBounds, visibleRect) {
+                layerCtx.stroke(
+                    wPath,
+                    with: .color(palette.walkwayStroke),
+                    style: StrokeStyle(
+                        lineWidth: max(1.0 / zoom, 1.4),
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
                 )
-                if !fits { continue }
+            }
+            drawDynamicVectorItems(
+                geometry.walkwayOverflow,
+                in: &layerCtx,
+                batchItems: batchItems,
+                visibleRect: visibleRect,
+                zoom: zoom
+            )
+
+            drawDynamicVectorItems(
+                geometry.foregroundItems,
+                in: &layerCtx,
+                batchItems: batchItems,
+                visibleRect: visibleRect,
+                zoom: zoom
+            )
+        }
+
+        // POIs pontuais e rótulos em coordenadas de tela após o drawLayer vetorial.
+        drawVisiblePointItems(
+            geometry.foregroundItems,
+            in: context,
+            visibleRect: visibleRect,
+            zoom: zoom
+        )
+
+        if let labelCache = cachedLabels {
+            drawVisibleLabels(
+                labelCache: labelCache,
+                in: context,
+                viewportSize: size,
+                visibleRect: visibleRect,
+                zoom: zoom
+            )
+        }
+    }
+
+    private func drawStaticLayerBatch(
+        _ staticBatch: CampusStaticLayerBatch,
+        in layerCtx: inout GraphicsContext,
+        visibleRect: CampusMapRect2D,
+        zoom: CGFloat
+    ) {
+        guard CampusMapTransformMath.rectsIntersect(staticBatch.bounds, visibleRect) else { return }
+        let isHighlightedParking = activePoiFilter == .parking && staticBatch.layer == .parking
+        let fill: Color = isHighlightedParking
+            ? accentColor.opacity(isDark ? 0.34 : 0.22)
+            : fillColor(for: staticBatch.layer, occupancy: .none)
+        layerCtx.fill(staticBatch.path, with: .color(fill), style: FillStyle(eoFill: false))
+
+        let stroke: Color = isHighlightedParking ? accentColor : strokeColor(for: staticBatch.layer)
+        let lineWidth: CGFloat = (isHighlightedParking ? 2.2 : 1.3) / zoom
+        layerCtx.stroke(staticBatch.path, with: .color(stroke), lineWidth: lineWidth)
+    }
+
+    private func drawDynamicVectorItems(
+        _ items: [CampusCachedDynamicItem],
+        in layerCtx: inout GraphicsContext,
+        batchItems: [CampusRenderFeature]?,
+        visibleRect: CampusMapRect2D,
+        zoom: CGFloat
+    ) {
+        for entry in items {
+            guard Float(zoom) >= entry.minZoom else { continue }
+            guard entry.geomKind != .point else { continue }
+            guard CampusMapTransformMath.bboxIntersects(
+                minX: entry.bboxMinX,
+                minY: entry.bboxMinY,
+                maxX: entry.bboxMaxX,
+                maxY: entry.bboxMaxY,
+                viewport: visibleRect
+            ) else {
+                continue
+            }
+            guard let path = entry.path else { continue }
+
+            if entry.geomKind == .polyline {
+                layerCtx.stroke(
+                    path,
+                    with: .color(palette.walkwayStroke),
+                    style: StrokeStyle(
+                        lineWidth: max(1.0 / zoom, 1.4),
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
+                )
+                continue
             }
 
-            context.draw(resolvedPrimary, at: pt, anchor: .center)
+            let isSelected = selectedFeatureId == entry.id
+            let matchesPoi = activePoiFilter.map { matchesPoiFilter(entry, filter: $0) } ?? false
+            let occupancy = (batchItems != nil && entry.featureIndex < batchItems!.count)
+                ? batchItems![entry.featureIndex].occupancy
+                : .none
 
-            if item.layer == .building && !item.secondaryLabel.isEmpty {
-                let secText = Text(item.secondaryLabel)
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(palette.secondaryLabelColor)
-                let resolvedSec = context.resolve(secText)
-                let secSize = resolvedSec.measure(in: CGSize(width: 240, height: 32))
-                if CampusMapTransformMath.shouldShowSecondaryLabel(
-                    bboxMinX: item.bboxMinX,
-                    bboxMaxX: item.bboxMaxX,
-                    zoomPtPerMeter: zoom,
-                    textWidthPt: secSize.width
-                ) {
-                    context.draw(
-                        resolvedSec,
-                        at: CGPoint(x: pt.x, y: pt.y + primarySize.height * 0.85),
-                        anchor: .center
-                    )
+            let fill = resolvePolygonFill(
+                layer: entry.layer,
+                occupancy: occupancy,
+                isSelected: isSelected,
+                matchesPoi: matchesPoi
+            )
+            layerCtx.fill(path, with: .color(fill), style: FillStyle(eoFill: true))
+
+            let stroke = resolvePolygonStroke(
+                layer: entry.layer,
+                occupancy: occupancy,
+                isSelected: isSelected,
+                matchesPoi: matchesPoi
+            )
+            let screenLineWidth: CGFloat = {
+                if isSelected { return 2.8 }
+                if isFreeRoomsModeEnabled && entry.layer == .room && occupancy == .noRegularClass {
+                    return 2.0
                 }
+                if matchesPoi { return 2.2 }
+                return entry.layer == .room ? 1.0 : 1.3
+            }()
+            let metricLineWidth = screenLineWidth / zoom
+
+            if entry.isMock && entry.layer == .room {
+                layerCtx.stroke(
+                    path,
+                    with: .color(stroke),
+                    style: StrokeStyle(
+                        lineWidth: metricLineWidth,
+                        dash: [5.0 / zoom, 3.5 / zoom]
+                    )
+                )
+            } else {
+                layerCtx.stroke(path, with: .color(stroke), lineWidth: metricLineWidth)
             }
         }
     }
 
-    private func matchesPoiFilter(_ item: CampusRenderFeature, filter: CampusPoiType) -> Bool {
+    private func drawVisiblePointItems(
+        _ items: [CampusCachedDynamicItem],
+        in context: GraphicsContext,
+        visibleRect: CampusMapRect2D,
+        zoom: CGFloat
+    ) {
+        let pointMarginM = Float(18.0 / zoom)
+        for entry in items where entry.geomKind == .point {
+            guard Float(zoom) >= entry.minZoom else { continue }
+            guard CampusMapTransformMath.pointInRect(
+                x: entry.pointX,
+                y: entry.pointY,
+                rect: visibleRect,
+                marginM: pointMarginM
+            ) else {
+                continue
+            }
+
+            let isSelected = selectedFeatureId == entry.id
+            let matchesPoi = activePoiFilter.map { matchesPoiFilter(entry, filter: $0) } ?? false
+            let pt = CampusMapTransformMath.mapToScreen(
+                mapX: CGFloat(entry.pointX),
+                mapY: CGFloat(entry.pointY),
+                transform: transform
+            )
+
+            if matchesPoi {
+                let haloRadius: CGFloat = isSelected ? 14 : 11.5
+                let halo = Path(ellipseIn: CGRect(
+                    x: pt.x - haloRadius,
+                    y: pt.y - haloRadius,
+                    width: haloRadius * 2,
+                    height: haloRadius * 2
+                ))
+                context.fill(halo, with: .color(accentColor.opacity(0.28)))
+            }
+
+            let radius: CGFloat = isSelected ? 8.0 : (matchesPoi ? 7.0 : 5.5)
+            let dot = Path(ellipseIn: CGRect(
+                x: pt.x - radius,
+                y: pt.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            ))
+            let dotFill = matchesPoi ? accentColor : palette.poiFill
+            let dotStroke: Color = isSelected ? palette.selectedStroke : .white
+            context.fill(dot, with: .color(dotFill))
+            context.stroke(dot, with: .color(dotStroke), lineWidth: isSelected ? 2.5 : 1.5)
+        }
+    }
+
+    private func drawVisibleLabels(
+        labelCache: CampusMapLabelCache,
+        in context: GraphicsContext,
+        viewportSize: CGSize,
+        visibleRect: CampusMapRect2D,
+        zoom: CGFloat
+    ) {
+        var collisionChecker = CampusLabelCollisionChecker()
+
+        if let selectedFeatureId, let selectedEntry = labelCache.byId[selectedFeatureId] {
+            tryDrawLabel(
+                selectedEntry,
+                in: context,
+                viewportSize: viewportSize,
+                visibleRect: visibleRect,
+                zoom: zoom,
+                collisionChecker: &collisionChecker
+            )
+        }
+
+        for entry in labelCache.orderedLabels {
+            if entry.featureId == selectedFeatureId { continue }
+            tryDrawLabel(
+                entry,
+                in: context,
+                viewportSize: viewportSize,
+                visibleRect: visibleRect,
+                zoom: zoom,
+                collisionChecker: &collisionChecker
+            )
+        }
+    }
+
+    private func tryDrawLabel(
+        _ entry: CampusCachedLabelItem,
+        in context: GraphicsContext,
+        viewportSize: CGSize,
+        visibleRect: CampusMapRect2D,
+        zoom: CGFloat,
+        collisionChecker: inout CampusLabelCollisionChecker
+    ) {
+        guard Float(zoom) >= entry.minZoom else { return }
+        guard CampusMapTransformMath.pointInRect(x: entry.labelX, y: entry.labelY, rect: visibleRect) else {
+            return
+        }
+
+        if entry.layer == .room {
+            let fits = CampusMapTransformMath.shouldShowSecondaryLabel(
+                bboxMinX: entry.bboxMinX,
+                bboxMaxX: entry.bboxMaxX,
+                zoomPtPerMeter: zoom,
+                textWidthPt: entry.primarySize.width
+            )
+            if !fits { return }
+        }
+
+        let pt = CampusMapTransformMath.mapToScreen(
+            mapX: CGFloat(entry.labelX),
+            mapY: CGFloat(entry.labelY),
+            transform: transform
+        )
+        let primaryRect = CGRect(
+            x: pt.x - entry.primarySize.width * 0.5,
+            y: pt.y - entry.primarySize.height * 0.5,
+            width: entry.primarySize.width,
+            height: entry.primarySize.height
+        )
+        guard primaryRect.maxX >= 0,
+              primaryRect.minX <= viewportSize.width,
+              primaryRect.maxY >= 0,
+              primaryRect.minY <= viewportSize.height else {
+            return
+        }
+        guard collisionChecker.tryPlace(primaryRect, padding: 4) else { return }
+
+        let resolvedPrimary = context.resolve(entry.primaryText)
+        context.draw(resolvedPrimary, at: pt, anchor: .center)
+
+        if entry.layer == .building,
+           let secText = entry.secondaryText,
+           CampusMapTransformMath.shouldShowSecondaryLabel(
+               bboxMinX: entry.bboxMinX,
+               bboxMaxX: entry.bboxMaxX,
+               zoomPtPerMeter: zoom,
+               textWidthPt: entry.secondarySize.width
+           ) {
+            let secCenter = CGPoint(x: pt.x, y: pt.y + entry.primarySize.height * 0.85)
+            let secRect = CGRect(
+                x: secCenter.x - entry.secondarySize.width * 0.5,
+                y: secCenter.y - entry.secondarySize.height * 0.5,
+                width: entry.secondarySize.width,
+                height: entry.secondarySize.height
+            )
+            if secRect.maxX >= 0,
+               secRect.minX <= viewportSize.width,
+               secRect.maxY >= 0,
+               secRect.minY <= viewportSize.height,
+               collisionChecker.tryPlace(secRect, padding: 4) {
+                let resolvedSec = context.resolve(secText)
+                context.draw(resolvedSec, at: secCenter, anchor: .center)
+            }
+        }
+    }
+
+    private func matchesPoiFilter(_ item: CampusCachedDynamicItem, filter: CampusPoiType) -> Bool {
         if item.poiType == filter { return true }
-        let cat = item.category.lowercased()
         switch filter {
-        case .library: return cat == "library"
-        case .dining: return cat == "dining"
-        case .parking: return item.layer == .parking || cat == "parking"
-        case .facultyOffice: return cat == "faculty_office"
+        case .library: return item.categoryLower == "library"
+        case .dining: return item.categoryLower == "dining"
+        case .parking: return item.layer == .parking || item.categoryLower == "parking"
+        case .facultyOffice: return item.categoryLower == "faculty_office"
         case .academic:
             return (item.layer == .building || item.layer == .campusZone || item.layer == .room)
-                && (cat == "academic" || cat == "academic_zone" || cat == "classroom" || cat == "lab")
+                && (item.categoryLower == "academic"
+                    || item.categoryLower == "academic_zone"
+                    || item.categoryLower == "classroom"
+                    || item.categoryLower == "lab")
         case .toilet, .entrance:
             return false
         }
     }
 
-    private func fillColor(
-        for item: CampusRenderFeature,
+    private func resolvePolygonFill(
+        layer: CampusMapLayer,
+        occupancy: CampusRenderOccupancyKind,
         isSelected: Bool,
-        freeMode: Bool,
-        matchesPoi: Bool,
-        palette: MapCanvasPalette
+        matchesPoi: Bool
     ) -> Color {
-        if isSelected && (item.layer == .room || item.layer == .building || item.layer == .campusZone) {
+        if isSelected && (layer == .room || layer == .building || layer == .campusZone) {
             return palette.selectedFill
         }
-        if matchesPoi && item.layer != .poi {
-            return accentColor.opacity(colorScheme == .dark ? 0.34 : 0.22)
+        if matchesPoi && layer != .poi {
+            return accentColor.opacity(isDark ? 0.34 : 0.22)
         }
-        switch item.layer {
+        if isFreeRoomsModeEnabled && layer == .room {
+            if occupancy == .noRegularClass {
+                return isDark
+                    ? Color(hex: 0x16A34A, alpha: 0.80)
+                    : Color(hex: 0x86EFAC, alpha: 0.92)
+            }
+            return palette.roomNoDataFill.opacity(0.45)
+        }
+        return fillColor(for: layer, occupancy: occupancy)
+    }
+
+    private func fillColor(
+        for layer: CampusMapLayer,
+        occupancy: CampusRenderOccupancyKind
+    ) -> Color {
+        switch layer {
         case .campusGround: return palette.campusGroundFill
         case .campusZone: return palette.campusZoneFill
         case .greenArea: return palette.greenAreaFill
@@ -406,15 +638,7 @@ public struct CampusMapCanvasView: View {
         case .walkway: return .clear
         case .building: return palette.buildingFill
         case .room:
-            if freeMode {
-                if item.occupancy == .noRegularClass {
-                    return colorScheme == .dark
-                        ? Color(hex: 0x16A34A, alpha: 0.80)
-                        : Color(hex: 0x86EFAC, alpha: 0.92)
-                }
-                return palette.roomNoDataFill.opacity(0.45)
-            }
-            switch item.occupancy {
+            switch occupancy {
             case .occupied: return palette.roomOccupiedFill
             case .noRegularClass: return palette.roomFreeFill
             case .noData: return palette.roomNoDataFill
@@ -425,22 +649,25 @@ public struct CampusMapCanvasView: View {
         }
     }
 
-    private func strokeColor(
-        for item: CampusRenderFeature,
+    private func resolvePolygonStroke(
+        layer: CampusMapLayer,
+        occupancy: CampusRenderOccupancyKind,
         isSelected: Bool,
-        freeMode: Bool,
-        matchesPoi: Bool,
-        palette: MapCanvasPalette
+        matchesPoi: Bool
     ) -> Color {
         if isSelected { return palette.selectedStroke }
         if matchesPoi { return accentColor }
-        if freeMode && item.layer == .room {
-            if item.occupancy == .noRegularClass {
-                return colorScheme == .dark ? Color(hex: 0x4ADE80) : Color(hex: 0x15803D)
+        if isFreeRoomsModeEnabled && layer == .room {
+            if occupancy == .noRegularClass {
+                return isDark ? Color(hex: 0x4ADE80) : Color(hex: 0x15803D)
             }
             return palette.roomStroke.opacity(0.42)
         }
-        switch item.layer {
+        return strokeColor(for: layer)
+    }
+
+    private func strokeColor(for layer: CampusMapLayer) -> Color {
+        switch layer {
         case .campusGround: return palette.campusGroundStroke
         case .campusZone: return palette.campusZoneStroke
         case .building: return palette.buildingStroke

@@ -73,11 +73,17 @@ public final class CampusMapController: ObservableObject {
         let mapBridge = CampusMapBridge(timestampIso: initialTimestampIso)
         self.bridge = mapBridge
         self.state = Self.snapshot(from: mapBridge)
+        mapBridge.onStateDidChange = { [weak self] in
+            self?.syncState()
+        }
     }
 
     public init(bridge: CampusMapBridge) {
         self.bridge = bridge
         self.state = Self.snapshot(from: bridge)
+        bridge.onStateDidChange = { [weak self] in
+            self?.syncState()
+        }
     }
 
     public func syncState() {
