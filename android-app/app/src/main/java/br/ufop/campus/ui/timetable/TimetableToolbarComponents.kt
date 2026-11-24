@@ -104,37 +104,22 @@ internal fun TimetableTopBar(
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.semantics { heading() }
                 )
-                if (activeFriend != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        FriendAvatarBadge(
-                            friendName = activeFriend.friendName,
-                            avatarBase64 = activeFriend.avatarBase64,
-                            size = 20.dp
-                        )
-                        val courseLabel = activeFriend.courseName
-                            .takeIf { it.isNotBlank() }
-                            ?: "Estudante"
-                        Text(
-                            text = "${activeFriend.friendName} · $courseLabel · $timetableSemester",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = accessibleTextColor(MaterialTheme.colorScheme.primary, isDark),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "Semestre $effectiveSemester · Toque em uma aula para ver detalhes",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(
+                    text = buildTimetableHeaderSubtitle(
+                        effectiveSemester = effectiveSemester,
+                        timetableSemester = timetableSemester,
+                        activeFriend = activeFriend
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (activeFriend != null) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (activeFriend != null) {
+                        accessibleTextColor(MaterialTheme.colorScheme.primary, isDark)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             Spacer(modifier = Modifier.width(8.dp))

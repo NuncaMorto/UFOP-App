@@ -35,9 +35,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,12 +76,16 @@ internal fun GradeSelectorDropdown(
 
     Box {
         val userDisplayName = studentProfile.fullName.ifBlank { "Você" }
+        val selectorAvatar = resolveGradeSelectorAvatarSource(
+            activeFriend = activeFriend,
+            studentProfile = studentProfile
+        )
         ExpressiveSelectorPill(
             label = selectedGradeLabel,
             isHighlighted = activeFriend != null,
-            leadingAvatarName = activeFriend?.friendName ?: userDisplayName,
-            leadingAvatarBase64 = activeFriend?.avatarBase64,
-            leadingAvatarFilePath = if (activeFriend == null) studentProfile.avatarPath else null,
+            leadingAvatarName = selectorAvatar.displayName,
+            leadingAvatarBase64 = selectorAvatar.avatarBase64,
+            leadingAvatarFilePath = selectorAvatar.avatarFilePath,
             visualHeight = toolbarVisualHeight,
             onClick = { expanded = true }
         )
@@ -288,26 +292,34 @@ internal fun FriendAvatarBadge(
     modifier: Modifier = Modifier,
     avatarFilePath: String? = null
 ) {
-    val cachedBitmap = remember(avatarBase64, avatarFilePath) {
-        avatarBase64?.trim()?.takeIf { it.isNotEmpty() }?.let { clean ->
-            friendAvatarBitmapCache.get(clean.hashCode())
-        } ?: avatarFilePath?.trim()?.takeIf { it.isNotEmpty() }?.let { cleanPath ->
+    val normalizedBase64 = remember(avatarBase64) {
+        avatarBase64?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    val normalizedFilePath = remember(avatarFilePath) {
+        avatarFilePath?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    val cachedBitmap = remember(normalizedBase64, normalizedFilePath) {
+        normalizedBase64?.let { clean ->
+            friendAvatarBitmapCache.get(clean)
+        } ?: normalizedFilePath?.let { cleanPath ->
             val file = File(cleanPath)
             if (file.exists()) localAvatarBitmapCache.get("${cleanPath}:${file.lastModified()}") else null
         }
     }
-    val decodedBitmap by produceState<Bitmap?>(
-        initialValue = cachedBitmap,
-        key1 = avatarBase64,
-        key2 = avatarFilePath
-    ) {
-        if (value != null) return@produceState
-        if (avatarBase64.isNullOrBlank() && avatarFilePath.isNullOrBlank()) return@produceState
-        value = withContext(Dispatchers.IO) {
-            if (!avatarBase64.isNullOrBlank()) {
-                decodeAvatarBase64(avatarBase64)
+    var decodedBitmap by remember(normalizedBase64, normalizedFilePath) {
+        mutableStateOf<Bitmap?>(cachedBitmap)
+    }
+    LaunchedEffect(normalizedBase64, normalizedFilePath) {
+        if (decodedBitmap != null) return@LaunchedEffect
+        if (normalizedBase64 == null && normalizedFilePath == null) {
+            decodedBitmap = null
+            return@LaunchedEffect
+        }
+        decodedBitmap = withContext(Dispatchers.IO) {
+            if (normalizedBase64 != null) {
+                decodeAvatarBase64(normalizedBase64)
             } else {
-                decodeLocalAvatarFile(avatarFilePath)
+                decodeLocalAvatarFile(normalizedFilePath)
             }
         }
     }

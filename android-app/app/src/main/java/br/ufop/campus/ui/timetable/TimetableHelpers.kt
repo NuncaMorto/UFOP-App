@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.FriendScheduleInfo
+import br.ufop.campus.core.ffi.StudentProfile
 import br.ufop.campus.core.ffi.TimetableCell
 import br.ufop.campus.core.ffi.TimetableRow
 import br.ufop.campus.core.map.extractCourseSectionFromNotes
@@ -140,8 +141,47 @@ private val STANDARD_UFOP_TIME_SLOTS = listOf(
     "20:50" to "22:30"
 )
 
-internal val friendAvatarBitmapCache = LruCache<Int, Bitmap>(16)
+internal val friendAvatarBitmapCache = LruCache<String, Bitmap>(16)
 internal val localAvatarBitmapCache = LruCache<String, Bitmap>(8)
+
+internal data class GradeAvatarSource(
+    val displayName: String,
+    val avatarBase64: String?,
+    val avatarFilePath: String?
+)
+
+internal fun resolveGradeSelectorAvatarSource(
+    activeFriend: FriendScheduleInfo?,
+    studentProfile: StudentProfile
+): GradeAvatarSource = if (activeFriend != null) {
+    GradeAvatarSource(
+        displayName = activeFriend.friendName.trim().ifBlank { "Amigo" },
+        avatarBase64 = activeFriend.avatarBase64?.trim()?.takeIf { it.isNotEmpty() },
+        avatarFilePath = null
+    )
+} else {
+    GradeAvatarSource(
+        displayName = studentProfile.fullName.trim().ifBlank { "Você" },
+        avatarBase64 = null,
+        avatarFilePath = studentProfile.avatarPath?.trim()?.takeIf { it.isNotEmpty() }
+    )
+}
+
+internal fun buildTimetableHeaderSubtitle(
+    effectiveSemester: String,
+    timetableSemester: String,
+    activeFriend: FriendScheduleInfo?
+): String {
+    if (activeFriend == null) {
+        return "Semestre $effectiveSemester · Toque em uma aula para ver detalhes"
+    }
+    val course = activeFriend.courseName.trim()
+    return if (course.isNotEmpty()) {
+        "Grade compartilhada · $course · $timetableSemester"
+    } else {
+        "Grade compartilhada · Semestre $timetableSemester"
+    }
+}
 
 private fun computeSampleSize(width: Int, height: Int, maxSidePx: Int): Int {
     var sample = 1
@@ -207,13 +247,12 @@ internal fun sanitizeFilenameToken(raw: String): String {
 
 internal fun decodeAvatarBase64(avatarBase64: String?): Bitmap? {
     val clean = avatarBase64?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-    val cacheKey = clean.hashCode()
-    friendAvatarBitmapCache.get(cacheKey)?.let { return it }
+    friendAvatarBitmapCache.get(clean)?.let { return it }
     return runCatching {
         val rawPayload = clean.substringAfter("base64,", clean)
         val bytes = Base64.decode(rawPayload, Base64.DEFAULT)
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { decoded ->
-            friendAvatarBitmapCache.put(cacheKey, decoded)
+            friendAvatarBitmapCache.put(clean, decoded)
         }
     }.getOrNull()
 }
