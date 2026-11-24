@@ -291,6 +291,8 @@ internal fun CourseCatalogSwitcherDialog(
                         key = { it.code }
                     ) { course ->
                         val isSelected = course.code == selectedCourseCode
+                        val versions = UfopCurriculumCatalog.getCourseVersions(course)
+                        val displayCourse = versions.lastOrNull { it.subjects.isNotEmpty() } ?: course
                         Surface(
                             onClick = { onSelectCourse(course) },
                             modifier = Modifier
@@ -327,17 +329,20 @@ internal fun CourseCatalogSwitcherDialog(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     val meta = buildString {
-                                        if (course.campus.isNotBlank()) append(course.campus)
-                                        if (course.degree.isNotBlank()) {
+                                        if (displayCourse.campus.isNotBlank()) append(displayCourse.campus)
+                                        if (displayCourse.degree.isNotBlank()) {
                                             if (isNotEmpty()) append(" · ")
-                                            append(course.degree)
+                                            append(displayCourse.degree)
                                         }
-                                        if (course.chTotal > 0) {
+                                        if (displayCourse.chTotal > 0) {
                                             if (isNotEmpty()) append(" · ")
-                                            append("${formatHoursPtBr(course.chTotal)}h")
+                                            append("${formatHoursPtBr(displayCourse.chTotal)}h")
                                         }
-                                        if (course.subjects.isNotEmpty()) {
-                                            append(" · ${course.subjects.size} comp.")
+                                        if (displayCourse.subjects.isNotEmpty()) {
+                                            append(" · ${displayCourse.subjects.size} comp.")
+                                        }
+                                        if (versions.size > 1) {
+                                            append(" · ${versions.size} versões")
                                         }
                                     }
                                     Text(

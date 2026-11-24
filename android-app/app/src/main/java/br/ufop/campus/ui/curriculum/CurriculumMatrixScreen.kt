@@ -310,6 +310,44 @@ fun CurriculumMatrixModal(
     }
     val isConsultationMode = compatibility?.isLegacyMatrixMismatch == true
 
+    val studentEntryTerm = remember(studentProfile.registrationNumber, earliestTranscriptSemester) {
+        val regEntry = UfopCurriculumCatalog.parseEnrollmentYearSemester(studentProfile.registrationNumber)
+        val txEntry = earliestTranscriptSemester?.let { raw ->
+            MATRIX_SEMESTER_ORDER_REGEX.find(raw)?.let { match ->
+                val rawYear = match.groupValues[1].toIntOrNull()
+                val fullYear = when {
+                    rawYear == null -> null
+                    match.groupValues[1].length == 2 -> if (rawYear >= 69) 1900 + rawYear else 2000 + rawYear
+                    else -> rawYear
+                }
+                val sem = match.groupValues[2].toIntOrNull()
+                if (fullYear != null && (sem == 1 || sem == 2)) fullYear to sem else null
+            }
+        }
+        listOfNotNull(regEntry, txEntry)
+            .minWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
+    }
+
+    val allCourseLegacyRefs = remember(selectedCourse?.code, catalogCourses) {
+        selectedCourse?.let { UfopCurriculumCatalog.getLegacyReferences(it.code) }.orEmpty()
+    }
+    val relevantLegacyRefs = remember(selectedCourse?.code, studentEntryTerm, allCourseLegacyRefs) {
+        val course = selectedCourse ?: return@remember emptyList()
+        val filtered = if (studentEntryTerm != null) {
+            UfopCurriculumCatalog.getLegacyReferences(
+                courseCode = course.code,
+                entryYear = studentEntryTerm.first,
+                entrySemester = studentEntryTerm.second
+            )
+        } else {
+            allCourseLegacyRefs
+        }
+        filtered.ifEmpty { allCourseLegacyRefs }
+    }
+    val officialLinks = remember(selectedCourse?.code, catalogCourses) {
+        selectedCourse?.let { UfopCurriculumCatalog.getOfficialLinks(it.code) }
+    }
+
     val evaluatedSubjects = remember(selectedCourse, approvedCodes, inProgressCodes) {
         val subjects = selectedCourse?.subjects.orEmpty()
         subjects.map { subject ->
@@ -452,7 +490,26 @@ fun CurriculumMatrixModal(
 
                         if (compatibility != null && compatibility.isLegacyMatrixMismatch) {
                             item(key = "legacy_consultation_banner") {
-                                LegacyMatrixConsultationBanner(compatibility = compatibility)
+                                LegacyMatrixConsultationBanner(
+                                    compatibility = compatibility,
+                                    course = selectedCourse
+                                )
+                            }
+                            if (selectedCourse.subjects.isNotEmpty() &&
+                                (relevantLegacyRefs.isNotEmpty() || !officialLinks?.officialMatrixUrl.isNullOrBlank())
+                            ) {
+                                item(key = "legacy_refs_${selectedCourse.code}_true") {
+                                    CurriculumLegacyReferencesCard(
+                                        references = relevantLegacyRefs,
+                                        officialLinks = officialLinks,
+                                        initiallyExpanded = true,
+                                        isLegacyAlertContext = true,
+                                        isDark = isDark,
+                                        reduceMotion = a11y.reduceMotion,
+                                        minTouchTarget = minTouchTarget,
+                                        onOpenUrl = { url -> openExternalCurriculumUrl(context, url) }
+                                    )
+                                }
                             }
                         }
 
@@ -464,6 +521,24 @@ fun CurriculumMatrixModal(
                                 isConsultationMode = isConsultationMode,
                                 isDark = isDark
                             )
+                        }
+
+                        if (!isConsultationMode &&
+                            selectedCourse.subjects.isNotEmpty() &&
+                            allCourseLegacyRefs.isNotEmpty()
+                        ) {
+                            item(key = "legacy_refs_${selectedCourse.code}_false") {
+                                CurriculumLegacyReferencesCard(
+                                    references = allCourseLegacyRefs,
+                                    officialLinks = officialLinks,
+                                    initiallyExpanded = false,
+                                    isLegacyAlertContext = false,
+                                    isDark = isDark,
+                                    reduceMotion = a11y.reduceMotion,
+                                    minTouchTarget = minTouchTarget,
+                                    onOpenUrl = { url -> openExternalCurriculumUrl(context, url) }
+                                )
+                            }
                         }
 
                         if (confirmationBanner != null) {
@@ -483,8 +558,11 @@ fun CurriculumMatrixModal(
                                 CurriculumEmptySubjectsNotice(
                                     course = selectedCourse,
                                     catalogCourseCount = catalogCourses.size,
+                                    officialLinks = officialLinks,
+                                    legacyReferences = allCourseLegacyRefs,
                                     isDark = isDark,
                                     minTouchTarget = minTouchTarget,
+                                    onOpenUrl = { url -> openExternalCurriculumUrl(context, url) },
                                     onOpenCoursePicker = { showCoursePickerDialog = true }
                                 )
                             }

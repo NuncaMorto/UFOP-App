@@ -108,9 +108,18 @@ object DynamicCurriculumCatalog {
     private val PREREQ_CODE_REGEX = Regex("""\b([A-Z]{2,5}\d{3,4}[A-Z]?)\b""")
     private val MIN_HOURS_REGEX = Regex("""\b(\d{1,5})\s*(?:h|hs|hora|horas)\b""", RegexOption.IGNORE_CASE)
     private val CURRICULUM_PAREN_REGEX = Regex("""\(\s*curr[ií]culo\s+(\d+)\s*\)""", RegexOption.IGNORE_CASE)
+    private val CURRICULUM_NUMBER_REGEX = Regex("""curr[ií]culo\s+(\d+)""", RegexOption.IGNORE_CASE)
     private val PAREN_SUFFIX_REGEX = Regex("""\s*\([^)]*\)""")
     private val NON_ALNUM_REGEX = Regex("""[^a-z0-9]+""")
     private val WHITESPACE_REGEX = Regex("""\s+""")
+
+    private val MATRIX_VERSION_COMPARATOR: Comparator<DynamicCurriculumMatrix> =
+        compareBy<DynamicCurriculumMatrix> { it.effectiveFrom }
+            .thenBy { extractCurriculumNumber(it.curriculumLabel) ?: 0 }
+            .thenBy { it.curriculumLabel }
+
+    private fun extractCurriculumNumber(raw: String): Int? =
+        CURRICULUM_NUMBER_REGEX.find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull()
 
     private val AUTOMACAO_ALIASES = listOf(
         "engenharia de controle e automacao",
@@ -316,6 +325,7 @@ object DynamicCurriculumCatalog {
     private data class CachedAllMatricesEntry(
         val sourceRef: List<UfopCourseCurriculum>,
         val courseRefs: List<UfopCourseCurriculum>,
+        val legacyCatalogRevision: Int,
         val matrices: List<DynamicCurriculumMatrix>
     )
 
@@ -498,15 +508,24 @@ object DynamicCurriculumCatalog {
         }
 
         val versionTerm = parseSemesterTerm(course.curriculumVersion)
+        val curriculumNum = extractCurriculumNumber(course.curriculumVersion)
         val versionSlug = if (versionTerm != null) {
-            "${versionTerm.first}_${versionTerm.second}"
+            val baseTermSlug = "${versionTerm.first}_${versionTerm.second}"
+            if (curriculumNum != null) "${baseTermSlug}_c$curriculumNum" else baseTermSlug
         } else {
             val rawSlug = normalizeLookupText(course.curriculumVersion).replace(' ', '_')
             rawSlug.ifEmpty { "2026_2" }
         }
         val matrixId = "ufop_${cleanCourseCode.lowercase()}_$versionSlug"
+        val legacyIds = if (versionTerm != null && curriculumNum != null && course.effectiveUntilYear == null) {
+            listOf("ufop_${cleanCourseCode.lowercase()}_${versionTerm.first}_${versionTerm.second}")
+        } else {
+            emptyList()
+        }
         val curriculumLabel = formatCurriculumLabel(course.curriculumVersion)
-        val effectiveFrom = if (versionTerm != null && versionTerm.first < course.effectiveFromYear) {
+        val versionKey = versionTerm?.let { it.first * 10 + it.second }
+        val courseFromKey = course.effectiveFromYear * 10 + course.effectiveFromSemester
+        val effectiveFrom = if (versionTerm != null && versionKey != null && versionKey < courseFromKey) {
             DynamicSemesterTerm(versionTerm.first, versionTerm.second)
         } else {
             DynamicSemesterTerm(course.effectiveFromYear, course.effectiveFromSemester)
@@ -527,6 +546,7 @@ object DynamicCurriculumCatalog {
             courseAliases = buildCourseAliases(cleanCourseCode, cleanCourseName),
             effectiveFrom = effectiveFrom,
             effectiveUntil = effectiveUntil,
+            legacyIds = legacyIds,
             campus = course.campus.trim()
         )
     }
@@ -535,6 +555,7 @@ object DynamicCurriculumCatalog {
         entry: CachedAllMatricesEntry,
         catalogCourses: List<UfopCourseCurriculum>
     ): Boolean {
+        if (entry.legacyCatalogRevision != UfopCurriculumCatalog.legacyCatalogRevision) return false
         if (entry.sourceRef === catalogCourses) return true
         val refs = entry.courseRefs
         if (refs.size != catalogCourses.size) return false
@@ -551,7 +572,7 @@ object DynamicCurriculumCatalog {
         }
         val built = fromCourseCurriculum(course)
         synchronized(matricesCacheLock) {
-            if (singleCourseCache.size > 128) {
+            if (singleCourseCache.size > 256) {
                 singleCourseCache.clear()
             }
             val bucket = singleCourseCache.getOrPut(identity) { mutableListOf() }
@@ -584,18 +605,31 @@ object DynamicCurriculumCatalog {
                 return@synchronized cached.matrices
             }
 
-            val generated = catalogCourses.mapNotNull { course ->
+            val revisionSnapshot = UfopCurriculumCatalog.legacyCatalogRevision
+            val seenMatrixIds = HashSet<String>(catalogCourses.size * 2)
+            curatedMatrices.forEach { seenMatrixIds.add(it.id) }
+            val generated = ArrayList<DynamicCurriculumMatrix>(catalogCourses.size)
+            catalogCourses.forEach { course ->
                 val code = course.code.trim().uppercase()
-                if (code in curatedCodes) null else fromCourseCurriculumCached(course)
+                if (code in curatedCodes) return@forEach
+                UfopCurriculumCatalog.getCourseVersions(course).forEach { version ->
+                    val matrix = fromCourseCurriculumCached(version) ?: return@forEach
+                    if (seenMatrixIds.add(matrix.id)) {
+                        generated.add(matrix)
+                    }
+                }
             }
 
             val sorted = (curatedMatrices + generated).sortedWith(
                 compareBy<DynamicCurriculumMatrix> { normalizeLookupText(it.courseName) }
                     .thenBy { it.effectiveFrom }
+                    .thenBy { extractCurriculumNumber(it.curriculumLabel) ?: Int.MAX_VALUE }
+                    .thenBy { it.curriculumLabel }
             )
             val entry = CachedAllMatricesEntry(
                 sourceRef = catalogCourses,
                 courseRefs = catalogCourses.toList(),
+                legacyCatalogRevision = revisionSnapshot,
                 matrices = sorted
             )
             if (allMatricesCache.size >= 8) {
@@ -655,6 +689,8 @@ object DynamicCurriculumCatalog {
                 compareByDescending<Pair<DynamicCurriculumMatrix, Int>> { it.second }
                     .thenBy { normalizeLookupText(it.first.courseName) }
                     .thenBy { it.first.effectiveFrom }
+                    .thenBy { extractCurriculumNumber(it.first.curriculumLabel) ?: Int.MAX_VALUE }
+                    .thenBy { it.first.curriculumLabel }
             )
             .map { it.first }
     }
@@ -698,13 +734,22 @@ object DynamicCurriculumCatalog {
             val byCatalogCode = if (!curatedMatches.isNullOrEmpty()) {
                 curatedMatches
             } else {
-                catalogCourses.mapNotNull { course ->
-                    if (course.code.trim().equals(matchedCodeUpper, ignoreCase = true)) {
-                        fromCourseCurriculumCached(course)
-                    } else {
-                        null
+                val expanded = LinkedHashMap<String, DynamicCurriculumMatrix>()
+                UfopCurriculumCatalog.getCourseVersions(matchedCatalog).forEach { version ->
+                    fromCourseCurriculumCached(version)?.let { matrix ->
+                        expanded.putIfAbsent(matrix.id, matrix)
                     }
                 }
+                catalogCourses.forEach { course ->
+                    if (course.code.trim().equals(matchedCodeUpper, ignoreCase = true)) {
+                        UfopCurriculumCatalog.getCourseVersions(course).forEach { version ->
+                            fromCourseCurriculumCached(version)?.let { matrix ->
+                                expanded.putIfAbsent(matrix.id, matrix)
+                            }
+                        }
+                    }
+                }
+                expanded.values.toList()
             }
             if (byCatalogCode.isEmpty()) {
                 return DynamicMatrixResolution(
@@ -747,7 +792,7 @@ object DynamicCurriculumCatalog {
                     m.effectiveFrom <= entryTerm &&
                         (m.effectiveUntil == null || entryTerm <= m.effectiveUntil)
                 }
-                .maxByOrNull { it.effectiveFrom }
+                .maxWithOrNull(MATRIX_VERSION_COMPARATOR)
 
             if (exactMatch != null) {
                 return DynamicMatrixResolution(
@@ -759,8 +804,8 @@ object DynamicCurriculumCatalog {
                 )
             }
 
-            val oldest = courseMatrices.minBy { it.effectiveFrom }
-            if (entryTerm < oldest.effectiveFrom) {
+            val oldest = courseMatrices.minWithOrNull(MATRIX_VERSION_COMPARATOR)
+            if (oldest != null && entryTerm < oldest.effectiveFrom) {
                 return DynamicMatrixResolution(
                     matrix = oldest,
                     studentEntryTerm = entryTerm,
@@ -771,8 +816,11 @@ object DynamicCurriculumCatalog {
             }
         }
 
-        val latest = courseMatrices.firstOrNull { it.effectiveUntil == null }
-            ?: courseMatrices.maxBy { it.effectiveFrom }
+        val latest = courseMatrices
+            .filter { it.effectiveUntil == null }
+            .maxWithOrNull(MATRIX_VERSION_COMPARATOR)
+            ?: courseMatrices.maxWithOrNull(MATRIX_VERSION_COMPARATOR)
+            ?: defaultMatrix
         return DynamicMatrixResolution(
             matrix = latest,
             studentEntryTerm = entryTerm,

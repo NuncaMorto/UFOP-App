@@ -14,6 +14,10 @@ private enum DynamicGridBuilderRegex {
         pattern: #"\(\s*curr[ií]culo\s+(\d+)\s*\)"#,
         options: [.caseInsensitive]
     )
+    static let curriculumNumber: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"curr[ií]culo\s+(\d+)"#,
+        options: [.caseInsensitive]
+    )
     static let whitespace: NSRegularExpression? = try? NSRegularExpression(
         pattern: #"\s+"#
     )
@@ -210,17 +214,29 @@ public extension DynamicCurriculumCatalog {
         }
 
         let versionTerm = parseSemesterTerm(course.curriculumVersion)
+        let curriculumNum = extractCurriculumNumber(course.curriculumVersion)
         let versionSlug: String = {
             if let versionTerm {
-                return "\(versionTerm.year)_\(versionTerm.semester)"
+                let baseTermSlug = "\(versionTerm.year)_\(versionTerm.semester)"
+                if let curriculumNum {
+                    return "\(baseTermSlug)_c\(curriculumNum)"
+                }
+                return baseTermSlug
             }
             let slug = normalizeLookupText(course.curriculumVersion).replacingOccurrences(of: " ", with: "_")
             return slug.isEmpty ? "2026_2" : slug
         }()
         let matrixId = "ufop_\(cleanCourseCode.lowercased())_\(versionSlug)"
+        let legacyIds: [String] = {
+            guard let versionTerm, curriculumNum != nil, course.effectiveUntilYear == nil else {
+                return []
+            }
+            return ["ufop_\(cleanCourseCode.lowercased())_\(versionTerm.year)_\(versionTerm.semester)"]
+        }()
         let curriculumLabel = formatCurriculumLabel(course.curriculumVersion)
         let effectiveFrom: DynamicSemesterTerm = {
-            if let versionTerm, versionTerm.year < course.effectiveFromYear {
+            if let versionTerm,
+               (versionTerm.year, versionTerm.semester) < (course.effectiveFromYear, course.effectiveFromSemester) {
                 return DynamicSemesterTerm(year: versionTerm.year, semester: versionTerm.semester)
             }
             return DynamicSemesterTerm(year: course.effectiveFromYear, semester: course.effectiveFromSemester)
@@ -241,8 +257,18 @@ public extension DynamicCurriculumCatalog {
             courseAliases: buildCourseAliases(courseCode: cleanCourseCode, courseName: cleanCourseName),
             effectiveFrom: effectiveFrom,
             effectiveUntil: effectiveUntil,
+            legacyIds: legacyIds,
             campus: course.campus.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+    }
+
+    internal static func extractCurriculumNumber(_ raw: String) -> Int? {
+        guard let regex = DynamicGridBuilderRegex.curriculumNumber,
+              let match = regex.firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)),
+              let range = Range(match.range(at: 1), in: raw) else {
+            return nil
+        }
+        return Int(raw[range])
     }
 
     static func buildAllMatrices(from catalogCourses: [UfopCourseCurriculum]) -> [DynamicCurriculumMatrix] {
@@ -253,17 +279,32 @@ public extension DynamicCurriculumCatalog {
                 .filter { !$0.isEmpty }
         )
 
-        let generated = catalogCourses.compactMap { course -> DynamicCurriculumMatrix? in
+        var seenIds = Set(curatedMatrices.map(\.id))
+        var generated: [DynamicCurriculumMatrix] = []
+        generated.reserveCapacity(catalogCourses.count)
+
+        for course in catalogCourses {
             let code = course.code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-            guard !curatedCodes.contains(code) else { return nil }
-            return fromCourseCurriculum(course)
+            guard !curatedCodes.contains(code) else { continue }
+            for version in UfopCurriculumCatalog.courseVersions(for: course) {
+                guard let matrix = fromCourseCurriculum(version) else { continue }
+                if seenIds.insert(matrix.id).inserted {
+                    generated.append(matrix)
+                }
+            }
         }
 
         return (curatedMatrices + generated).sorted { lhs, rhs in
             let lName = normalizeLookupText(lhs.courseName)
             let rName = normalizeLookupText(rhs.courseName)
             if lName != rName { return lName < rName }
-            return lhs.effectiveFrom < rhs.effectiveFrom
+            if lhs.effectiveFrom != rhs.effectiveFrom {
+                return lhs.effectiveFrom < rhs.effectiveFrom
+            }
+            let lNum = extractCurriculumNumber(lhs.curriculumLabel) ?? Int.max
+            let rNum = extractCurriculumNumber(rhs.curriculumLabel) ?? Int.max
+            if lNum != rNum { return lNum < rNum }
+            return lhs.curriculumLabel < rhs.curriculumLabel
         }
     }
 

@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.14"
+    public static let currentVersionString = "1.9.15"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.14",
-            title: "Abertura Direta .ufopgrade, AirDrop, QR Code Offline & Mapa Mais Rápido",
+            version: "v1.9.15",
+            title: "Matrizes Históricas, Resolução por Ingresso & PPCs Oficiais",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Integração de 33 matrizes curriculares históricas completas de 21 cursos (1.650 componentes), preservando as matrizes curadas de Eng. de Controle e Automação (AUT 2024/1 e 2026/1).",
+                "Resolução automática por ano e semestre de ingresso na Matriz Curricular e na Grade Dinâmica (FAR, MED, AMB, LTP, EFB/EFL, ECO e outros), sem falso aviso de matriz legada.",
+                "Desbloqueio de 4 cursos que estavam sem disciplinas em 2026/2 (D06, EST, LTI e LTT), totalizando 82 matrizes com IDs únicos na Grade Dinâmica.",
+                "42 referências oficiais e links de PPCs na seção expansível Matrizes anteriores e PPCs oficiais, além de acesso direto no navegador para cursos ainda pendentes (IA e D05)."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.14",
+            title: "Abertura Direta .ufopgrade, AirDrop, QR Code Offline & Mapa Mais Rápido",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Abertura direta de arquivos .ufopgrade recebidos pelo WhatsApp, Telegram, Arquivos ou AirDrop com confirmação segura antes de salvar em Grades de Amigos (respeitando o bloqueio por senha e Face ID / Touch ID).",
                 "Interoperabilidade total ufopgrade-v1 entre iOS e Android, com Grades de Amigos na Grade Horária e AirDrop por aproximação (iOS 17+).",

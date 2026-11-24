@@ -37,7 +37,7 @@ fi
 
 echo "==> Sincronizando catálogos UFOP JSON para Resources/Data"
 mkdir -p "${IOS_DATA_DIR}"
-for json_asset in "ufop_matrizes_2026_2.json" "ufop_room_allocations_2026_2.json"; do
+for json_asset in "ufop_matrizes_2026_2.json" "ufop_matrizes_antigas.json" "ufop_room_allocations_2026_2.json"; do
   if [[ -f "${ASSETS_DIR}/${json_asset}" ]]; then
     cp -f "${ASSETS_DIR}/${json_asset}" "${IOS_DATA_DIR}/${json_asset}"
   fi

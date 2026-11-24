@@ -38,7 +38,8 @@ data class UfopCourseCurriculum(
     val effectiveFromYear: Int = 2026,
     val effectiveFromSemester: Int = 1,
     val effectiveUntilYear: Int? = null,
-    val effectiveUntilSemester: Int? = null
+    val effectiveUntilSemester: Int? = null,
+    val sourceUrl: String? = null
 ) {
     fun containsEntryTerm(year: Int, semester: Int): Boolean {
         val entryKey = year * 10 + semester
@@ -56,6 +57,58 @@ data class UfopCourseCurriculum(
         return entryKey < fromKey
     }
 }
+
+data class UfopLegacyReference(
+    val id: String,
+    val courseCodes: List<String>,
+    val courseName: String,
+    val academicUnit: String,
+    val versionTitle: String,
+    val details: String,
+    val accessType: String,
+    val url: String,
+    val effectiveFromYear: Int? = null,
+    val effectiveFromSemester: Int? = null,
+    val effectiveUntilYear: Int? = null,
+    val effectiveUntilSemester: Int? = null,
+    val entryRuleSummary: String = ""
+) {
+    fun matchesEntryTerm(entryYear: Int, entrySemester: Int? = null): Boolean {
+        if (effectiveFromYear != null) {
+            if (entrySemester != null) {
+                val entryKey = entryYear * 10 + entrySemester
+                val fromKey = effectiveFromYear * 10 + (effectiveFromSemester ?: 1)
+                if (entryKey < fromKey) return false
+            } else if (entryYear < effectiveFromYear) {
+                return false
+            }
+        }
+        if (effectiveUntilYear != null) {
+            if (entrySemester != null) {
+                val entryKey = entryYear * 10 + entrySemester
+                val untilKey = effectiveUntilYear * 10 + (effectiveUntilSemester ?: 2)
+                if (entryKey > untilKey) return false
+            } else if (entryYear > effectiveUntilYear) {
+                return false
+            }
+        }
+        return true
+    }
+}
+
+data class UfopCourseOfficialLinks(
+    val courseCode: String,
+    val officialMatrixUrl: String? = null,
+    val drivePdfUrl: String? = null,
+    val sheetStatus: String = ""
+)
+
+data class UfopLegacyCatalogData(
+    val schemaVersion: Int = 1,
+    val historicalCurricula: List<UfopCourseCurriculum> = emptyList(),
+    val legacyReferences: List<UfopLegacyReference> = emptyList(),
+    val courseOfficialLinks: Map<String, UfopCourseOfficialLinks> = emptyMap()
+)
 
 data class CurriculumCompatibilityStatus(
     val isLegacyMatrixMismatch: Boolean,
@@ -168,19 +221,59 @@ fun checkCurriculumCompatibility(
 object UfopCurriculumCatalog {
 
     private const val ASSET_FILE_NAME = "ufop_matrizes_2026_2.json"
+    private const val LEGACY_ASSET_FILE_NAME = "ufop_matrizes_antigas.json"
 
     private val DIACRITICS_REGEX = Regex("\\p{M}+")
     private val NON_ALNUM_REGEX = Regex("[^a-z0-9]+")
     private val PAREN_SUFFIX_REGEX = Regex("\\s*\\([^)]*\\)")
+    private val WHITESPACE_REGEX = Regex("\\s+")
+    private val CURRICULUM_NUMBER_REGEX = Regex("""curr[ií]culo\s+(\d+)""", RegexOption.IGNORE_CASE)
     private val STOP_WORDS = setOf(
         "de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos",
         "para", "por", "com", "a", "o", "as", "os", "curso"
     )
 
+    private val COURSE_VERSION_COMPARATOR: Comparator<UfopCourseCurriculum> =
+        compareBy<UfopCourseCurriculum> { it.effectiveFromYear }
+            .thenBy { it.effectiveFromSemester }
+            .thenBy { extractCurriculumNumber(it.curriculumVersion) ?: Int.MAX_VALUE }
+            .thenBy { it.curriculumVersion }
+
     private val loadLock = Any()
 
     @Volatile
     private var cachedCourses: List<UfopCourseCurriculum>? = null
+
+    @Volatile
+    private var cachedLegacyCatalog: UfopLegacyCatalogData? = null
+
+    @Volatile
+    private var cachedMergedHistoricalByCode: Map<String, List<UfopCourseCurriculum>>? = null
+
+    @Volatile
+    internal var legacyCatalogRevision: Int = 0
+        private set
+
+    internal fun extractCurriculumNumber(rawVersion: String): Int? =
+        CURRICULUM_NUMBER_REGEX.find(rawVersion)?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+    private fun normalizeVersionKey(rawVersion: String): String =
+        rawVersion.trim().lowercase().replace(WHITESPACE_REGEX, " ")
+
+    private fun JSONObject.optNullableString(key: String): String? {
+        if (!has(key) || isNull(key)) return null
+        val value = optString(key, "").trim()
+        return value.takeIf { it.isNotEmpty() }
+    }
+
+    private fun JSONObject.optNullableInt(key: String): Int? {
+        if (!has(key) || isNull(key)) return null
+        return when (val raw = opt(key)) {
+            is Number -> raw.toInt()
+            is String -> raw.trim().toIntOrNull()
+            else -> null
+        }
+    }
 
     private fun mapDepartmentCodeForSubjectCode(subjectCode: String): String {
         val prefix = subjectCode.trim().takeWhile { it.isLetter() }.uppercase()
@@ -246,10 +339,49 @@ object UfopCurriculumCatalog {
         )
     }
 
-    val historicalCourseVersions: Map<String, List<UfopCourseCurriculum>> by lazy {
+    private val curatedHistoricalCourseVersions: Map<String, List<UfopCourseCurriculum>> by lazy {
         mapOf(
             "AUT" to listOf(engControleAutomacao2024_1)
         )
+    }
+
+    val historicalCourseVersions: Map<String, List<UfopCourseCurriculum>>
+        get() {
+            cachedMergedHistoricalByCode?.let { return it }
+            return synchronized(loadLock) {
+                cachedMergedHistoricalByCode?.let { return@synchronized it }
+                val merged = buildMergedHistoricalMap(cachedLegacyCatalog)
+                cachedMergedHistoricalByCode = merged
+                merged
+            }
+        }
+
+    private fun buildMergedHistoricalMap(
+        legacyData: UfopLegacyCatalogData?
+    ): Map<String, List<UfopCourseCurriculum>> {
+        val grouped = LinkedHashMap<String, MutableList<UfopCourseCurriculum>>()
+        curatedHistoricalCourseVersions.forEach { (code, versions) ->
+            val key = code.trim().uppercase()
+            val list = grouped.getOrPut(key) { mutableListOf() }
+            versions.forEach { version ->
+                val verKey = normalizeVersionKey(version.curriculumVersion)
+                if (list.none { normalizeVersionKey(it.curriculumVersion) == verKey }) {
+                    list.add(version)
+                }
+            }
+        }
+        legacyData?.historicalCurricula.orEmpty().forEach { version ->
+            val key = version.code.trim().uppercase()
+            if (key.isEmpty()) return@forEach
+            val list = grouped.getOrPut(key) { mutableListOf() }
+            val verKey = normalizeVersionKey(version.curriculumVersion)
+            if (list.none { normalizeVersionKey(it.curriculumVersion) == verKey }) {
+                list.add(version)
+            }
+        }
+        return grouped.mapValues { (_, list) ->
+            list.sortedWith(COURSE_VERSION_COMPARATOR)
+        }
     }
 
     fun getCourseVersions(baseCourse: UfopCourseCurriculum): List<UfopCourseCurriculum> {
@@ -258,18 +390,23 @@ object UfopCurriculumCatalog {
         if (historical.isEmpty()) return listOf(baseCourse)
 
         val combined = ArrayList<UfopCourseCurriculum>(historical.size + 1)
+        val seenKeys = HashSet<String>(historical.size + 1)
         historical.forEach { version ->
-            if (combined.none { it.curriculumVersion == version.curriculumVersion }) {
+            val key = normalizeVersionKey(version.curriculumVersion)
+            if (seenKeys.add(key)) {
                 combined.add(version)
             }
         }
-        if (combined.none { it.curriculumVersion == baseCourse.curriculumVersion }) {
-            combined.add(baseCourse)
+        val hasDetailedHistorical = combined.any { it.subjects.isNotEmpty() }
+        val shouldIncludeBase = baseCourse.subjects.isNotEmpty() || !hasDetailedHistorical
+        if (shouldIncludeBase) {
+            val baseKey = normalizeVersionKey(baseCourse.curriculumVersion)
+            if (seenKeys.add(baseKey)) {
+                combined.add(baseCourse)
+            }
         }
-        return combined.sortedWith(
-            compareBy<UfopCourseCurriculum> { it.effectiveFromYear }
-                .thenBy { it.effectiveFromSemester }
-        )
+        if (combined.isEmpty()) return listOf(baseCourse)
+        return combined.sortedWith(COURSE_VERSION_COMPARATOR)
     }
 
     fun resolveCourseForStudent(
@@ -278,13 +415,16 @@ object UfopCurriculumCatalog {
         earliestTranscriptSemester: String? = null
     ): UfopCourseCurriculum {
         val versions = getCourseVersions(baseCourse)
-        if (versions.size <= 1) return baseCourse
+        if (versions.isEmpty()) return baseCourse
+        if (versions.size == 1) return versions.first()
+
+        val latestVersion = versions.lastOrNull { it.effectiveUntilYear == null } ?: versions.last()
 
         val regEntry = parseEnrollmentYearSemester(registrationNumber)
         val txEntry = parseSemesterYearTerm(earliestTranscriptSemester)
         val effectiveEntry = listOfNotNull(regEntry, txEntry)
             .minWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
-            ?: return baseCourse
+            ?: return latestVersion
 
         val exactMatch = versions.lastOrNull {
             it.containsEntryTerm(effectiveEntry.first, effectiveEntry.second)
@@ -296,10 +436,12 @@ object UfopCurriculumCatalog {
             return oldest
         }
 
-        return baseCourse
+        return latestVersion
     }
 
     fun peekCachedCourses(): List<UfopCourseCurriculum>? = cachedCourses
+
+    fun peekCachedLegacyCatalog(): UfopLegacyCatalogData? = cachedLegacyCatalog
 
     internal fun setCachedCoursesForTesting(courses: List<UfopCourseCurriculum>?) {
         synchronized(loadLock) {
@@ -307,17 +449,85 @@ object UfopCurriculumCatalog {
         }
     }
 
+    internal fun setCachedLegacyCatalogForTesting(data: UfopLegacyCatalogData?) {
+        synchronized(loadLock) {
+            cachedLegacyCatalog = data
+            cachedMergedHistoricalByCode = null
+            legacyCatalogRevision += 1
+        }
+    }
+
     fun getAllCourses(context: Context): List<UfopCourseCurriculum> {
-        cachedCourses?.let { return it }
+        val courses = cachedCourses ?: synchronized(loadLock) {
+            cachedCourses ?: run {
+                val rawJson = runCatching {
+                    context.assets.open(ASSET_FILE_NAME).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                }.getOrDefault("")
+                val parsed = if (rawJson.isBlank()) emptyList() else loadFromJsonString(rawJson)
+                cachedCourses = parsed
+                parsed
+            }
+        }
+        if (cachedLegacyCatalog == null) {
+            getLegacyCatalog(context)
+        }
+        return courses
+    }
+
+    fun getLegacyCatalog(context: Context): UfopLegacyCatalogData {
+        cachedLegacyCatalog?.let { return it }
         return synchronized(loadLock) {
-            cachedCourses?.let { return@synchronized it }
+            cachedLegacyCatalog?.let { return@synchronized it }
             val rawJson = runCatching {
-                context.assets.open(ASSET_FILE_NAME).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                context.assets.open(LEGACY_ASSET_FILE_NAME).bufferedReader(Charsets.UTF_8).use { it.readText() }
             }.getOrDefault("")
-            val parsed = if (rawJson.isBlank()) emptyList() else loadFromJsonString(rawJson)
-            cachedCourses = parsed
+            val parsed = if (rawJson.isBlank()) UfopLegacyCatalogData() else loadLegacyCatalogFromJsonString(rawJson)
+            cachedLegacyCatalog = parsed
+            cachedMergedHistoricalByCode = null
+            legacyCatalogRevision += 1
             parsed
         }
+    }
+
+    fun getLegacyReferences(
+        courseCode: String,
+        entryYear: Int? = null,
+        entrySemester: Int? = null
+    ): List<UfopLegacyReference> {
+        val codeKey = courseCode.trim().uppercase()
+        if (codeKey.isEmpty()) return emptyList()
+        val refs = cachedLegacyCatalog?.legacyReferences.orEmpty()
+            .filter { ref -> ref.courseCodes.any { it.equals(codeKey, ignoreCase = true) } }
+        return if (entryYear != null) {
+            refs.filter { it.matchesEntryTerm(entryYear = entryYear, entrySemester = entrySemester) }
+        } else {
+            refs
+        }
+    }
+
+    fun getLegacyReferences(
+        context: Context,
+        courseCode: String,
+        entryYear: Int? = null,
+        entrySemester: Int? = null
+    ): List<UfopLegacyReference> {
+        if (cachedLegacyCatalog == null) {
+            getLegacyCatalog(context)
+        }
+        return getLegacyReferences(courseCode = courseCode, entryYear = entryYear, entrySemester = entrySemester)
+    }
+
+    fun getOfficialLinks(courseCode: String): UfopCourseOfficialLinks? {
+        val codeKey = courseCode.trim().uppercase()
+        if (codeKey.isEmpty()) return null
+        return cachedLegacyCatalog?.courseOfficialLinks?.get(codeKey)
+    }
+
+    fun getOfficialLinks(context: Context, courseCode: String): UfopCourseOfficialLinks? {
+        if (cachedLegacyCatalog == null) {
+            getLegacyCatalog(context)
+        }
+        return getOfficialLinks(courseCode)
     }
 
     fun findCourse(
@@ -360,69 +570,175 @@ object UfopCurriculumCatalog {
         val result = ArrayList<UfopCourseCurriculum>(coursesArray.length())
         for (i in 0 until coursesArray.length()) {
             val obj = coursesArray.optJSONObject(i) ?: continue
-            val code = obj.optString("code", "").trim().uppercase()
-            val name = obj.optString("name", "").trim()
-            if (code.isEmpty() || name.isEmpty()) continue
+            parseCourseCurriculumObject(obj)?.let(result::add)
+        }
+        return result
+    }
 
-            val subjectsArr = obj.optJSONArray("subjects")
-            val subjects = if (subjectsArr != null && subjectsArr.length() > 0) {
-                ArrayList<UfopCurriculumSubject>(subjectsArr.length()).apply {
-                    for (j in 0 until subjectsArr.length()) {
-                        val sObj = subjectsArr.optJSONObject(j) ?: continue
-                        val sCode = sObj.optString("code", "").trim().uppercase()
-                        val rawSubjectName = sObj.optString("name", "").trim()
-                        if (sCode.isEmpty() || rawSubjectName.isEmpty()) continue
-                        val normalizedSubjectName = normalizeUfopPortugueseText(rawSubjectName)
-                        val prereqArr = sObj.optJSONArray("prerequisites")
-                        val prereqs = if (prereqArr != null && prereqArr.length() > 0) {
-                            List(prereqArr.length()) { k -> prereqArr.optString(k, "").trim() }
-                                .filter { it.isNotEmpty() }
-                        } else {
-                            emptyList()
-                        }
-                        add(
-                            UfopCurriculumSubject(
-                                code = sCode,
-                                name = normalizedSubjectName,
-                                departmentId = sObj.optString("departmentId", "ufop").trim().lowercase()
-                                    .ifEmpty { "ufop" },
-                                departmentCode = sObj.optString("departmentCode", "UFOP").trim().uppercase()
-                                    .ifEmpty { "UFOP" },
-                                period = sObj.optInt("period", 0).coerceIn(0, 12),
-                                type = sObj.optString("type", "Obrigatória").trim().ifEmpty { "Obrigatória" },
-                                chs = sObj.optInt("chs", 0).coerceAtLeast(0),
-                                che = sObj.optInt("che", 0).coerceAtLeast(0),
-                                cha = sObj.optInt("cha", 0).coerceAtLeast(0),
-                                weeklyTheory = sObj.optInt("weeklyTheory", 0).coerceAtLeast(0),
-                                weeklyPractice = sObj.optInt("weeklyPractice", 0).coerceAtLeast(0),
-                                prerequisites = prereqs
-                            )
-                        )
-                    }
+    fun loadLegacyCatalogFromJsonString(rawJson: String): UfopLegacyCatalogData {
+        val trimmed = rawJson.trim()
+        if (trimmed.isEmpty()) return UfopLegacyCatalogData()
+        val root = JSONObject(trimmed)
+        val schemaVersion = root.optNullableInt("schemaVersion") ?: 1
+
+        val historicalArray = root.optJSONArray("historicalCurricula") ?: JSONArray()
+        val historical = ArrayList<UfopCourseCurriculum>(historicalArray.length())
+        for (i in 0 until historicalArray.length()) {
+            val obj = historicalArray.optJSONObject(i) ?: continue
+            parseCourseCurriculumObject(obj)?.let(historical::add)
+        }
+
+        val refsArray = root.optJSONArray("legacyReferences") ?: JSONArray()
+        val legacyRefs = ArrayList<UfopLegacyReference>(refsArray.length())
+        for (i in 0 until refsArray.length()) {
+            val obj = refsArray.optJSONObject(i) ?: continue
+            val id = obj.optNullableString("id") ?: continue
+            val versionTitle = obj.optNullableString("versionTitle") ?: continue
+            val url = obj.optNullableString("url") ?: continue
+            val codesArray = obj.optJSONArray("courseCodes") ?: JSONArray()
+            val courseCodes = ArrayList<String>(codesArray.length())
+            for (k in 0 until codesArray.length()) {
+                val rawCode = codesArray.optString(k, "").trim().uppercase()
+                if (rawCode.isNotEmpty() && !codesArray.isNull(k)) {
+                    courseCodes.add(rawCode)
                 }
-            } else {
-                emptyList()
             }
-
-            result.add(
-                UfopCourseCurriculum(
-                    code = code,
-                    name = name,
-                    degree = obj.optString("degree", "").trim(),
-                    campus = obj.optString("campus", "").trim(),
-                    curriculumVersion = obj.optString("curriculumVersion", "").trim(),
-                    chMandatory = obj.optInt("chMandatory", 0).coerceAtLeast(0),
-                    chOptional = obj.optInt("chOptional", 0).coerceAtLeast(0),
-                    chElective = obj.optInt("chElective", 0).coerceAtLeast(0),
-                    chExtension = obj.optInt("chExtension", 0).coerceAtLeast(0),
-                    chActivities = obj.optInt("chActivities", 0).coerceAtLeast(0),
-                    chTotal = obj.optInt("chTotal", 0).coerceAtLeast(0),
-                    status = obj.optString("status", "").trim(),
-                    subjects = subjects
+            if (courseCodes.isEmpty()) continue
+            legacyRefs.add(
+                UfopLegacyReference(
+                    id = id,
+                    courseCodes = courseCodes,
+                    courseName = obj.optNullableString("courseName") ?: "",
+                    academicUnit = obj.optNullableString("academicUnit") ?: "",
+                    versionTitle = versionTitle,
+                    details = obj.optNullableString("details") ?: "",
+                    accessType = obj.optNullableString("accessType") ?: "",
+                    url = url,
+                    effectiveFromYear = obj.optNullableInt("effectiveFromYear"),
+                    effectiveFromSemester = obj.optNullableInt("effectiveFromSemester")?.takeIf { it == 1 || it == 2 },
+                    effectiveUntilYear = obj.optNullableInt("effectiveUntilYear"),
+                    effectiveUntilSemester = obj.optNullableInt("effectiveUntilSemester")?.takeIf { it == 1 || it == 2 },
+                    entryRuleSummary = obj.optNullableString("entryRuleSummary") ?: ""
                 )
             )
         }
-        return result
+
+        val linksObj = root.optJSONObject("courseOfficialLinks")
+        val officialLinks = LinkedHashMap<String, UfopCourseOfficialLinks>(linksObj?.length() ?: 0)
+        if (linksObj != null) {
+            val keys = linksObj.keys()
+            while (keys.hasNext()) {
+                val rawCode = keys.next()
+                val code = rawCode.trim().uppercase()
+                if (code.isEmpty()) continue
+                val entry = linksObj.optJSONObject(rawCode) ?: continue
+                officialLinks[code] = UfopCourseOfficialLinks(
+                    courseCode = code,
+                    officialMatrixUrl = entry.optNullableString("officialMatrixUrl"),
+                    drivePdfUrl = entry.optNullableString("drivePdfUrl"),
+                    sheetStatus = entry.optNullableString("sheetStatus") ?: ""
+                )
+            }
+        }
+
+        return UfopLegacyCatalogData(
+            schemaVersion = schemaVersion,
+            historicalCurricula = historical,
+            legacyReferences = legacyRefs,
+            courseOfficialLinks = officialLinks
+        )
+    }
+
+    private fun parseCourseCurriculumObject(obj: JSONObject): UfopCourseCurriculum? {
+        val code = obj.optNullableString("code")?.uppercase() ?: return null
+        val name = obj.optNullableString("name") ?: return null
+        val curriculumVersion = obj.optNullableString("curriculumVersion") ?: ""
+
+        val explicitFromYear = obj.optNullableInt("effectiveFromYear")
+        val explicitFromSemester = obj.optNullableInt("effectiveFromSemester")?.takeIf { it == 1 || it == 2 }
+        val (effectiveFromYear, effectiveFromSemester) = if (explicitFromYear != null) {
+            explicitFromYear to (explicitFromSemester ?: 1)
+        } else {
+            val parsedTerm = parseSemesterYearTerm(curriculumVersion)
+            if (parsedTerm != null) {
+                // AUT Currículo 3 entrou em vigor em 2026/1 (logo após 2024/1–2025/2), apesar do rótulo 2026/2 no catálogo base.
+                if (code == "AUT" && parsedTerm.first == 2026 && parsedTerm.second == 2) {
+                    2026 to 1
+                } else {
+                    parsedTerm
+                }
+            } else {
+                2026 to 1
+            }
+        }
+
+        val effectiveUntilYear = obj.optNullableInt("effectiveUntilYear")
+        val effectiveUntilSemester = obj.optNullableInt("effectiveUntilSemester")?.takeIf { it == 1 || it == 2 }
+        val sourceUrl = obj.optNullableString("sourceUrl")
+
+        val subjectsArr = obj.optJSONArray("subjects")
+        val subjects = if (subjectsArr != null && subjectsArr.length() > 0) {
+            ArrayList<UfopCurriculumSubject>(subjectsArr.length()).apply {
+                for (j in 0 until subjectsArr.length()) {
+                    val sObj = subjectsArr.optJSONObject(j) ?: continue
+                    val sCode = sObj.optNullableString("code")?.uppercase() ?: continue
+                    val rawSubjectName = sObj.optNullableString("name") ?: continue
+                    val normalizedSubjectName = normalizeUfopPortugueseText(rawSubjectName)
+                    val prereqArr = sObj.optJSONArray("prerequisites")
+                    val prereqs = if (prereqArr != null && prereqArr.length() > 0) {
+                        ArrayList<String>(prereqArr.length()).apply {
+                            for (k in 0 until prereqArr.length()) {
+                                if (!prereqArr.isNull(k)) {
+                                    val p = prereqArr.optString(k, "").trim()
+                                    if (p.isNotEmpty()) add(p)
+                                }
+                            }
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    add(
+                        UfopCurriculumSubject(
+                            code = sCode,
+                            name = normalizedSubjectName,
+                            departmentId = sObj.optNullableString("departmentId")?.lowercase() ?: "ufop",
+                            departmentCode = sObj.optNullableString("departmentCode")?.uppercase() ?: "UFOP",
+                            period = sObj.optInt("period", 0).coerceIn(0, 12),
+                            type = sObj.optNullableString("type") ?: "Obrigatória",
+                            chs = sObj.optInt("chs", 0).coerceAtLeast(0),
+                            che = sObj.optInt("che", 0).coerceAtLeast(0),
+                            cha = sObj.optInt("cha", 0).coerceAtLeast(0),
+                            weeklyTheory = sObj.optInt("weeklyTheory", 0).coerceAtLeast(0),
+                            weeklyPractice = sObj.optInt("weeklyPractice", 0).coerceAtLeast(0),
+                            prerequisites = prereqs
+                        )
+                    )
+                }
+            }
+        } else {
+            emptyList()
+        }
+
+        return UfopCourseCurriculum(
+            code = code,
+            name = name,
+            degree = obj.optNullableString("degree") ?: "",
+            campus = obj.optNullableString("campus") ?: "",
+            curriculumVersion = curriculumVersion,
+            chMandatory = obj.optInt("chMandatory", 0).coerceAtLeast(0),
+            chOptional = obj.optInt("chOptional", 0).coerceAtLeast(0),
+            chElective = obj.optInt("chElective", 0).coerceAtLeast(0),
+            chExtension = obj.optInt("chExtension", 0).coerceAtLeast(0),
+            chActivities = obj.optInt("chActivities", 0).coerceAtLeast(0),
+            chTotal = obj.optInt("chTotal", 0).coerceAtLeast(0),
+            status = obj.optNullableString("status") ?: "",
+            subjects = subjects,
+            effectiveFromYear = effectiveFromYear,
+            effectiveFromSemester = effectiveFromSemester,
+            effectiveUntilYear = effectiveUntilYear,
+            effectiveUntilSemester = effectiveUntilSemester,
+            sourceUrl = sourceUrl
+        )
     }
 
     fun findCourse(

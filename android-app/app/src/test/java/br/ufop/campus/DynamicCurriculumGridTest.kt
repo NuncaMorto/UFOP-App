@@ -36,6 +36,9 @@ class DynamicCurriculumGridTest {
 
     @Before
     fun setUpCryptoKey() {
+        UfopCurriculumCatalog.setCachedCoursesForTesting(null)
+        UfopCurriculumCatalog.setCachedLegacyCatalogForTesting(null)
+        DynamicCurriculumCatalog.clearCachesForTesting()
         val syntheticKeyBytes = ByteArray(32) { idx -> (0x5A xor (idx * 13 + 5)).toByte() }
         CampusCryptoEngine.setTestKeyOverrideForJvm(SecretKeySpec(syntheticKeyBytes, "AES"))
     }
@@ -43,6 +46,9 @@ class DynamicCurriculumGridTest {
     @After
     fun tearDownCryptoKey() {
         CampusCryptoEngine.setTestKeyOverrideForJvm(null)
+        UfopCurriculumCatalog.setCachedCoursesForTesting(null)
+        UfopCurriculumCatalog.setCachedLegacyCatalogForTesting(null)
+        DynamicCurriculumCatalog.clearCachesForTesting()
     }
 
     @Test
@@ -617,7 +623,8 @@ class DynamicCurriculumGridTest {
         )
 
         val matrix = DynamicCurriculumCatalog.fromCourseCurriculum(syntheticCourse)!!
-        assertEquals("ufop_tst_2026_2", matrix.id)
+        assertEquals("ufop_tst_2026_2_c1", matrix.id)
+        assertEquals(listOf("ufop_tst_2026_2"), matrix.legacyIds)
         assertEquals("2026/2 · Currículo 1", matrix.curriculumLabel)
         assertEquals(2, matrix.totalPeriods)
         assertEquals(100, matrix.requiredActivitiesHours)
@@ -653,7 +660,8 @@ class DynamicCurriculumGridTest {
                 campusHint = "Ouro Preto"
             )
             assertTrue("Query '$query' deveria resolver curso", res.isCourseMatched)
-            assertEquals("ufop_far_2026_2", res.matrix.id)
+            assertEquals("ufop_far_2026_2_c5", res.matrix.id)
+            assertEquals(listOf("ufop_far_2026_2"), res.matrix.legacyIds)
             assertEquals("FAR", res.matrix.courseCode)
             assertEquals("Farmácia", res.matrix.courseName)
             assertEquals("2026/2 · Currículo 5", res.matrix.curriculumLabel)

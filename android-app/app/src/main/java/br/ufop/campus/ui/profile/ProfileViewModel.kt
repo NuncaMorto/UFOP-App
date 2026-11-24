@@ -59,7 +59,8 @@ class ProfileViewModel(
         val campusName: String,
         val earliestSemester: String?,
         val catalogIdentity: Int,
-        val catalogSize: Int
+        val catalogSize: Int,
+        val legacyCatalogRevision: Int
     )
 
     private val scope = CoroutineScope(SupervisorJob() + computeDispatcher)
@@ -266,7 +267,8 @@ class ProfileViewModel(
                 campusName = studentProfile.campusName,
                 earliestSemester = earliestSemester,
                 catalogIdentity = System.identityHashCode(activeCatalog),
-                catalogSize = activeCatalog.size
+                catalogSize = activeCatalog.size,
+                legacyCatalogRevision = UfopCurriculumCatalog.legacyCatalogRevision
             )
 
             if (matrixKey != lastMatrixKey) {

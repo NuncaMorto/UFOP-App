@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.15 — Matrizes Curriculares Históricas, Resolução por Ingresso & Referências Oficiais
+
+- **Android (`1.9.15` · Beta) & iOS (`1.9.15`):**
+  - **33 matrizes curriculares históricas completas (`21` cursos · `1.650` componentes):** integração sincronizada no Android e no iOS de `ufop_matrizes_antigas.json` sem alterar `ufop_matrizes_2026_2.json` nem as matrizes curadas de Eng. de Controle e Automação (`AUT` `2024/1` e `2026/1`).
+  - **Resolução automática por ano/semestre de ingresso:** seleção automática da versão curricular aplicável pela matrícula ou histórico escolar (como `FAR` 2018/2, 2022/1, 2024/1 e 2026/2, `MED`, `AMB`, `LTP`, `EFB`/`EFL` e `ECO`), eliminando avisos falsos de matriz legada quando a versão histórica cobre o ingresso e liberando o seletor de versões para todos os 22 cursos multi-versão.
+  - **4 novos cursos completos na Matriz e na Grade Dinâmica (`D06`, `EST`, `LTI`, `LTT`):** cursos que estavam vazios no catálogo 2026/2 passam a exibir suas matrizes oficiais completas (totalizando `82` matrizes com IDs únicos na Grade Dinâmica).
+  - **42 referências oficiais e links de PPCs:** nova seção expansível **Matrizes anteriores e PPCs oficiais** na Matriz Curricular (expandida automaticamente no modo consulta legada) e botões diretos para abrir `officialMatrixUrl` e PPCs no navegador para cursos ainda sem detalhamento (`IA`, `D05`).
+
+<!-- versionCode: 32 -->
+
+---
+
 ## v1.9.14 — Abertura Direta .ufopgrade, AirDrop, QR Code Offline & Mapa Otimizado
 
 - **Android (`1.9.14` · Beta) & iOS (`1.9.14`):**

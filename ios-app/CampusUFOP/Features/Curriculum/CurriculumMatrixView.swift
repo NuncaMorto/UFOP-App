@@ -15,11 +15,13 @@ public struct CurriculumMatrixView: View {
     @Environment(CampusAppearanceController.self) private var appearance
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.openURL) private var openURL
 
     @State private var selectedCourseCode: String = ""
     @State private var selectedCurriculumVersion: String = ""
     @State private var searchQuery: String = ""
     @State private var showTranscriptPicker: Bool = false
+    @State private var showLegacyReferencesExpanded: Bool = false
     @State private var importError: String?
     @State private var simulatedExtras: [SimulatedExtraSubject] = []
     @State private var newSimCh: Int = 60
@@ -93,6 +95,43 @@ public struct CurriculumMatrixView: View {
         selectedCurriculumVersion = resolved.curriculumVersion
     }
 
+    private var studentEntryTerm: (year: Int, semester: Int)? {
+        let regEntry = UfopCurriculumCatalog.parseEnrollmentYearSemester(store.studentProfile.registrationNumber)
+        let txEntry = earliestTranscriptSemester.flatMap { DynamicCurriculumCatalog.parseSemesterTerm($0) }
+        switch (regEntry, txEntry) {
+        case let (.some(a), .some(b)):
+            return (a.year, a.semester) <= (b.year, b.semester) ? a : b
+        case let (.some(a), .none):
+            return a
+        case let (.none, .some(b)):
+            return b
+        case (.none, .none):
+            return nil
+        }
+    }
+
+    private func compatibilityStatus(for course: UfopCourseCurriculum) -> CurriculumCompatibilityStatus {
+        let earliestTx = earliestTranscriptSemester
+        let txCodes = Set(store.transcriptEntries.map(\.code))
+        return UfopCurriculumCatalog.checkCompatibility(
+            registrationNumber: store.studentProfile.registrationNumber,
+            earliestTranscriptSemester: earliestTx,
+            transcriptCourseCodes: txCodes,
+            course: course
+        )
+    }
+
+    private func openExternalUrl(_ rawUrl: String) {
+        let trimmed = rawUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return
+        }
+        openURL(url)
+    }
+
     public var body: some View {
         let accent = appearance.accentColor.primary(for: colorScheme)
         let hc = appearance.accessibility.highContrastMode
@@ -125,7 +164,18 @@ public struct CurriculumMatrixView: View {
                         courseSelectorCard(course: course, accent: accent, highContrast: hc)
 
                         if let course {
-                            legacyCompatibilityBanner(for: course, highContrast: hc)
+                            let status = compatibilityStatus(for: course)
+                            if status.isLegacyMatrixMismatch {
+                                legacyCompatibilityBanner(status: status, for: course, highContrast: hc)
+                            }
+                            if !course.subjects.isEmpty {
+                                legacyReferencesSection(
+                                    for: course,
+                                    isLegacyMismatch: status.isLegacyMatrixMismatch,
+                                    accent: accent,
+                                    highContrast: hc
+                                )
+                            }
                         }
 
                         creAndSimulatorCard(report: creReport, accent: accent, highContrast: hc)
@@ -152,6 +202,7 @@ public struct CurriculumMatrixView: View {
         }
         .onChange(of: selectedCourseCode) { _, newCode in
             let matched = UfopCurriculumCatalog.allCourses.first(where: { $0.code == newCode })
+            showLegacyReferencesExpanded = false
             resolveInitialVersion(for: matched)
         }
         .fileImporter(
@@ -233,7 +284,10 @@ public struct CurriculumMatrixView: View {
                                         selectedCurriculumVersion = version.curriculumVersion
                                     }
                                 } label: {
-                                    Text(version.curriculumVersion)
+                                    let versionLabel = version.curriculumVersion.isEmpty
+                                        ? "\(version.effectiveFromYear)/\(version.effectiveFromSemester)"
+                                        : version.curriculumVersion
+                                    Text(versionLabel)
                                         .font(.system(size: 12, weight: .bold, design: .rounded))
                                         .foregroundStyle(
                                             isSelected
@@ -254,7 +308,10 @@ public struct CurriculumMatrixView: View {
             }
 
             if let course {
-                Text("\(course.degree) · \(course.curriculumVersion) · \(course.chTotal)h totais")
+                let versionText = course.curriculumVersion.isEmpty
+                    ? "\(course.effectiveFromYear)/\(course.effectiveFromSemester)"
+                    : course.curriculumVersion
+                Text("\(course.degree) · \(versionText) · \(course.chTotal)h totais")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
             }
@@ -263,37 +320,161 @@ public struct CurriculumMatrixView: View {
         .liquidGlassCard(tint: accent, highContrast: highContrast)
     }
 
+    private func legacyCompatibilityBanner(
+        status: CurriculumCompatibilityStatus,
+        for course: UfopCourseCurriculum,
+        highContrast: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(Color(hex: 0xF59E0B))
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Atenção: Matriz Curricular Legada (< \(course.effectiveFromYear)/\(course.effectiveFromSemester))")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                Text("Ingresso detectado (\(status.studentEntryLabel ?? "anterior")) pode seguir PPC anterior ao currículo de referência \(status.matrixVersionLabel). Algumas disciplinas e pré-requisitos podem divergir.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0xF59E0B).opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(hex: 0xF59E0B).opacity(0.4), lineWidth: 1))
+    }
+
     @ViewBuilder
-    private func legacyCompatibilityBanner(for course: UfopCourseCurriculum, highContrast: Bool) -> some View {
-        let earliestTx = earliestTranscriptSemester
-        let txCodes = Set(store.transcriptEntries.map(\.code))
-        let status = UfopCurriculumCatalog.checkCompatibility(
-            registrationNumber: store.studentProfile.registrationNumber,
-            earliestTranscriptSemester: earliestTx,
-            transcriptCourseCodes: txCodes,
-            course: course
-        )
+    private func legacyReferencesSection(
+        for course: UfopCourseCurriculum,
+        isLegacyMismatch: Bool,
+        accent: Color,
+        highContrast: Bool
+    ) -> some View {
+        let allRefs = UfopCurriculumCatalog.legacyReferences(for: course.code)
+        let entryRefs: [UfopLegacyReference] = {
+            if isLegacyMismatch, let entry = studentEntryTerm {
+                let filtered = UfopCurriculumCatalog.legacyReferences(
+                    for: course.code,
+                    entryYear: entry.year,
+                    entrySemester: entry.semester
+                )
+                return filtered.isEmpty ? allRefs : filtered
+            }
+            return allRefs
+        }()
+        let officialLinks = UfopCurriculumCatalog.officialLinks(for: course.code)
+        let hasOfficialUrl = !(officialLinks?.officialMatrixUrl ?? "").isEmpty || !(officialLinks?.drivePdfUrl ?? "").isEmpty
 
-        if status.isLegacyMatrixMismatch {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color(hex: 0xF59E0B))
-                    .padding(.top, 2)
+        if !entryRefs.isEmpty || (isLegacyMismatch && hasOfficialUrl) {
+            let expanded = isLegacyMismatch || showLegacyReferencesExpanded
+            VStack(alignment: .leading, spacing: 10) {
+                Button {
+                    if !isLegacyMismatch {
+                        withAnimation(.snappy) {
+                            showLegacyReferencesExpanded.toggle()
+                        }
+                    }
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Matrizes anteriores e PPCs oficiais")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                            Text(
+                                entryRefs.isEmpty
+                                    ? "Links oficiais do curso na UFOP"
+                                    : "\(entryRefs.count) referência(s) oficial(is) para consulta"
+                            )
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                        }
+                        Spacer()
+                        if !isLegacyMismatch {
+                            Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(appearance.accessibility.minTouchHeight)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Atenção: Matriz Curricular Legada (< \(course.effectiveFromYear)/\(course.effectiveFromSemester))")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                    Text("Ingresso detectado (\(status.studentEntryLabel ?? "anterior")) pode seguir PPC anterior ao currículo de referência \(status.matrixVersionLabel). Algumas disciplinas e pré-requisitos podem divergir.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                if expanded {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(entryRefs) { ref in
+                            legacyReferenceRow(ref, accent: accent, highContrast: highContrast)
+                        }
+
+                        if let matrixUrl = officialLinks?.officialMatrixUrl, !matrixUrl.isEmpty {
+                            Button {
+                                openExternalUrl(matrixUrl)
+                            } label: {
+                                Label("Portal oficial UFOP", systemImage: "safari")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundStyle(accent)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
+                            }
+                            .buttonStyle(.plain)
+                            .minimumTouchTarget(appearance.accessibility.minTouchHeight)
+                        }
+                    }
                 }
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0xF59E0B).opacity(0.14)))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(hex: 0xF59E0B).opacity(0.4), lineWidth: 1))
+            .liquidGlassCard(cornerRadius: 16, tint: isLegacyMismatch ? Color(hex: 0xF59E0B) : accent, highContrast: highContrast)
         }
+    }
+
+    private func legacyReferenceRow(
+        _ ref: UfopLegacyReference,
+        accent: Color,
+        highContrast: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
+                Text(ref.versionTitle)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                Spacer(minLength: 6)
+                if !ref.accessType.isEmpty {
+                    Text(ref.accessType)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(accent.opacity(0.14)))
+                }
+            }
+
+            if !ref.entryRuleSummary.isEmpty {
+                Text(ref.entryRuleSummary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+            }
+
+            Button {
+                openExternalUrl(ref.url)
+            } label: {
+                Label("Abrir oficial", systemImage: "arrow.up.right.square")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(accent)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(appearance.accessibility.minTouchHeight)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: highContrast))
+        )
     }
 
     private func creAndSimulatorCard(report: AcademicCreReport, accent: Color, highContrast: Bool) -> some View {
@@ -383,56 +564,108 @@ public struct CurriculumMatrixView: View {
         }
 
         let enrolledCodes = Set(store.filteredDisciplines.map { $0.code.uppercased() })
-        let approvedCodes = Set(store.transcriptEntries.filter { ["AP", "AE", "DP"].contains($0.status) }.map { $0.code.uppercased() })
+        let approvedCodes = Set(store.transcriptEntries.filter { ["AP", "AE", "DE", "DJ"].contains($0.status) }.map { $0.code.uppercased() })
+        let officialLinks = UfopCurriculumCatalog.officialLinks(for: course.code)
+        let courseLegacyRefs = UfopCurriculumCatalog.legacyReferences(for: course.code)
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
-                TextField("Filtrar código ou disciplina na matriz", text: $searchQuery)
-                    .font(.system(size: 14))
-            }
-            .padding(12)
-            .liquidGlassCard(cornerRadius: 14, highContrast: highContrast)
+            if course.subjects.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundStyle(Color(hex: 0xF59E0B))
+                        Text("Resumo 2026/2 · Detalhamento PDF pendente na fonte pública")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                    }
 
-            ForEach(periods, id: \.self) { period in
-                let items = filtered.filter { $0.period == period }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(period == 0 ? "Atividades Complementares / Estágio / TCC" : "\(period)º Período")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(accent)
+                    Text("As cargas horárias totais de \(course.name) já estão sincronizadas (\(course.chTotal)h totais). Você pode consultar a matriz completa diretamente nas páginas oficiais da UFOP.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
-                    ForEach(items) { subject in
-                        let codeUpper = subject.code.uppercased()
-                        let statusBadge: (String, Color) = {
-                            if approvedCodes.contains(codeUpper) { return ("Concluída", CampusTheme.algebraGreen) }
-                            if enrolledCodes.contains(codeUpper) { return ("Cursando", CampusTheme.mathBlue) }
-                            return ("\(subject.chs)h", CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
-                        }()
-
-                        HStack(alignment: .top, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("\(subject.code) · \(subject.name)")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                                if !subject.prerequisites.isEmpty {
-                                    Text("Pré-req.: \(subject.prerequisites.joined(separator: ", "))")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
-                                }
-                            }
-
-                            Spacer()
-
-                            Text(statusBadge.0)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(statusBadge.1)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Capsule().fill(statusBadge.1.opacity(0.14)))
+                    if let matrixUrl = officialLinks?.officialMatrixUrl, !matrixUrl.isEmpty {
+                        Button {
+                            openExternalUrl(matrixUrl)
+                        } label: {
+                            Label("Abrir matriz oficial no navegador", systemImage: "safari")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(appearance.accentColor.onPrimary(for: colorScheme))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .liquidGlassCapsule(selected: true, accent: accent, interactive: true, highContrast: highContrast)
                         }
-                        .padding(12)
-                        .liquidGlassCard(cornerRadius: 14, highContrast: highContrast)
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(appearance.accessibility.minTouchHeight)
+                    }
+
+                    if let driveUrl = officialLinks?.drivePdfUrl, !driveUrl.isEmpty {
+                        Button {
+                            openExternalUrl(driveUrl)
+                        } label: {
+                            Label("Abrir PDF oficial", systemImage: "doc.text")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(accent)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(appearance.accessibility.minTouchHeight)
+                    }
+
+                    ForEach(courseLegacyRefs) { ref in
+                        legacyReferenceRow(ref, accent: accent, highContrast: highContrast)
+                    }
+                }
+                .padding(16)
+                .liquidGlassCard(tint: accent, highContrast: highContrast)
+            } else {
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+                    TextField("Filtrar código ou disciplina na matriz", text: $searchQuery)
+                        .font(.system(size: 14))
+                }
+                .padding(12)
+                .liquidGlassCard(cornerRadius: 14, highContrast: highContrast)
+
+                ForEach(periods, id: \.self) { period in
+                    let items = filtered.filter { $0.period == period }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(period == 0 ? "Atividades Complementares / Estágio / TCC" : "\(period)º Período")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(accent)
+
+                        ForEach(items) { subject in
+                            let codeUpper = subject.code.uppercased()
+                            let statusBadge: (String, Color) = {
+                                if approvedCodes.contains(codeUpper) { return ("Concluída", CampusTheme.algebraGreen) }
+                                if enrolledCodes.contains(codeUpper) { return ("Cursando", CampusTheme.mathBlue) }
+                                return ("\(subject.chs)h", CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                            }()
+
+                            HStack(alignment: .top, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("\(subject.code) · \(subject.name)")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                                    if !subject.prerequisites.isEmpty {
+                                        Text("Pré-req.: \(subject.prerequisites.joined(separator: ", "))")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+                                    }
+                                }
+
+                                Spacer()
+
+                                Text(statusBadge.0)
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundStyle(statusBadge.1)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(statusBadge.1.opacity(0.14)))
+                            }
+                            .padding(12)
+                            .liquidGlassCard(cornerRadius: 14, highContrast: highContrast)
+                        }
                     }
                 }
             }

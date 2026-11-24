@@ -13,7 +13,8 @@ private enum DynamicGridSingleMatrixCache {
     private static var cache: [String: DynamicCurriculumMatrix] = [:]
 
     static func matrix(for course: UfopCourseCurriculum) -> DynamicCurriculumMatrix? {
-        let key = "\(course.code.uppercased())|\(course.curriculumVersion)|\(course.subjects.count)|\(course.chTotal)"
+        let untilKey = course.effectiveUntilYear.map(String.init) ?? "open"
+        let key = "\(course.code.uppercased())|\(course.curriculumVersion)|\(course.effectiveFromYear)/\(course.effectiveFromSemester)|\(untilKey)|\(course.subjects.count)|\(course.chTotal)"
         lock.lock()
         if let hit = cache[key] {
             lock.unlock()
@@ -26,7 +27,7 @@ private enum DynamicGridSingleMatrixCache {
         }
 
         lock.lock()
-        if cache.count > 128 {
+        if cache.count > 256 {
             cache.removeAll(keepingCapacity: true)
         }
         cache[key] = built
@@ -82,9 +83,27 @@ public extension DynamicCurriculumCatalog {
             let lName = normalizeLookupText(lhs.matrix.courseName)
             let rName = normalizeLookupText(rhs.matrix.courseName)
             if lName != rName { return lName < rName }
-            return lhs.matrix.effectiveFrom < rhs.matrix.effectiveFrom
+            if lhs.matrix.effectiveFrom != rhs.matrix.effectiveFrom {
+                return lhs.matrix.effectiveFrom < rhs.matrix.effectiveFrom
+            }
+            let lNum = extractCurriculumNumber(lhs.matrix.curriculumLabel) ?? Int.max
+            let rNum = extractCurriculumNumber(rhs.matrix.curriculumLabel) ?? Int.max
+            if lNum != rNum { return lNum < rNum }
+            return lhs.matrix.curriculumLabel < rhs.matrix.curriculumLabel
         }
         .map(\.matrix)
+    }
+
+    private static func isLowerMatrixVersion(_ lhs: DynamicCurriculumMatrix, _ rhs: DynamicCurriculumMatrix) -> Bool {
+        if lhs.effectiveFrom != rhs.effectiveFrom {
+            return lhs.effectiveFrom < rhs.effectiveFrom
+        }
+        let lNum = extractCurriculumNumber(lhs.curriculumLabel) ?? 0
+        let rNum = extractCurriculumNumber(rhs.curriculumLabel) ?? 0
+        if lNum != rNum {
+            return lNum < rNum
+        }
+        return lhs.curriculumLabel < rhs.curriculumLabel
     }
 
     static func loadCompletedCodesWithLegacyFallback(
@@ -138,9 +157,23 @@ public extension DynamicCurriculumCatalog {
             if !curatedMatches.isEmpty {
                 byCatalogCode = curatedMatches
             } else {
-                byCatalogCode = catalogCourses
-                    .filter { $0.code.caseInsensitiveCompare(matchedCatalog.code) == .orderedSame }
-                    .compactMap { DynamicGridSingleMatrixCache.matrix(for: $0) }
+                var seenIds: Set<String> = []
+                var expanded: [DynamicCurriculumMatrix] = []
+                for version in UfopCurriculumCatalog.courseVersions(for: matchedCatalog) {
+                    if let matrix = DynamicGridSingleMatrixCache.matrix(for: version),
+                       seenIds.insert(matrix.id).inserted {
+                        expanded.append(matrix)
+                    }
+                }
+                for course in catalogCourses where course.code.caseInsensitiveCompare(matchedCatalog.code) == .orderedSame {
+                    for version in UfopCurriculumCatalog.courseVersions(for: course) {
+                        if let matrix = DynamicGridSingleMatrixCache.matrix(for: version),
+                           seenIds.insert(matrix.id).inserted {
+                            expanded.append(matrix)
+                        }
+                    }
+                }
+                byCatalogCode = expanded
             }
             if byCatalogCode.isEmpty {
                 return DynamicMatrixResolution(
@@ -183,7 +216,7 @@ public extension DynamicCurriculumCatalog {
                 matrix.effectiveFrom <= entryTerm &&
                     (matrix.effectiveUntil.map { entryTerm <= $0 } ?? true)
             }
-            if let bestExact = exactMatches.max(by: { $0.effectiveFrom < $1.effectiveFrom }) {
+            if let bestExact = exactMatches.max(by: isLowerMatrixVersion) {
                 return DynamicMatrixResolution(
                     matrix: bestExact,
                     studentEntryTerm: entryTerm,
@@ -193,7 +226,7 @@ public extension DynamicCurriculumCatalog {
                 )
             }
 
-            if let oldest = courseMatrices.min(by: { $0.effectiveFrom < $1.effectiveFrom }),
+            if let oldest = courseMatrices.min(by: isLowerMatrixVersion),
                entryTerm < oldest.effectiveFrom {
                 return DynamicMatrixResolution(
                     matrix: oldest,
@@ -205,8 +238,8 @@ public extension DynamicCurriculumCatalog {
             }
         }
 
-        let latest = courseMatrices.first(where: { $0.effectiveUntil == nil })
-            ?? courseMatrices.max(by: { $0.effectiveFrom < $1.effectiveFrom })
+        let latest = courseMatrices.filter { $0.effectiveUntil == nil }.max(by: isLowerMatrixVersion)
+            ?? courseMatrices.max(by: isLowerMatrixVersion)
             ?? defaultMatrix
 
         return DynamicMatrixResolution(

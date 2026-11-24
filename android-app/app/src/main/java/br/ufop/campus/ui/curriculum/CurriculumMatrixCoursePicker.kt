@@ -1,6 +1,17 @@
 package br.ufop.campus.ui.curriculum
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +29,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -32,8 +46,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -42,11 +61,25 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.curriculum.CurriculumCompatibilityStatus
 import br.ufop.campus.core.curriculum.UfopCourseCurriculum
+import br.ufop.campus.core.curriculum.UfopCourseOfficialLinks
+import br.ufop.campus.core.curriculum.UfopLegacyReference
 import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+
+internal fun openExternalCurriculumUrl(context: Context, rawUrl: String) {
+    val cleanUrl = rawUrl.trim()
+    if (cleanUrl.isEmpty()) return
+    val parsed = runCatching { Uri.parse(cleanUrl) }.getOrNull() ?: return
+    val scheme = parsed.scheme?.lowercase()
+    if (scheme != "http" && scheme != "https") return
+    val intent = Intent(Intent.ACTION_VIEW, parsed).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(intent) }
+}
 
 @Composable
 internal fun CurriculumMatrixTopBar(
@@ -153,7 +186,9 @@ internal fun CurriculumVersionSelectorCard(
             ) {
                 availableVersions.forEach { version ->
                     val isVersionSelected = version.curriculumVersion == selectedCurriculumVersion
-                    val versionLabel = version.curriculumVersion.ifBlank { "2026/2 (Currículo 3)" }
+                    val versionLabel = version.curriculumVersion.ifBlank {
+                        "${version.effectiveFromYear}/${version.effectiveFromSemester}"
+                    }
                     FilterChip(
                         selected = isVersionSelected,
                         onClick = { onSelectVersion(version.curriculumVersion) },
@@ -187,9 +222,11 @@ internal fun CurriculumVersionSelectorCard(
 
 @Composable
 internal fun LegacyMatrixConsultationBanner(
-    compatibility: CurriculumCompatibilityStatus
+    compatibility: CurriculumCompatibilityStatus,
+    course: UfopCourseCurriculum
 ) {
-    val entryLabel = compatibility.studentEntryLabel ?: "anterior a 2026/1"
+    val effectiveStartLabel = "${course.effectiveFromYear}/${course.effectiveFromSemester}"
+    val entryLabel = compatibility.studentEntryLabel ?: "anterior a $effectiveStartLabel"
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -220,7 +257,7 @@ internal fun LegacyMatrixConsultationBanner(
                 )
             }
             Text(
-                text = "Sua matrícula ($entryLabel) precede a atualização de matriz curricular de 2026/1. Por isso, marcações de \"Já cursada\", \"Disponível\" e \"Falta pré-requisito\" foram ocultadas para evitar divergências com sua grade original.",
+                text = "Sua matrícula ($entryLabel) ou histórico diverge da vigência desta matriz ($effectiveStartLabel). Por isso, marcações de \"Já cursada\", \"Disponível\" e \"Falta pré-requisito\" foram ocultadas para evitar divergências com sua grade original.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -230,6 +267,245 @@ internal fun LegacyMatrixConsultationBanner(
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+private fun formatReferenceValidity(ref: UfopLegacyReference): String? {
+    val fromLabel = ref.effectiveFromYear?.let { year ->
+        "$year/${ref.effectiveFromSemester ?: 1}"
+    }
+    val untilLabel = ref.effectiveUntilYear?.let { year ->
+        "$year/${ref.effectiveUntilSemester ?: 2}"
+    }
+    return when {
+        fromLabel != null && untilLabel != null -> "Vigência: $fromLabel – $untilLabel"
+        fromLabel != null -> "Vigência a partir de $fromLabel"
+        untilLabel != null -> "Vigência até $untilLabel"
+        else -> null
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun CurriculumLegacyReferencesCard(
+    references: List<UfopLegacyReference>,
+    officialLinks: UfopCourseOfficialLinks?,
+    initiallyExpanded: Boolean,
+    isLegacyAlertContext: Boolean,
+    isDark: Boolean,
+    reduceMotion: Boolean,
+    minTouchTarget: Dp,
+    onOpenUrl: (String) -> Unit
+) {
+    var isExpanded by rememberSaveable(initiallyExpanded, references.firstOrNull()?.id) {
+        mutableStateOf(initiallyExpanded)
+    }
+    val containerColor = if (isLegacyAlertContext) {
+        StatusCancelledAmber.copy(alpha = 0.08f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val borderColor = if (isLegacyAlertContext) {
+        StatusCancelledAmber.copy(alpha = 0.36f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = minTouchTarget)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "Matrizes anteriores e PPCs oficiais",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                    val subtitle = if (references.isNotEmpty()) {
+                        "${references.size} referência(s) oficial(is) para consulta"
+                    } else {
+                        "Links oficiais do curso na UFOP"
+                    }
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Icon(
+                    imageVector = if (isExpanded) {
+                        Icons.Default.KeyboardArrowUp
+                    } else {
+                        Icons.Default.KeyboardArrowDown
+                    },
+                    contentDescription = if (isExpanded) "Recolher referências" else "Expandir referências",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = if (reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
+                exit = if (reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                    references.forEach { ref ->
+                        LegacyReferenceItemRow(
+                            reference = ref,
+                            isDark = isDark,
+                            minTouchTarget = minTouchTarget,
+                            onOpenUrl = onOpenUrl
+                        )
+                    }
+
+                    val matrixUrl = officialLinks?.officialMatrixUrl?.takeIf { it.isNotBlank() }
+                    val driveUrl = officialLinks?.drivePdfUrl?.takeIf { it.isNotBlank() }
+                    if (matrixUrl != null || driveUrl != null) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (matrixUrl != null) {
+                                OutlinedButton(
+                                    onClick = { onOpenUrl(matrixUrl) },
+                                    modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Portal oficial UFOP")
+                                }
+                            }
+                            if (driveUrl != null) {
+                                OutlinedButton(
+                                    onClick = { onOpenUrl(driveUrl) },
+                                    modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("PDF matriz 2026/2")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LegacyReferenceItemRow(
+    reference: UfopLegacyReference,
+    isDark: Boolean,
+    minTouchTarget: Dp,
+    onOpenUrl: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = reference.versionTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (reference.accessType.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = DepartmentMathBlue.copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            text = reference.accessType,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = accessibleTextColor(DepartmentMathBlue, isDark),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            }
+
+            if (reference.entryRuleSummary.isNotBlank()) {
+                Text(
+                    text = reference.entryRuleSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            formatReferenceValidity(reference)?.let { validity ->
+                Text(
+                    text = validity,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            OutlinedButton(
+                onClick = { onOpenUrl(reference.url) },
+                modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Abrir oficial")
+            }
         }
     }
 }
@@ -436,12 +712,16 @@ internal fun CurriculumConfirmationBanner(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun CurriculumEmptySubjectsNotice(
     course: UfopCourseCurriculum,
     catalogCourseCount: Int,
+    officialLinks: UfopCourseOfficialLinks?,
+    legacyReferences: List<UfopLegacyReference>,
     isDark: Boolean,
     minTouchTarget: Dp,
+    onOpenUrl: (String) -> Unit,
     onOpenCoursePicker: () -> Unit
 ) {
     Surface(
@@ -477,6 +757,65 @@ internal fun CurriculumEmptySubjectsNotice(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            val matrixUrl = officialLinks?.officialMatrixUrl?.takeIf { it.isNotBlank() }
+            val driveUrl = officialLinks?.drivePdfUrl?.takeIf { it.isNotBlank() }
+            if (matrixUrl != null || driveUrl != null) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (matrixUrl != null) {
+                        Button(
+                            onClick = { onOpenUrl(matrixUrl) },
+                            modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                            shape = RoundedCornerShape(22.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Abrir matriz oficial no navegador")
+                        }
+                    }
+                    if (driveUrl != null) {
+                        OutlinedButton(
+                            onClick = { onOpenUrl(driveUrl) },
+                            modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                            shape = RoundedCornerShape(22.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Abrir PDF oficial")
+                        }
+                    }
+                }
+            }
+
+            if (legacyReferences.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                Text(
+                    text = "PPCs e páginas oficiais de referência",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                legacyReferences.forEach { ref ->
+                    LegacyReferenceItemRow(
+                        reference = ref,
+                        isDark = isDark,
+                        minTouchTarget = minTouchTarget,
+                        onOpenUrl = onOpenUrl
+                    )
+                }
+            }
+
             OutlinedButton(
                 onClick = onOpenCoursePicker,
                 modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),

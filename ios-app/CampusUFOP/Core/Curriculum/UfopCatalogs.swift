@@ -65,6 +65,7 @@ public struct UfopCourseCurriculum: Codable, Identifiable, Equatable, Sendable {
     public let effectiveFromSemester: Int
     public let effectiveUntilYear: Int?
     public let effectiveUntilSemester: Int?
+    public let sourceUrl: String?
 
     public var id: String { code }
 
@@ -86,6 +87,7 @@ public struct UfopCourseCurriculum: Codable, Identifiable, Equatable, Sendable {
         case effectiveFromSemester
         case effectiveUntilYear
         case effectiveUntilSemester
+        case sourceUrl
     }
 
     public init(
@@ -105,7 +107,8 @@ public struct UfopCourseCurriculum: Codable, Identifiable, Equatable, Sendable {
         effectiveFromYear: Int = 2026,
         effectiveFromSemester: Int = 1,
         effectiveUntilYear: Int? = nil,
-        effectiveUntilSemester: Int? = nil
+        effectiveUntilSemester: Int? = nil,
+        sourceUrl: String? = nil
     ) {
         self.code = code
         self.name = name
@@ -124,15 +127,18 @@ public struct UfopCourseCurriculum: Codable, Identifiable, Equatable, Sendable {
         self.effectiveFromSemester = effectiveFromSemester
         self.effectiveUntilYear = effectiveUntilYear
         self.effectiveUntilSemester = effectiveUntilSemester
+        self.sourceUrl = sourceUrl
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.code = try container.decode(String.self, forKey: .code)
+        let decodedCode = try container.decode(String.self, forKey: .code)
+        let decodedVersion = try container.decode(String.self, forKey: .curriculumVersion)
+        self.code = decodedCode
         self.name = try container.decode(String.self, forKey: .name)
         self.degree = try container.decode(String.self, forKey: .degree)
         self.campus = try container.decode(String.self, forKey: .campus)
-        self.curriculumVersion = try container.decode(String.self, forKey: .curriculumVersion)
+        self.curriculumVersion = decodedVersion
         self.chMandatory = try container.decode(Int.self, forKey: .chMandatory)
         self.chOptional = try container.decode(Int.self, forKey: .chOptional)
         self.chElective = try container.decode(Int.self, forKey: .chElective)
@@ -141,16 +147,39 @@ public struct UfopCourseCurriculum: Codable, Identifiable, Equatable, Sendable {
         self.chTotal = try container.decode(Int.self, forKey: .chTotal)
         self.status = try container.decode(String.self, forKey: .status)
         self.subjects = try container.decode([UfopCurriculumSubject].self, forKey: .subjects)
-        self.effectiveFromYear = try container.decodeIfPresent(Int.self, forKey: .effectiveFromYear) ?? 2026
-        self.effectiveFromSemester = try container.decodeIfPresent(Int.self, forKey: .effectiveFromSemester) ?? 1
+        let explicitFromYear = try container.decodeIfPresent(Int.self, forKey: .effectiveFromYear)
+        let explicitFromSem = try container.decodeIfPresent(Int.self, forKey: .effectiveFromSemester)
+        if let explicitFromYear {
+            self.effectiveFromYear = explicitFromYear
+            if let explicitFromSem, (explicitFromSem == 1 || explicitFromSem == 2) {
+                self.effectiveFromSemester = explicitFromSem
+            } else {
+                self.effectiveFromSemester = 1
+            }
+        } else if let parsedTerm = UfopCurriculumCatalog.parseSemesterTerm(decodedVersion) {
+            if decodedCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == "AUT",
+               parsedTerm.year == 2026,
+               parsedTerm.semester == 2 {
+                self.effectiveFromYear = 2026
+                self.effectiveFromSemester = 1
+            } else {
+                self.effectiveFromYear = parsedTerm.year
+                self.effectiveFromSemester = parsedTerm.semester
+            }
+        } else {
+            self.effectiveFromYear = 2026
+            self.effectiveFromSemester = 1
+        }
         self.effectiveUntilYear = try container.decodeIfPresent(Int.self, forKey: .effectiveUntilYear)
         self.effectiveUntilSemester = try container.decodeIfPresent(Int.self, forKey: .effectiveUntilSemester)
+        self.sourceUrl = try container.decodeIfPresent(String.self, forKey: .sourceUrl)
     }
 
     public func containsEntryTerm(year: Int, semester: Int) -> Bool {
         let afterStart = (year > effectiveFromYear) || (year == effectiveFromYear && semester >= effectiveFromSemester)
         guard afterStart else { return false }
-        if let untilYear = effectiveUntilYear, let untilSem = effectiveUntilSemester {
+        if let untilYear = effectiveUntilYear {
+            let untilSem = effectiveUntilSemester ?? 2
             return (year < untilYear) || (year == untilYear && semester <= untilSem)
         }
         return true
@@ -159,6 +188,132 @@ public struct UfopCourseCurriculum: Codable, Identifiable, Equatable, Sendable {
     public func isEntryBeforeEffectiveStart(year: Int, semester: Int) -> Bool {
         (year < effectiveFromYear) || (year == effectiveFromYear && semester < effectiveFromSemester)
     }
+}
+
+public struct UfopLegacyReference: Codable, Identifiable, Equatable, Sendable {
+    public let id: String
+    public let courseCodes: [String]
+    public let courseName: String
+    public let academicUnit: String
+    public let versionTitle: String
+    public let details: String
+    public let accessType: String
+    public let url: String
+    public let effectiveFromYear: Int?
+    public let effectiveFromSemester: Int?
+    public let effectiveUntilYear: Int?
+    public let effectiveUntilSemester: Int?
+    public let entryRuleSummary: String
+
+    public init(
+        id: String,
+        courseCodes: [String],
+        courseName: String,
+        academicUnit: String,
+        versionTitle: String,
+        details: String,
+        accessType: String,
+        url: String,
+        effectiveFromYear: Int? = nil,
+        effectiveFromSemester: Int? = nil,
+        effectiveUntilYear: Int? = nil,
+        effectiveUntilSemester: Int? = nil,
+        entryRuleSummary: String = ""
+    ) {
+        self.id = id
+        self.courseCodes = courseCodes
+        self.courseName = courseName
+        self.academicUnit = academicUnit
+        self.versionTitle = versionTitle
+        self.details = details
+        self.accessType = accessType
+        self.url = url
+        self.effectiveFromYear = effectiveFromYear
+        self.effectiveFromSemester = effectiveFromSemester
+        self.effectiveUntilYear = effectiveUntilYear
+        self.effectiveUntilSemester = effectiveUntilSemester
+        self.entryRuleSummary = entryRuleSummary
+    }
+
+    public func matchesEntryTerm(year: Int, semester: Int? = nil) -> Bool {
+        if let fromYear = effectiveFromYear {
+            if let semester {
+                let entryKey = year * 10 + semester
+                let fromKey = fromYear * 10 + (effectiveFromSemester ?? 1)
+                if entryKey < fromKey { return false }
+            } else if year < fromYear {
+                return false
+            }
+        }
+        if let untilYear = effectiveUntilYear {
+            if let semester {
+                let entryKey = year * 10 + semester
+                let untilKey = untilYear * 10 + (effectiveUntilSemester ?? 2)
+                if entryKey > untilKey { return false }
+            } else if year > untilYear {
+                return false
+            }
+        }
+        return true
+    }
+}
+
+public struct UfopCourseOfficialLinks: Equatable, Sendable {
+    public let courseCode: String
+    public let officialMatrixUrl: String?
+    public let drivePdfUrl: String?
+    public let sheetStatus: String
+
+    public init(
+        courseCode: String,
+        officialMatrixUrl: String? = nil,
+        drivePdfUrl: String? = nil,
+        sheetStatus: String = ""
+    ) {
+        self.courseCode = courseCode
+        self.officialMatrixUrl = officialMatrixUrl
+        self.drivePdfUrl = drivePdfUrl
+        self.sheetStatus = sheetStatus
+    }
+}
+
+public struct UfopLegacyCatalogData: Equatable, Sendable {
+    public let schemaVersion: Int
+    public let historicalCurricula: [UfopCourseCurriculum]
+    public let legacyReferences: [UfopLegacyReference]
+    public let courseOfficialLinks: [String: UfopCourseOfficialLinks]
+
+    public static let empty = UfopLegacyCatalogData(
+        schemaVersion: 1,
+        historicalCurricula: [],
+        legacyReferences: [],
+        courseOfficialLinks: [:]
+    )
+
+    public init(
+        schemaVersion: Int,
+        historicalCurricula: [UfopCourseCurriculum],
+        legacyReferences: [UfopLegacyReference],
+        courseOfficialLinks: [String: UfopCourseOfficialLinks]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.historicalCurricula = historicalCurricula
+        self.legacyReferences = legacyReferences
+        self.courseOfficialLinks = courseOfficialLinks
+    }
+}
+
+private struct RawUfopCourseOfficialLinks: Codable {
+    let officialMatrixUrl: String?
+    let drivePdfUrl: String?
+    let sheetStatus: String?
+}
+
+private struct RawUfopLegacyCatalogRoot: Codable {
+    let schemaVersion: Int?
+    let historicalCurricula: [UfopCourseCurriculum]?
+    let legacyReferences: [UfopLegacyReference]?
+    let courseOfficialLinks: [String: RawUfopCourseOfficialLinks]?
 }
 
 private struct UfopCurriculumRoot: Codable {
@@ -314,9 +469,107 @@ public enum UfopCurriculumCatalog {
         )
     }()
 
-    public static let historicalCourseVersions: [String: [UfopCourseCurriculum]] = [
+    private static let curriculumNumberRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"curr[ií]culo\s+(\d+)"#,
+        options: [.caseInsensitive]
+    )
+
+    internal static func extractCurriculumNumber(_ rawVersion: String) -> Int? {
+        guard let regex = curriculumNumberRegex,
+              let match = regex.firstMatch(in: rawVersion, range: NSRange(rawVersion.startIndex..., in: rawVersion)),
+              let range = Range(match.range(at: 1), in: rawVersion) else {
+            return nil
+        }
+        return Int(rawVersion[range])
+    }
+
+    private static func normalizeVersionKey(_ rawVersion: String) -> String {
+        rawVersion
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+
+    private static func versionSortPredicate(_ lhs: UfopCourseCurriculum, _ rhs: UfopCourseCurriculum) -> Bool {
+        if lhs.effectiveFromYear != rhs.effectiveFromYear {
+            return lhs.effectiveFromYear < rhs.effectiveFromYear
+        }
+        if lhs.effectiveFromSemester != rhs.effectiveFromSemester {
+            return lhs.effectiveFromSemester < rhs.effectiveFromSemester
+        }
+        let lNum = extractCurriculumNumber(lhs.curriculumVersion) ?? Int.max
+        let rNum = extractCurriculumNumber(rhs.curriculumVersion) ?? Int.max
+        if lNum != rNum {
+            return lNum < rNum
+        }
+        return lhs.curriculumVersion < rhs.curriculumVersion
+    }
+
+    private static let curatedHistoricalCourseVersions: [String: [UfopCourseCurriculum]] = [
         "AUT": [aut2024_1Curriculum]
     ]
+
+    public static func loadLegacyCatalog(from data: Data) -> UfopLegacyCatalogData? {
+        guard let decoded = try? JSONDecoder().decode(RawUfopLegacyCatalogRoot.self, from: data) else {
+            return nil
+        }
+        var normalizedLinks: [String: UfopCourseOfficialLinks] = [:]
+        if let rawLinks = decoded.courseOfficialLinks {
+            for (rawCode, entry) in rawLinks {
+                let codeKey = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                guard !codeKey.isEmpty else { continue }
+                normalizedLinks[codeKey] = UfopCourseOfficialLinks(
+                    courseCode: codeKey,
+                    officialMatrixUrl: entry.officialMatrixUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                    drivePdfUrl: entry.drivePdfUrl?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                    sheetStatus: entry.sheetStatus?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                )
+            }
+        }
+        return UfopLegacyCatalogData(
+            schemaVersion: decoded.schemaVersion ?? 1,
+            historicalCurricula: decoded.historicalCurricula ?? [],
+            legacyReferences: decoded.legacyReferences ?? [],
+            courseOfficialLinks: normalizedLinks
+        )
+    }
+
+    public static let legacyCatalog: UfopLegacyCatalogData = {
+        guard let url = Bundle.main.url(forResource: "ufop_matrizes_antigas", withExtension: "json", subdirectory: "Data")
+            ?? Bundle.main.url(forResource: "ufop_matrizes_antigas", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let parsed = loadLegacyCatalog(from: data) else {
+            return .empty
+        }
+        return parsed
+    }()
+
+    public static let historicalCourseVersions: [String: [UfopCourseCurriculum]] = {
+        var grouped: [String: [UfopCourseCurriculum]] = [:]
+        for (rawCode, versions) in curatedHistoricalCourseVersions {
+            let codeKey = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            var list = grouped[codeKey] ?? []
+            for item in versions {
+                let verKey = normalizeVersionKey(item.curriculumVersion)
+                if !list.contains(where: { normalizeVersionKey($0.curriculumVersion) == verKey }) {
+                    list.append(item)
+                }
+            }
+            grouped[codeKey] = list
+        }
+        for item in legacyCatalog.historicalCurricula {
+            let codeKey = item.code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            guard !codeKey.isEmpty else { continue }
+            var list = grouped[codeKey] ?? []
+            let verKey = normalizeVersionKey(item.curriculumVersion)
+            if !list.contains(where: { normalizeVersionKey($0.curriculumVersion) == verKey }) {
+                list.append(item)
+            }
+            grouped[codeKey] = list
+        }
+        return grouped.mapValues { $0.sorted(by: versionSortPredicate) }
+    }()
 
     public static let allCourses: [UfopCourseCurriculum] = {
         guard let url = Bundle.main.url(forResource: "ufop_matrizes_2026_2", withExtension: "json", subdirectory: "Data")
@@ -328,28 +581,46 @@ public enum UfopCurriculumCatalog {
         return decoded.courses
     }()
 
-    public static func courseVersions(for courseCode: String) -> [UfopCourseCurriculum] {
-        let upper = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    private static func mergeAndSortVersions(
+        baseCourse: UfopCourseCurriculum,
+        historical: [UfopCourseCurriculum]
+    ) -> [UfopCourseCurriculum] {
+        guard !historical.isEmpty else { return [baseCourse] }
         var versions: [UfopCourseCurriculum] = []
-        if let base = allCourses.first(where: { $0.code.uppercased() == upper }) {
-            versions.append(base)
-        }
-        if let historical = historicalCourseVersions[upper] {
-            for item in historical where !versions.contains(where: { $0.curriculumVersion == item.curriculumVersion }) {
+        var seenKeys: Set<String> = []
+        for item in historical {
+            let key = normalizeVersionKey(item.curriculumVersion)
+            if seenKeys.insert(key).inserted {
                 versions.append(item)
             }
         }
-        return versions.sorted { lhs, rhs in
-            if lhs.effectiveFromYear != rhs.effectiveFromYear {
-                return lhs.effectiveFromYear > rhs.effectiveFromYear
+        let hasDetailedHistorical = versions.contains { !$0.subjects.isEmpty }
+        let shouldIncludeBase = !baseCourse.subjects.isEmpty || !hasDetailedHistorical
+        if shouldIncludeBase {
+            let baseKey = normalizeVersionKey(baseCourse.curriculumVersion)
+            if seenKeys.insert(baseKey).inserted {
+                versions.append(baseCourse)
             }
-            return lhs.effectiveFromSemester > rhs.effectiveFromSemester
         }
+        if versions.isEmpty {
+            return [baseCourse]
+        }
+        return versions.sorted(by: versionSortPredicate)
+    }
+
+    public static func courseVersions(for courseCode: String) -> [UfopCourseCurriculum] {
+        let upper = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let historical = historicalCourseVersions[upper] ?? []
+        if let base = allCourses.first(where: { $0.code.uppercased() == upper }) {
+            return mergeAndSortVersions(baseCourse: base, historical: historical)
+        }
+        return historical.sorted(by: versionSortPredicate)
     }
 
     public static func courseVersions(for course: UfopCourseCurriculum) -> [UfopCourseCurriculum] {
-        let byCode = courseVersions(for: course.code)
-        return byCode.isEmpty ? [course] : byCode
+        let upper = course.code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let historical = historicalCourseVersions[upper] ?? []
+        return mergeAndSortVersions(baseCourse: course, historical: historical)
     }
 
     public static func resolveCourseForStudent(
@@ -358,7 +629,10 @@ public enum UfopCurriculumCatalog {
         earliestTranscriptSemester: String?
     ) -> UfopCourseCurriculum {
         let versions = courseVersions(for: baseCourse)
-        guard versions.count > 1 else { return baseCourse }
+        guard !versions.isEmpty else { return baseCourse }
+        if versions.count == 1 { return versions[0] }
+
+        let latestVersion = versions.last(where: { $0.effectiveUntilYear == nil }) ?? versions.last ?? baseCourse
 
         let regEntry = parseEnrollmentYearSemester(registrationNumber)
         let txEntry = earliestTranscriptSemester.flatMap { parseSemesterTerm($0) }
@@ -376,18 +650,38 @@ public enum UfopCurriculumCatalog {
             }
         }()
 
-        guard let entry = effectiveEntry else { return baseCourse }
+        guard let entry = effectiveEntry else { return latestVersion }
 
-        if let exactMatch = versions.first(where: { $0.containsEntryTerm(year: entry.year, semester: entry.semester) }) {
+        if let exactMatch = versions.last(where: { $0.containsEntryTerm(year: entry.year, semester: entry.semester) }) {
             return exactMatch
         }
 
-        if let oldest = versions.min(by: { ($0.effectiveFromYear, $0.effectiveFromSemester) < ($1.effectiveFromYear, $1.effectiveFromSemester) }),
+        if let oldest = versions.first,
            oldest.isEntryBeforeEffectiveStart(year: entry.year, semester: entry.semester) {
             return oldest
         }
 
-        return baseCourse
+        return latestVersion
+    }
+
+    public static func legacyReferences(
+        for courseCode: String,
+        entryYear: Int? = nil,
+        entrySemester: Int? = nil
+    ) -> [UfopLegacyReference] {
+        let upper = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !upper.isEmpty else { return [] }
+        let matching = legacyCatalog.legacyReferences.filter { ref in
+            ref.courseCodes.contains { $0.caseInsensitiveCompare(upper) == .orderedSame }
+        }
+        guard let entryYear else { return matching }
+        return matching.filter { $0.matchesEntryTerm(year: entryYear, semester: entrySemester) }
+    }
+
+    public static func officialLinks(for courseCode: String) -> UfopCourseOfficialLinks? {
+        let upper = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !upper.isEmpty else { return nil }
+        return legacyCatalog.courseOfficialLinks[upper]
     }
 
     public static func findCourse(matching query: String) -> UfopCourseCurriculum? {
@@ -661,7 +955,7 @@ public enum UfopCurriculumCatalog {
         return (1969...2099).contains(full) ? full : nil
     }
 
-    private static func parseSemesterTerm(_ raw: String) -> (year: Int, semester: Int)? {
+    internal static func parseSemesterTerm(_ raw: String) -> (year: Int, semester: Int)? {
         let pattern = #"(?:^|\D)(\d{4}|\d{2})\s*[./-]\s*([12])(?:\D|$)"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)),
@@ -678,6 +972,12 @@ public enum UfopCurriculumCatalog {
         raw.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "pt_BR"))
             .replacingOccurrences(of: #"[^a-z0-9]+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
