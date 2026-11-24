@@ -6,7 +6,7 @@ import Foundation
 
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let xcframeworkPath = packageDir
-    .appendingPathComponent("../rust-core/target/ios/CampusCoreFFI.xcframework")
+    .appendingPathComponent("Frameworks/CampusCoreFFI.xcframework")
     .standardizedFileURL
     .path
 
@@ -28,7 +28,7 @@ if hasCompiledXCFramework {
     targets.insert(
         .binaryTarget(
             name: "CampusCoreFFI",
-            path: "../rust-core/target/ios/CampusCoreFFI.xcframework"
+            path: "Frameworks/CampusCoreFFI.xcframework"
         ),
         at: 0
     )

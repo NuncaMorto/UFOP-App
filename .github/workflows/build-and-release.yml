@@ -14,7 +14,7 @@ on:
           - android
           - both
       release_tag:
-        description: "Tag da Release (ex.: v1.9.6) para anexar os binários compilados (opcional)"
+        description: "Tag da Release (ex.: v1.9.15) para anexar os binários compilados (opcional)"
         required: false
         default: ""
         type: string
@@ -35,12 +35,268 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-and-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  prepare:
+    name: Resolve & Validate Release Metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      version: ${{ steps.meta.outputs.version }}
+      version_code: ${{ steps.meta.outputs.version_code }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      android_build_type: ${{ steps.meta.outputs.android_build_type }}
+      should_release: ${{ steps.meta.outputs.should_release }}
+      run_android: ${{ steps.meta.outputs.run_android }}
+      run_ios: ${{ steps.meta.outputs.run_ios }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Resolve version & platform matrix
+        id: meta
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+            [[ "${TAG}" == v* ]] || TAG="v${TAG}"
+          else
+            RAW_VER="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-app/app/build.gradle.kts | head -n 1)"
+            if [[ -z "${RAW_VER}" ]]; then
+              echo "::error::Não foi possível ler versionName em android-app/app/build.gradle.kts."
+              exit 1
+            fi
+            TAG="v${RAW_VER}"
+          fi
+          VERSION="${TAG#v}"
+
+          VERSION_CODE="$(sed -n 's/.*versionCode *= *\([0-9][0-9]*\).*/\1/p' android-app/app/build.gradle.kts | head -n 1)"
+          if [[ -z "${VERSION_CODE}" ]]; then
+            echo "::error::Não foi possível ler versionCode em android-app/app/build.gradle.kts."
+            exit 1
+          fi
+
+          INPUT_PRE="${{ github.event.inputs.prerelease }}"
+          if [[ "${TAG}" == *-* ]]; then
+            IS_PRERELEASE="true"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${INPUT_PRE}" == "true" ]] || { [[ -z "${INPUT_PRE}" ]] && [[ "${GITHUB_REF_NAME}" == "develop" ]]; }; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+
+          WANT_RELEASE_APK="false"
+          if [[ "${{ github.event.inputs.android_build_type }}" == "release" ]] || { [[ "${GITHUB_REF}" == refs/tags/v* ]] && [[ "${IS_PRERELEASE}" == "false" ]]; }; then
+            WANT_RELEASE_APK="true"
+          fi
+
+          if [[ "${WANT_RELEASE_APK}" == "true" && -n "${KEYSTORE_B64}" ]]; then
+            BUILD_TYPE="release"
+          else
+            if [[ "${WANT_RELEASE_APK}" == "true" && -z "${KEYSTORE_B64}" ]]; then
+              echo "::warning::Build release solicitado, mas o secret ANDROID_KEYSTORE_BASE64 não está configurado; gerando debug APK."
+            fi
+            BUILD_TYPE="debug"
+          fi
+
+          SHOULD_RELEASE="false"
+          if [[ "${GITHUB_REF}" == refs/tags/v* || -n "${{ github.event.inputs.release_tag }}" ]]; then
+            SHOULD_RELEASE="true"
+          fi
+
+          PLATFORM="${{ github.event.inputs.platform }}"
+          RUN_ANDROID="false"
+          RUN_IOS="false"
+          if [[ "${GITHUB_REF}" == refs/tags/v* || "${PLATFORM}" == "both" ]]; then
+            RUN_ANDROID="true"
+            RUN_IOS="true"
+          elif [[ "${PLATFORM}" == "android" ]]; then
+            RUN_ANDROID="true"
+          elif [[ "${PLATFORM}" == "ios" ]]; then
+            RUN_IOS="true"
+          fi
+
+          echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "version_code=${VERSION_CODE}" >> "${GITHUB_OUTPUT}"
+          echo "is_prerelease=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "android_build_type=${BUILD_TYPE}" >> "${GITHUB_OUTPUT}"
+          echo "should_release=${SHOULD_RELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "run_android=${RUN_ANDROID}" >> "${GITHUB_OUTPUT}"
+          echo "run_ios=${RUN_IOS}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate strict version synchronization before releasing
+        if: ${{ steps.meta.outputs.should_release == 'true' }}
+        run: pwsh -NoProfile -File scripts/bump-version.ps1 -Version "${{ steps.meta.outputs.version }}" -Code "${{ steps.meta.outputs.version_code }}" -CheckOnly -Strict
+
+  android-apk:
+    name: Verify Rust, Build FFI & Assemble Android (.apk)
+    needs: prepare
+    if: ${{ needs.prepare.outputs.run_android == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust toolchain (host + Android ABIs)
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          components: rustfmt, clippy
+          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+      - name: Cache Cargo registry, cargo-ndk & build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-ndk
+            target
+          key: ${{ runner.os }}-release-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-release-cargo-
+
+      - name: Ensure cargo-ndk is installed
+        run: |
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+          cargo ndk --version
+
+      - name: Verify Rust core, map assets & UniFFI bindings
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+          pwsh -NoProfile -File scripts/check-map-assets.ps1
+          pwsh -NoProfile -File scripts/sync-uniffi-bindings.ps1 -CheckOnly
+
+      - name: Build Android native library (libcampus_core.so)
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_NDK_HOME:-}" ]]; then
+            if [[ -n "${ANDROID_NDK_LATEST_HOME:-}" && -d "${ANDROID_NDK_LATEST_HOME}" ]]; then
+              export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME}"
+            else
+              SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+              if [[ -d "${SDK_ROOT}/ndk" ]]; then
+                LATEST_NDK="$(ls -1 "${SDK_ROOT}/ndk" | sort -V | tail -n 1)"
+                if [[ -n "${LATEST_NDK}" ]]; then
+                  export ANDROID_NDK_HOME="${SDK_ROOT}/ndk/${LATEST_NDK}"
+                fi
+              fi
+            fi
+          fi
+
+          if [[ -z "${ANDROID_NDK_HOME:-}" || ! -d "${ANDROID_NDK_HOME}" ]]; then
+            echo "::error::ANDROID_NDK_HOME não localizado para compilar libcampus_core.so."
+            exit 1
+          fi
+          echo "Using ANDROID_NDK_HOME=${ANDROID_NDK_HOME}"
+
+          mkdir -p android-app/app/src/main/jniLibs
+          cargo ndk \
+            -t arm64-v8a \
+            -t armeabi-v7a \
+            -t x86_64 \
+            -o android-app/app/src/main/jniLibs \
+            build -p campus_core --release
+
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            SO_FILE="android-app/app/src/main/jniLibs/${abi}/libcampus_core.so"
+            if [[ ! -s "${SO_FILE}" ]]; then
+              echo "::error::Biblioteca nativa ausente ou vazia: ${SO_FILE}"
+              exit 1
+            fi
+            ls -lh "${SO_FILE}"
+          done
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run Android unit tests & assemble APK
+        env:
+          FEEDBACK_RECIPIENT: ${{ secrets.FEEDBACK_RECIPIENT }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          BUILD_TYPE: ${{ needs.prepare.outputs.android_build_type }}
+        run: |
+          set -euo pipefail
+          chmod +x android-app/gradlew
+          cd android-app
+          if [[ "${BUILD_TYPE}" == "release" ]]; then
+            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/ufop-release.jks"
+            export ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/ufop-release.jks"
+            ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon
+          else
+            ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+          fi
+
+      - name: Cleanup temporary keystore
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/ufop-release.jks"
+
+      - name: Package APK, verify embedded .so & compute SHA-256
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_TYPE: ${{ needs.prepare.outputs.android_build_type }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          if [[ "${BUILD_TYPE}" == "release" ]]; then
+            APK_NAME="Vida-Academica-v${VERSION}.apk"
+            cp android-app/app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
+          else
+            APK_NAME="Vida-Academica-v${VERSION}-debug.apk"
+            cp android-app/app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
+          fi
+
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            if ! unzip -l "dist/${APK_NAME}" | grep -q "lib/${abi}/libcampus_core.so"; then
+              echo "::error::APK gerado não contém lib/${abi}/libcampus_core.so!"
+              exit 1
+            fi
+          done
+
+          (cd dist && sha256sum "${APK_NAME}" > "${APK_NAME}.sha256")
+          ls -lh "dist/${APK_NAME}"
+          cat "dist/${APK_NAME}.sha256"
+
+      - name: Upload Android .apk workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: vida-academica-android-apk
+          path: dist/*.apk*
+
   ios-ipa:
     name: Build iOS (.ipa unsigned)
+    needs: prepare
+    if: ${{ needs.prepare.outputs.run_ios == 'true' }}
     runs-on: macos-15
     timeout-minutes: 25
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -68,42 +324,10 @@ jobs:
             brew install xcodegen
           fi
 
-      - name: Resolve version metadata
-        id: meta
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
-            TAG="${{ github.event.inputs.release_tag }}"
-            [[ "${TAG}" == v* ]] || TAG="v${TAG}"
-          else
-            RAW_VER="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-app/app/build.gradle.kts | head -n 1)"
-            TAG="v${RAW_VER:-1.9.6}"
-          fi
-          VERSION="${TAG#v}"
-
-          INPUT_PRE="${{ github.event.inputs.prerelease }}"
-          if [[ "${TAG}" == *-* ]]; then
-            IS_PRERELEASE="true"
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            if [[ "${INPUT_PRE}" == "true" ]] || { [[ -z "${INPUT_PRE}" ]] && [[ "${GITHUB_REF_NAME}" == "develop" ]]; }; then
-              IS_PRERELEASE="true"
-            else
-              IS_PRERELEASE="false"
-            fi
-          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
-            IS_PRERELEASE="true"
-          else
-            IS_PRERELEASE="false"
-          fi
-
-          echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "is_prerelease=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"
-
       - name: Build iOS .ipa (unsigned)
         env:
-          VERSION_OVERRIDE: ${{ steps.meta.outputs.version }}
+          VERSION_OVERRIDE: ${{ needs.prepare.outputs.version }}
+          BUILD_NUMBER_OVERRIDE: ${{ needs.prepare.outputs.version_code }}
         run: |
           chmod +x scripts/build-ios-ipa.sh
           ./scripts/build-ios-ipa.sh
@@ -114,222 +338,103 @@ jobs:
           name: vida-academica-ios-ipa
           path: dist/*.ipa*
 
-      - name: Attach .ipa to GitHub Release
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.meta.outputs.release_tag }}
-          VERSION: ${{ steps.meta.outputs.version }}
-          IS_PRERELEASE: ${{ steps.meta.outputs.is_prerelease }}
-        run: |
-          if ! gh release view "${TAG}" >/dev/null 2>&1; then
-            NOTES_FILE="$(mktemp)"
-            python3 - "${VERSION}" "${NOTES_FILE}" << 'PY'
-          import re, sys
-          from pathlib import Path
-          version, out_path = sys.argv[1], sys.argv[2]
-          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
-          pat = re.compile(rf"^##\s+(?:\[)?v?{re.escape(version)}(?:\b|\]|\s|$)")
-          cap, active = [], False
-          for line in lines:
-              if not active:
-                  if pat.match(line):
-                      active = True
-                      cap.append(line)
-              else:
-                  if line.startswith("## "):
-                      break
-                  cap.append(line)
-          while cap and cap[-1].strip() in ("", "---"):
-              cap.pop()
-          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica v{version}\n"
-          Path(out_path).write_text(text, encoding="utf-8")
-          PY
-            if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release create "${TAG}" --title "Vida Acadêmica ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
-            else
-              gh release create "${TAG}" --title "Vida Acadêmica ${TAG}" --notes-file "${NOTES_FILE}" --latest
-            fi
-          else
-            if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release edit "${TAG}" --prerelease
-            else
-              gh release edit "${TAG}" --prerelease=false --latest
-            fi
-          fi
-          gh release upload "${TAG}" dist/*.ipa dist/*.ipa.sha256 --clobber
-
-  android-apk:
-    name: Verify Rust + Test & Build Android (.apk)
+  publish-release:
+    name: Publish GitHub Release (Atomic)
+    needs: [prepare, android-apk, ios-ipa]
+    if: >-
+      always() &&
+      needs.prepare.result == 'success' &&
+      needs.prepare.outputs.should_release == 'true' &&
+      (needs.android-apk.result == 'success' || needs.android-apk.result == 'skipped') &&
+      (needs.ios-ipa.result == 'success' || needs.ios-ipa.result == 'skipped')
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' }}
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - name: Download built artifacts
+        uses: actions/download-artifact@v7
         with:
-          components: rustfmt, clippy
+          path: release-artifacts
+          merge-multiple: true
 
-      - name: Cache Cargo registry & build
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Verify Rust core
-        run: |
-          cargo fmt --all -- --check
-          cargo clippy --workspace --all-targets -- -D warnings
-          cargo test --workspace
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-
-      - name: Resolve version & build metadata
-        id: meta
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
-            TAG="${{ github.event.inputs.release_tag }}"
-            [[ "${TAG}" == v* ]] || TAG="v${TAG}"
-          else
-            RAW_VER="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' android-app/app/build.gradle.kts | head -n 1)"
-            TAG="v${RAW_VER:-1.9.6}"
-          fi
-          VERSION="${TAG#v}"
-
-          INPUT_PRE="${{ github.event.inputs.prerelease }}"
-          if [[ "${TAG}" == *-* ]]; then
-            IS_PRERELEASE="true"
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            if [[ "${INPUT_PRE}" == "true" ]] || { [[ -z "${INPUT_PRE}" ]] && [[ "${GITHUB_REF_NAME}" == "develop" ]]; }; then
-              IS_PRERELEASE="true"
-            else
-              IS_PRERELEASE="false"
-            fi
-          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
-            IS_PRERELEASE="true"
-          else
-            IS_PRERELEASE="false"
-          fi
-
-          WANT_RELEASE="false"
-          if [[ "${{ github.event.inputs.android_build_type }}" == "release" ]] || { [[ "${GITHUB_REF}" == refs/tags/v* ]] && [[ "${IS_PRERELEASE}" == "false" ]]; }; then
-            WANT_RELEASE="true"
-          fi
-
-          if [[ "${WANT_RELEASE}" == "true" && -n "${KEYSTORE_B64}" ]]; then
-            BUILD_TYPE="release"
-          else
-            if [[ "${WANT_RELEASE}" == "true" && -z "${KEYSTORE_B64}" ]]; then
-              echo "::warning::Build release solicitado, mas o secret ANDROID_KEYSTORE_BASE64 não está configurado; gerando debug APK."
-            fi
-            BUILD_TYPE="debug"
-          fi
-
-          echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "is_prerelease=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"
-          echo "build_type=${BUILD_TYPE}" >> "${GITHUB_OUTPUT}"
-
-      - name: Run Android unit tests & assemble APK
-        env:
-          FEEDBACK_RECIPIENT: ${{ secrets.FEEDBACK_RECIPIENT }}
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          BUILD_TYPE: ${{ steps.meta.outputs.build_type }}
-        run: |
-          chmod +x android-app/gradlew
-          cd android-app
-          if [[ "${BUILD_TYPE}" == "release" ]]; then
-            echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/ufop-release.jks"
-            export ANDROID_KEYSTORE_PATH="${RUNNER_TEMP}/ufop-release.jks"
-            ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon
-          else
-            ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
-          fi
-
-      - name: Cleanup temporary keystore
-        if: always()
-        run: rm -f "${RUNNER_TEMP}/ufop-release.jks"
-
-      - name: Package APK & SHA-256
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-          BUILD_TYPE: ${{ steps.meta.outputs.build_type }}
-        run: |
-          mkdir -p dist
-          if [[ "${BUILD_TYPE}" == "release" ]]; then
-            APK_NAME="Vida-Academica-v${VERSION}.apk"
-            cp android-app/app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
-          else
-            APK_NAME="Vida-Academica-v${VERSION}-debug.apk"
-            cp android-app/app/build/outputs/apk/debug/app-debug.apk "dist/${APK_NAME}"
-          fi
-          (cd dist && sha256sum "${APK_NAME}" > "${APK_NAME}.sha256")
-
-      - name: Upload Android .apk workflow artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: vida-academica-android-apk
-          path: dist/*.apk*
-
-      - name: Attach .apk to GitHub Release
-        if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event.inputs.release_tag != '' }}
+      - name: Prepare release notes, consolidated SHA256SUMS.txt & publish
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.meta.outputs.release_tag }}
-          VERSION: ${{ steps.meta.outputs.version }}
-          IS_PRERELEASE: ${{ steps.meta.outputs.is_prerelease }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
+          IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}
         run: |
-          if ! gh release view "${TAG}" >/dev/null 2>&1; then
-            NOTES_FILE="$(mktemp)"
-            python3 - "${VERSION}" "${NOTES_FILE}" << 'PY'
-          import re, sys
+          set -euo pipefail
+
+          NOTES_FILE="${RUNNER_TEMP}/release-notes.md"
+          python3 scripts/extract-release-notes.py \
+            --version "${VERSION}" \
+            --version-code "${VERSION_CODE}" \
+            --out "${NOTES_FILE}"
+
+          RELEASE_EXISTS="false"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            RELEASE_EXISTS="true"
+            mkdir -p "${RUNNER_TEMP}/prev-sums"
+            gh release download "${TAG}" --pattern "SHA256SUMS.txt" --dir "${RUNNER_TEMP}/prev-sums" || true
+          fi
+
+          python3 - "${RUNNER_TEMP}/prev-sums/SHA256SUMS.txt" "release-artifacts" << 'PY'
+          import hashlib, re, sys
           from pathlib import Path
-          version, out_path = sys.argv[1], sys.argv[2]
-          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
-          pat = re.compile(rf"^##\s+(?:\[)?v?{re.escape(version)}(?:\b|\]|\s|$)")
-          cap, active = [], False
-          for line in lines:
-              if not active:
-                  if pat.match(line):
-                      active = True
-                      cap.append(line)
-              else:
-                  if line.startswith("## "):
-                      break
-                  cap.append(line)
-          while cap and cap[-1].strip() in ("", "---"):
-              cap.pop()
-          text = "\n".join(cap) + "\n" if cap else f"## Vida Acadêmica v{version}\n"
-          Path(out_path).write_text(text, encoding="utf-8")
+
+          prev_file = Path(sys.argv[1])
+          art_dir = Path(sys.argv[2])
+
+          sums: dict[str, str] = {}
+          if prev_file.is_file():
+              for line in prev_file.read_text(encoding="utf-8").splitlines():
+                  m = re.match(r"^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$", line)
+                  if m:
+                      sums[m.group(2).strip()] = m.group(1).lower()
+
+          for p in sorted(art_dir.iterdir()):
+              if p.is_file() and (p.name.endswith(".apk") or p.name.endswith(".ipa")):
+                  digest = hashlib.sha256(p.read_bytes()).hexdigest().lower()
+                  sums[p.name] = digest
+
+          out_lines = [f"{sums[name]}  {name}" for name in sorted(sums)]
+          (art_dir / "SHA256SUMS.txt").write_text("\n".join(out_lines) + "\n", encoding="utf-8")
           PY
+
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            TITLE="Vida Acadêmica ${TAG} (Beta / Testes)"
+          else
+            TITLE="Vida Acadêmica ${TAG}"
+          fi
+
+          if [[ "${RELEASE_EXISTS}" == "false" ]]; then
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release create "${TAG}" --title "Vida Acadêmica ${TAG} (Beta / Testes)" --notes-file "${NOTES_FILE}" --prerelease
+              gh release create "${TAG}" --title "${TITLE}" --notes-file "${NOTES_FILE}" --prerelease
             else
-              gh release create "${TAG}" --title "Vida Acadêmica ${TAG}" --notes-file "${NOTES_FILE}" --latest
+              gh release create "${TAG}" --title "${TITLE}" --notes-file "${NOTES_FILE}" --latest
             fi
           else
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
-              gh release edit "${TAG}" --prerelease
+              gh release edit "${TAG}" --title "${TITLE}" --notes-file "${NOTES_FILE}" --prerelease
             else
-              gh release edit "${TAG}" --prerelease=false --latest
+              gh release edit "${TAG}" --title "${TITLE}" --notes-file "${NOTES_FILE}" --prerelease=false --latest
             fi
           fi
-          gh release upload "${TAG}" dist/*.apk dist/*.apk.sha256 --clobber
+
+          UPLOAD_FILES=()
+          for f in release-artifacts/*; do
+            if [[ -f "${f}" ]]; then
+              UPLOAD_FILES+=("${f}")
+            fi
+          done
+          if [[ "${#UPLOAD_FILES[@]}" -eq 0 ]]; then
+            echo "::error::Nenhum artefato encontrado para publicar na release ${TAG}."
+            exit 1
+          fi
+
+          gh release upload "${TAG}" "${UPLOAD_FILES[@]}" --clobber
+          gh release view "${TAG}" --json tagName,name,url,isPrerelease

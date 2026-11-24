@@ -61,10 +61,12 @@ else
 fi
 
 cp "${BUILD_DIR}/swift/"*.swift "${SWIFT_OUT_DIR}/"
-cp "${BUILD_DIR}/swift/"*.h "${HEADERS_DIR}/"
+cp "${BUILD_DIR}/swift/"*.h "${SWIFT_OUT_DIR}/"
 if ls "${BUILD_DIR}/swift/"*.modulemap >/dev/null 2>&1; then
+  cp "${BUILD_DIR}/swift/"*.modulemap "${SWIFT_OUT_DIR}/"
   cp "${BUILD_DIR}/swift/"*.modulemap "${HEADERS_DIR}/module.modulemap"
 fi
+cp "${BUILD_DIR}/swift/"*.h "${HEADERS_DIR}/"
 
 echo "==> Criando fat static library para iOS Simulator"
 mkdir -p "${BUILD_DIR}/sim"

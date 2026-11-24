@@ -3,6 +3,7 @@ name: Deploy Download Page (GitHub Pages)
 on:
   push:
     branches:
+      # Durante o beta mantemos develop + main; a partir da v1.0.0 estável restringir para main.
       - develop
       - main
     paths:
@@ -29,6 +30,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+
+      - name: Validate download page assets & JS syntax
+        run: |
+          set -euo pipefail
+          test -s docs/index.html
+          test -s docs/styles.css
+          test -s docs/app.js
+          node --check docs/app.js
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

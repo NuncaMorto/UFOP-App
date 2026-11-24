@@ -1,26 +1,20 @@
-param(
-    [Parameter(Mandatory = $true)]
+﻿param(
     [string]$Version,
 
-    [Parameter(Mandatory = $true)]
-    [int]$Code,
+    [int]$Code = 0,
 
     [switch]$CheckOnly,
 
-    [switch]$Strict
+    [switch]$Strict,
+
+    [switch]$BumpPatch,
+
+    [switch]$BumpMinor,
+
+    [switch]$Stable
 )
 
 $ErrorActionPreference = "Stop"
-
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    Write-Error "Invalid SemVer '$Version'. Expected X.Y.Z (e.g., 1.9.13)."
-    exit 1
-}
-
-if ($Code -le 0) {
-    Write-Error "Invalid versionCode '$Code'. Must be > 0."
-    exit 1
-}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
@@ -48,13 +42,23 @@ function Apply-RegexReplace {
     return $rx.Replace($Content, $Replacement)
 }
 
+function Join-PathParts {
+    param(
+        [string]$Base,
+        [string[]]$Parts
+    )
+    $cur = $Base
+    foreach ($p in $Parts) { $cur = Join-Path $cur $p }
+    return $cur
+}
+
 $targets = [ordered]@{
-    buildGradle  = Join-Path $repoRoot "android-app\app\build.gradle.kts"
-    projectYml   = Join-Path $repoRoot "ios-app\project.yml"
-    docsJs       = Join-Path $repoRoot "docs\app.js"
-    docsHtml     = Join-Path $repoRoot "docs\index.html"
-    swiftNotes   = Join-Path $repoRoot "ios-app\CampusUFOP\Features\Profile\ReleaseNotesSheetView.swift"
-    androidNotes = Join-Path $repoRoot "android-app\app\src\main\java\br\ufop\campus\ui\profile\ReleaseNotesDialog.kt"
+    buildGradle  = Join-PathParts $repoRoot @("android-app", "app", "build.gradle.kts")
+    projectYml   = Join-PathParts $repoRoot @("ios-app", "project.yml")
+    docsJs       = Join-PathParts $repoRoot @("docs", "app.js")
+    docsHtml     = Join-PathParts $repoRoot @("docs", "index.html")
+    swiftNotes   = Join-PathParts $repoRoot @("ios-app", "CampusUFOP", "Features", "Profile", "ReleaseNotesSheetView.swift")
+    androidNotes = Join-PathParts $repoRoot @("android-app", "app", "src", "main", "java", "br", "ufop", "campus", "ui", "profile", "ReleaseNotesDialog.kt")
     changelog    = Join-Path $repoRoot "CHANGELOG.md"
 }
 
@@ -63,6 +67,68 @@ foreach ($entry in $targets.GetEnumerator()) {
         Write-Error "Required file not found: $($entry.Value)"
         exit 1
     }
+}
+
+$gradleInitial = Read-Utf8File $targets.buildGradle
+$currentVersion = ""
+$currentCode = 0
+if ($gradleInitial -match '\bversionName\s*=\s*"(\d+\.\d+\.\d+)"') {
+    $currentVersion = $Matches[1]
+}
+if ($gradleInitial -match '\bversionCode\s*=\s*(\d+)') {
+    $currentCode = [int]$Matches[1]
+}
+
+if ($BumpPatch -and $BumpMinor) {
+    Write-Error "Cannot combine -BumpPatch and -BumpMinor."
+    exit 1
+}
+
+if (($BumpPatch -or $BumpMinor) -and $CheckOnly) {
+    Write-Error "Cannot combine -BumpPatch/-BumpMinor with -CheckOnly."
+    exit 1
+}
+
+if ($BumpPatch -or $BumpMinor) {
+    if ($currentVersion -notmatch '^(\d+)\.(\d+)\.(\d+)$' -or $currentCode -le 0) {
+        Write-Error "Failed to parse current versionName/versionCode from $($targets.buildGradle)."
+        exit 1
+    }
+    $maj = [int]$Matches[1]
+    $min = [int]$Matches[2]
+    $pat = [int]$Matches[3]
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        if ($BumpMinor) {
+            $Version = "$maj.$($min + 1).0"
+        } else {
+            $Version = "$maj.$min.$($pat + 1)"
+        }
+    }
+    if ($Code -le 0) {
+        $Code = $currentCode + 1
+    }
+} elseif ($CheckOnly) {
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        $Version = $currentVersion
+    }
+    if ($Code -le 0) {
+        $Code = $currentCode
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($Version) -or $Code -le 0) {
+    Write-Error "Specify -Version <X.Y.Z> -Code <N>, use -BumpPatch / -BumpMinor, or use -CheckOnly."
+    exit 1
+}
+
+if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+    Write-Error "Invalid SemVer '$Version'. Expected X.Y.Z (e.g., 1.9.13)."
+    exit 1
+}
+
+if ($Code -le 0) {
+    Write-Error "Invalid versionCode '$Code'. Must be > 0."
+    exit 1
 }
 
 if (-not $CheckOnly) {
@@ -91,7 +157,8 @@ if (-not $CheckOnly) {
     # 3. docs/app.js
     $jsText = Read-Utf8File $targets.docsJs
     $jsUpdated = Apply-RegexReplace -Content $jsText -Pattern 'releases/tag/v\d+\.\d+\.\d+' -Replacement "releases/tag/v$Version" -Label "FALLBACK URL" -FilePath $targets.docsJs
-    $jsUpdated = Apply-RegexReplace -Content $jsUpdated -Pattern '"v\d+\.\d+\.\d+(\s+[^\r\n"]*Beta")' -Replacement "`"v$Version`$1" -Label "fallback badge" -FilePath $targets.docsJs
+    $badgeReplacement = if ($Stable) { "`$1`"v$Version`"" } else { "`$1`"v$Version · Beta`"" }
+    $jsUpdated = Apply-RegexReplace -Content $jsUpdated -Pattern '(\$\("ver-badge"\)\.textContent\s*=\s*)"v\d+\.\d+\.\d+(?:\s+[^\r\n"]*?Beta)?"' -Replacement $badgeReplacement -Label "fallback badge" -FilePath $targets.docsJs
     $jsUpdated = Apply-RegexReplace -Content $jsUpdated -Pattern '(vers[^\r\n"]*\sv)\d+\.\d+\.\d+(\s+no GitHub)' -Replacement "`${1}$Version`$2" -Label "fallback status" -FilePath $targets.docsJs
     if ($jsUpdated -ne $jsText) {
         Write-Utf8File $targets.docsJs $jsUpdated
@@ -146,8 +213,11 @@ $jsCheck = Read-Utf8File $targets.docsJs
 if ($jsCheck -notmatch "releases/tag/v$vEsc") {
     $errors.Add("docs/app.js FALLBACK tag is not v$Version")
 }
-if ($jsCheck -notmatch "`"v$vEsc\s+") {
+$badgeCheckRx = '\$\("ver-badge"\)\.textContent\s*=\s*"v' + $vEsc + '(?:\s+[^\r\n"]*?Beta)?"'
+if ($jsCheck -notmatch $badgeCheckRx) {
     $errors.Add("docs/app.js fallback badge is not v$Version")
+} elseif ($Stable -and $jsCheck -match ('\$\("ver-badge"\)\.textContent\s*=\s*"v' + $vEsc + '\s+[^\r\n"]*?Beta"')) {
+    $errors.Add("docs/app.js fallback badge still has Beta suffix under -Stable")
 }
 if ($jsCheck -notmatch "\sv$vEsc\s+no GitHub") {
     $errors.Add("docs/app.js fallback status text does not reference v$Version")

@@ -19,8 +19,158 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect Changed Scopes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      android: ${{ steps.filter.outputs.android }}
+      ios: ${{ steps.filter.outputs.ios }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - name: Checkout repository for diff
+        if: ${{ github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/main' }}
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed scopes
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Em dispatch manual ou na branch estável main, roda a suíte completa.
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" || "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "rust=true" >> "${GITHUB_OUTPUT}"
+            echo "android=true" >> "${GITHUB_OUTPUT}"
+            echo "ios=true" >> "${GITHUB_OUTPUT}"
+            echo "docs=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          RUN_ALL="false"
+          FILES=""
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.sha }}"
+            if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              FILES="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
+            else
+              RUN_ALL="true"
+            fi
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            BEFORE_SHA="${{ github.event.before }}"
+            if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" == "0000000000000000000000000000000000000000" ]] || ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+              RUN_ALL="true"
+            else
+              FILES="$(git diff --name-only "${BEFORE_SHA}..${GITHUB_SHA}")"
+            fi
+          else
+            RUN_ALL="true"
+          fi
+
+          if [[ "${RUN_ALL}" == "true" ]]; then
+            echo "rust=true" >> "${GITHUB_OUTPUT}"
+            echo "android=true" >> "${GITHUB_OUTPUT}"
+            echo "ios=true" >> "${GITHUB_OUTPUT}"
+            echo "docs=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          RUST="false"
+          ANDROID="false"
+          IOS="false"
+          DOCS="false"
+
+          if printf '%s\n' "${FILES}" | grep -qE '^(rust-core/|Cargo\.(toml|lock)$|android-app/app/src/main/java/br/ufop/campus/core/uniffi/campus_core\.kt$|ios-app/CampusUFOP/CoreFFI/Generated/|scripts/(verify-core|sync-uniffi-bindings|check-map-assets)\.ps1$|\.github/workflows/ci-quality\.yml$)'; then
+            RUST="true"
+          fi
+          if printf '%s\n' "${FILES}" | grep -qE '^(android-app/|rust-core/src/ffi/|rust-core/src/models\.rs$|rust-core/uniffi\.toml$|\.github/workflows/ci-quality\.yml$)'; then
+            ANDROID="true"
+          fi
+          if printf '%s\n' "${FILES}" | grep -qE '^(ios-app/|scripts/(check-swift-hygiene\.ps1|build-ios-.*\.sh)$)'; then
+            IOS="true"
+          fi
+          if printf '%s\n' "${FILES}" | grep -qE '^docs/'; then
+            DOCS="true"
+          fi
+
+          echo "Changed files:"
+          printf '%s\n' "${FILES}"
+          echo "Scopes -> rust=${RUST}, android=${ANDROID}, ios=${IOS}, docs=${DOCS}"
+
+          echo "rust=${RUST}" >> "${GITHUB_OUTPUT}"
+          echo "android=${ANDROID}" >> "${GITHUB_OUTPUT}"
+          echo "ios=${IOS}" >> "${GITHUB_OUTPUT}"
+          echo "docs=${DOCS}" >> "${GITHUB_OUTPUT}"
+
+  privacy-hygiene:
+    name: Privacy, Version & Asset Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+
+      - name: Verify site JavaScript syntax
+        run: node --check docs/app.js
+
+      - name: Verify Python release helpers syntax
+        run: python3 -m py_compile scripts/extract-release-notes.py
+
+      - name: Validate version synchronization
+        run: pwsh -NoProfile -File scripts/bump-version.ps1 -CheckOnly
+
+      - name: Validate map assets & UniFFI parity
+        run: pwsh -NoProfile -File scripts/check-map-assets.ps1
+
+      - name: Validate iOS Swift hygiene
+        run: pwsh -NoProfile -File scripts/check-swift-hygiene.ps1 -SkipSwiftc
+
+      - name: Check iOS shell scripts syntax
+        run: bash -n scripts/build-ios-xcframework.sh scripts/build-ios-ipa.sh
+
+      - name: Verify blocked files, secrets & store-safe applicationId
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git ls-files | grep -E '(\.(apk|aab|pdf|jks|keystore|p12|pem|key|so|a|xcframework)$|(^|/)jniLibs/|(^|/)local\.properties$|(^|/)\.env($|\..*))' | grep -vE '(^|/)\.env\.example$'; then
+            echo "::error::Arquivo sensível ou binário proibido rastreado no Git."
+            exit 1
+          fi
+
+          if git grep -n -E '(gh[pous]_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,})' -- ':!.github/workflows/ci-quality.yml'; then
+            echo "::error::Possível token ou chave de API encontrado no código."
+            exit 1
+          fi
+
+          if git grep -n -E '[A-Za-z0-9._%+-]+@(gmail|hotmail|outlook|yahoo)\.(com|com\.br)' -- ':!.github/workflows/ci-quality.yml'; then
+            echo "::error::E-mail pessoal literal encontrado em arquivo rastreado."
+            exit 1
+          fi
+
+          if git grep -n -E '([A-Za-z]:\\Users\\[^\\[:space:]]+|/Users/[^/[:space:]]+|/home/[^/[:space:]]+)' -- ':!.github/workflows/ci-quality.yml' ':!AGENTS.md' ':!scripts/build-apk.ps1'; then
+            echo "::error::Caminho absoluto com usuário local encontrado em arquivo rastreado."
+            exit 1
+          fi
+
+          if ! grep -q 'applicationId = "io.github.nuncamorto.vidaacademica"' android-app/app/build.gradle.kts; then
+            echo "::error::applicationId esperado não encontrado em android-app/app/build.gradle.kts."
+            exit 1
+          fi
+
   rust-quality:
-    name: Rust Quality (fmt, clippy, test)
+    name: Rust Quality (fmt, clippy, test & UniFFI sync)
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -40,6 +190,8 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-ci-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-ci-cargo-
 
       - name: Check formatting (rustfmt)
         run: cargo fmt --all -- --check
@@ -50,8 +202,13 @@ jobs:
       - name: Run Rust workspace tests
         run: cargo test --workspace
 
+      - name: Verify UniFFI Kotlin & Swift bindings have zero drift
+        run: pwsh -NoProfile -File scripts/sync-uniffi-bindings.ps1 -CheckOnly
+
   android-quality:
     name: Android Quality (tests & build)
+    needs: changes
+    if: ${{ needs.changes.outputs.android == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -89,57 +246,33 @@ jobs:
           if-no-files-found: ignore
           path: android-app/app/build/reports/lint-results-debug.*
 
-  privacy-hygiene:
-    name: Privacy & Security Hygiene
+  ci-gate:
+    name: CI Quality Gate
+    needs: [changes, privacy-hygiene, rust-quality, android-quality]
+    if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "20"
-
-      - name: Verify site JavaScript syntax
-        run: node --check docs/app.js
-
-      - name: Validate map assets & UniFFI bindings
-        run: pwsh -NoProfile -File scripts/check-map-assets.ps1
-
-      - name: Validate iOS Swift hygiene
-        run: pwsh -NoProfile -File scripts/check-swift-hygiene.ps1 -SkipSwiftc
-
-      - name: Check iOS shell scripts syntax
-        run: bash -n scripts/build-ios-xcframework.sh scripts/build-ios-ipa.sh
-
-      - name: Verify blocked files, secrets & store-safe applicationId
+      - name: Evaluate required job outcomes
         shell: bash
         run: |
           set -euo pipefail
+          CHANGES_RES="${{ needs.changes.result }}"
+          HYGIENE_RES="${{ needs.privacy-hygiene.result }}"
+          RUST_RES="${{ needs.rust-quality.result }}"
+          ANDROID_RES="${{ needs.android-quality.result }}"
 
-          if git ls-files | grep -E '(\.(apk|aab|pdf|jks|keystore|p12|pem|key)$|(^|/)local\.properties$|(^|/)\.env($|\..*))'; then
-            echo "::error::Arquivo sensível ou binário proibido rastreado no Git."
+          echo "Results -> changes=${CHANGES_RES}, privacy-hygiene=${HYGIENE_RES}, rust-quality=${RUST_RES}, android-quality=${ANDROID_RES}"
+
+          if [[ "${CHANGES_RES}" != "success" || "${HYGIENE_RES}" != "success" ]]; then
+            echo "::error::Job obrigatório falhou."
             exit 1
           fi
-
-          if git grep -n -E '(gh[pous]_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,})' -- ':!.github/workflows/ci-quality.yml'; then
-            echo "::error::Possível token ou chave de API encontrado no código."
+          if [[ "${RUST_RES}" != "success" && "${RUST_RES}" != "skipped" ]]; then
+            echo "::error::rust-quality falhou (${RUST_RES})."
             exit 1
           fi
-
-          if git grep -n -E '[A-Za-z0-9._%+-]+@(gmail|hotmail|outlook|yahoo)\.(com|com\.br)' -- ':!.github/workflows/ci-quality.yml'; then
-            echo "::error::E-mail pessoal literal encontrado em arquivo rastreado."
-            exit 1
-          fi
-
-          if git grep -n -E '([A-Za-z]:\\Users\\[^\\[:space:]]+|/Users/[^/[:space:]]+)' -- ':!.github/workflows/ci-quality.yml' ':!AGENTS.md' ':!scripts/build-apk.ps1'; then
-            echo "::error::Caminho absoluto com usuário local encontrado em arquivo rastreado."
-            exit 1
-          fi
-
-          if ! grep -q 'applicationId = "io.github.nuncamorto.vidaacademica"' android-app/app/build.gradle.kts; then
-            echo "::error::applicationId esperado não encontrado em android-app/app/build.gradle.kts."
+          if [[ "${ANDROID_RES}" != "success" && "${ANDROID_RES}" != "skipped" ]]; then
+            echo "::error::android-quality falhou (${ANDROID_RES})."
             exit 1
           fi

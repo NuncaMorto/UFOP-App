@@ -16,6 +16,7 @@ android-app/.gradle/
 android-app/.kotlin/
 android-app/build/
 android-app/app/build/
+android-app/app/src/main/jniLibs/
 android-app/local.properties
 android-app/.idea/
 android-app/captures/
@@ -39,6 +40,7 @@ local.properties
 # iOS / Xcode
 *.ipa
 ios-app/*.xcodeproj/
+ios-app/Frameworks/*.xcframework/
 ios-app/CampusUFOP/Resources/Data/*.json
 ios-app/build/
 ios-app/.build/

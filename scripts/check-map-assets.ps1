@@ -1,9 +1,14 @@
 <#
 .SYNOPSIS
     Validates UFOP offline 2D map assets, strict JSON/GeoJSON structure, privacy hygiene,
-    manifest <-> disk <-> assets.rs parity, and UniFFI generated Kotlin/Swift bindings.
+    manifest <-> disk <-> assets.rs parity, UniFFI generated Kotlin/Swift bindings,
+    and Android native jniLibs freshness.
     Compatible with Windows PowerShell 5.1 and cross-platform PowerShell 7+ (pwsh).
 #>
+param(
+    [switch]$StrictNative
+)
+
 $ErrorActionPreference = "Stop"
 
 function Join-PathParts {
@@ -516,10 +521,118 @@ foreach ($rawLine in ($UniffiText -split "`r?`n")) {
     }
 }
 
+function Strip-RustComments {
+    param([string]$Source)
+    # Remove /* ... */ e // ... preservando strings basicas e quebras de linha
+    $noBlock = [regex]::Replace($Source, '/\*[\s\S]*?\*/', {
+        param($m)
+        return ([regex]::Replace($m.Value, '[^\n]', ' '))
+    })
+    $lines = $noBlock -split "`r?`n"
+    $out = [System.Collections.Generic.List[string]]::new($lines.Length)
+    foreach ($ln in $lines) {
+        $idx = $ln.IndexOf('//')
+        if ($idx -ge 0) {
+            $out.Add($ln.Substring(0, $idx))
+        } else {
+            $out.Add($ln)
+        }
+    }
+    return ($out -join "`n")
+}
+
+function Get-ExpectedRustFfiChecksums {
+    param([string]$FfiDir)
+    $expected = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    if (-not (Test-Path -LiteralPath $FfiDir -PathType Container)) {
+        return ,$expected
+    }
+
+    $rsFiles = Get-ChildItem -LiteralPath $FfiDir -Filter "*.rs" -File | Sort-Object Name
+    foreach ($file in $rsFiles) {
+        $raw = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
+        $clean = Strip-RustComments -Source $raw
+
+        # Tokenizacao simples por linha/chaves suficiente para blocos #[uniffi::export] em rust-core/src/ffi/
+        $braceDepth = 0
+        $pendingExport = $false
+        $pendingConstructor = $false
+        $inExportImpl = $false
+        $implStructLower = ""
+        $implBraceDepth = 0
+
+        foreach ($rawLine in ($clean -split "`n")) {
+            $line = $rawLine.Trim()
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+            if (-not $inExportImpl) {
+                if ($line -match '#\[\s*uniffi::export\b') {
+                    $pendingExport = $true
+                    continue
+                }
+                if ($pendingExport -and $braceDepth -eq 0) {
+                    if ($line -match '^#\[') {
+                        continue
+                    }
+                    if ($line -match '^(?:pub(?:\([^)]*\))?\s+)?fn\s+([A-Za-z0-9_]+)\s*\(') {
+                        $fnName = $Matches[1]
+                        [void]$expected.Add("uniffi_campus_core_checksum_func_$fnName")
+                        $pendingExport = $false
+                    } elseif ($line -match '^impl\s+(?:<[^>]+>\s*)?([A-Za-z0-9_]+)\b') {
+                        $implStructLower = $Matches[1].ToLowerInvariant()
+                        $inExportImpl = $true
+                        $implBraceDepth = $braceDepth
+                        $pendingExport = $false
+                        $pendingConstructor = $false
+                    } elseif ($line -notmatch '^pub\s+') {
+                        $pendingExport = $false
+                    }
+                }
+            } else {
+                if ($braceDepth -eq ($implBraceDepth + 1)) {
+                    if ($line -match '#\[\s*uniffi::constructor\b') {
+                        $pendingConstructor = $true
+                    } elseif ($line -match '^pub\s+(?:async\s+)?fn\s+([A-Za-z0-9_]+)\s*\(') {
+                        $mName = $Matches[1]
+                        if ($pendingConstructor) {
+                            [void]$expected.Add("uniffi_campus_core_checksum_constructor_${implStructLower}_$mName")
+                        } else {
+                            [void]$expected.Add("uniffi_campus_core_checksum_method_${implStructLower}_$mName")
+                        }
+                        $pendingConstructor = $false
+                    } elseif ($line -notmatch '^#\[' -and $line -notmatch '^pub\s*$') {
+                        if ($line -match ';') {
+                            $pendingConstructor = $false
+                        }
+                    }
+                }
+            }
+
+            $opens = ([regex]::Matches($line, '\{')).Count
+            $closes = ([regex]::Matches($line, '\}')).Count
+            $braceDepth += ($opens - $closes)
+
+            if ($inExportImpl -and $braceDepth -le $implBraceDepth) {
+                $inExportImpl = $false
+                $implStructLower = ""
+                $pendingConstructor = $false
+            }
+        }
+    }
+
+    return ,$expected
+}
+
 if ([string]::IsNullOrWhiteSpace($KotlinPkg) -or [string]::IsNullOrWhiteSpace($KotlinCdylib) -or [string]::IsNullOrWhiteSpace($SwiftModule)) {
     Add-CheckFailure "Failed to parse package_name/cdylib_name/module_name from rust-core/uniffi.toml"
 } else {
     $RequiredSymbols = @("CampusEngine", "CampusMapEngine", "RenderBatch", "validateOverlay")
+    $KotlinContractVersion = $null
+    $SwiftContractVersion = $null
+    $KotlinChecksums = @{}
+    $SwiftChecksums = @{}
+    $KtReadable = $false
+    $SwReadable = $false
 
     # Kotlin binding check
     $PkgSubParts = $KotlinPkg.Split('.')
@@ -546,7 +659,15 @@ if ([string]::IsNullOrWhiteSpace($KotlinPkg) -or [string]::IsNullOrWhiteSpace($K
             if ($ktMissing.Count -gt 0) {
                 Add-CheckFailure "Kotlin UniFFI binding missing required declarations/symbols: $($ktMissing -join ', ')"
             } else {
-                Add-CheckPass "Kotlin UniFFI binding verified ($KotlinPkg/$KotlinCdylib.kt, $($ktInfo.Length) bytes, all symbols present)."
+                $KtReadable = $true
+                if ($ktText -match '\bval\s+bindings_contract_version\s*=\s*(\d+)') {
+                    $KotlinContractVersion = $Matches[1]
+                }
+                $ktCsMatches = [regex]::Matches($ktText, 'lib\.(uniffi_campus_core_checksum_[A-Za-z0-9_]+)\(\)\s*!=\s*(\d+)\.toShort\(\)')
+                foreach ($m in $ktCsMatches) {
+                    $KotlinChecksums[$m.Groups[1].Value] = $m.Groups[2].Value
+                }
+                Add-CheckPass "Kotlin UniFFI binding verified ($KotlinPkg/$KotlinCdylib.kt, $($ktInfo.Length) bytes, $($KotlinChecksums.Count) checksums)."
             }
         }
     }
@@ -585,9 +706,134 @@ if ([string]::IsNullOrWhiteSpace($KotlinPkg) -or [string]::IsNullOrWhiteSpace($K
         if ($swMissing.Count -gt 0) {
             Add-CheckFailure "Swift UniFFI bindings missing required declarations/symbols: $($swMissing -join ', ')"
         } else {
+            $SwReadable = $true
+            if ($swText -match '\blet\s+bindings_contract_version\s*=\s*(\d+)') {
+                $SwiftContractVersion = $Matches[1]
+            }
+            $swCsMatches = [regex]::Matches($swText, 'if\s*\(\s*(uniffi_campus_core_checksum_[A-Za-z0-9_]+)\(\)\s*!=\s*(\d+)\s*\)')
+            foreach ($m in $swCsMatches) {
+                $SwiftChecksums[$m.Groups[1].Value] = $m.Groups[2].Value
+            }
             $swBytes = (Get-Item -LiteralPath $SwiftFile).Length
-            Add-CheckPass "Swift UniFFI bindings verified ($SwiftModule.swift + FFI header + modulemap, $swBytes bytes, all symbols present)."
+            Add-CheckPass "Swift UniFFI bindings verified ($SwiftModule.swift + FFI header + modulemap, $swBytes bytes, $($SwiftChecksums.Count) checksums)."
         }
+    }
+
+    # Cross-check contract version, Kotlin <-> Swift checksum parity, and Rust FFI exports
+    if ($KtReadable -and $SwReadable) {
+        $parityOk = $true
+        if ([string]::IsNullOrWhiteSpace($KotlinContractVersion) -or [string]::IsNullOrWhiteSpace($SwiftContractVersion)) {
+            Add-CheckFailure "Could not parse UniFFI bindings_contract_version from Kotlin ('$KotlinContractVersion') or Swift ('$SwiftContractVersion')."
+            $parityOk = $false
+        } elseif ($KotlinContractVersion -ne $SwiftContractVersion) {
+            Add-CheckFailure "UniFFI contract version mismatch: Kotlin=$KotlinContractVersion vs Swift=$SwiftContractVersion."
+            $parityOk = $false
+        }
+
+        if ($KotlinChecksums.Count -eq 0 -or $SwiftChecksums.Count -eq 0) {
+            Add-CheckFailure "No UniFFI API checksums parsed (Kotlin=$($KotlinChecksums.Count), Swift=$($SwiftChecksums.Count))."
+            $parityOk = $false
+        } else {
+            foreach ($k in $KotlinChecksums.Keys) {
+                if (-not $SwiftChecksums.ContainsKey($k)) {
+                    Add-CheckFailure "UniFFI checksum present in Kotlin but missing in Swift: $k"
+                    $parityOk = $false
+                } elseif ($KotlinChecksums[$k] -ne $SwiftChecksums[$k]) {
+                    Add-CheckFailure "UniFFI checksum mismatch for '$k': Kotlin=$($KotlinChecksums[$k]) vs Swift=$($SwiftChecksums[$k])"
+                    $parityOk = $false
+                }
+            }
+            foreach ($k in $SwiftChecksums.Keys) {
+                if (-not $KotlinChecksums.ContainsKey($k)) {
+                    Add-CheckFailure "UniFFI checksum present in Swift but missing in Kotlin: $k"
+                    $parityOk = $false
+                }
+            }
+        }
+
+        $FfiDir = Join-PathParts -Base $RepoRoot -Parts @("rust-core", "src", "ffi")
+        $ExpectedFfi = Get-ExpectedRustFfiChecksums -FfiDir $FfiDir
+        if ($ExpectedFfi.Count -eq 0) {
+            Add-CheckFailure "No #[uniffi::export] declarations parsed from rust-core/src/ffi/"
+            $parityOk = $false
+        } else {
+            foreach ($expSym in $ExpectedFfi) {
+                if (-not $KotlinChecksums.ContainsKey($expSym)) {
+                    Add-CheckFailure "Rust FFI export '$expSym' is missing from Kotlin binding (run .\scripts\sync-uniffi-bindings.ps1)."
+                    $parityOk = $false
+                }
+                if (-not $SwiftChecksums.ContainsKey($expSym)) {
+                    Add-CheckFailure "Rust FFI export '$expSym' is missing from Swift binding (run .\scripts\sync-uniffi-bindings.ps1)."
+                    $parityOk = $false
+                }
+            }
+            foreach ($k in $KotlinChecksums.Keys) {
+                if (-not $ExpectedFfi.Contains($k)) {
+                    Add-CheckFailure "Kotlin binding has stale checksum '$k' not found in rust-core/src/ffi/ (run .\scripts\sync-uniffi-bindings.ps1)."
+                    $parityOk = $false
+                }
+            }
+        }
+
+        if ($parityOk) {
+            Add-CheckPass "UniFFI checksum & FFI export parity verified ($($ExpectedFfi.Count) symbols, contract v$KotlinContractVersion, Kotlin <-> Swift <-> rust-core/src/ffi 100% match)."
+        }
+    }
+}
+
+# 5. Android native jniLibs freshness check (warn by default, fail under -StrictNative)
+$JniLibsDir = Join-PathParts -Base $RepoRoot -Parts @("android-app", "app", "src", "main", "jniLibs")
+$ExpectedAbis = @("arm64-v8a", "armeabi-v7a", "x86_64")
+
+$RustInputFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+$RustSrcDir = Join-PathParts -Base $RepoRoot -Parts @("rust-core", "src")
+if (Test-Path -LiteralPath $RustSrcDir) {
+    foreach ($f in (Get-ChildItem -LiteralPath $RustSrcDir -Recurse -File)) { $RustInputFiles.Add($f) }
+}
+foreach ($f in $AllMapDataFiles) { $RustInputFiles.Add($f) }
+foreach ($relCfgParts in @(@("rust-core", "Cargo.toml"), @("rust-core", "uniffi.toml"), @("Cargo.lock"))) {
+    $cfgPath = Join-PathParts -Base $RepoRoot -Parts $relCfgParts
+    if (Test-Path -LiteralPath $cfgPath -PathType Leaf) {
+        $RustInputFiles.Add((Get-Item -LiteralPath $cfgPath))
+    }
+}
+
+$NewestRustUtc = [datetime]::MinValue
+foreach ($rf in $RustInputFiles) {
+    if ($rf.LastWriteTimeUtc -gt $NewestRustUtc) {
+        $NewestRustUtc = $rf.LastWriteTimeUtc
+    }
+}
+
+if (-not (Test-Path -LiteralPath $JniLibsDir -PathType Container)) {
+    if ($StrictNative) {
+        Add-CheckFailure "Android jniLibs missing at $JniLibsDir (run .\scripts\build-android-ffi.ps1)."
+    } else {
+        Write-Host "[INFO] android-app/app/src/main/jniLibs not present locally (expected in CI before cargo-ndk)." -ForegroundColor DarkYellow
+    }
+} else {
+    $MissingAbis = [System.Collections.Generic.List[string]]::new()
+    $OldestSoUtc = [datetime]::MaxValue
+    foreach ($abi in $ExpectedAbis) {
+        $soPath = Join-Path (Join-Path $JniLibsDir $abi) "libcampus_core.so"
+        if (-not (Test-Path -LiteralPath $soPath -PathType Leaf) -or (Get-Item -LiteralPath $soPath).Length -le 0) {
+            $MissingAbis.Add($abi)
+        } else {
+            $soTime = (Get-Item -LiteralPath $soPath).LastWriteTimeUtc
+            if ($soTime -lt $OldestSoUtc) {
+                $OldestSoUtc = $soTime
+            }
+        }
+    }
+
+    if ($MissingAbis.Count -gt 0) {
+        $msg = "Android jniLibs missing/empty ABI(s): $($MissingAbis -join ', '). Run .\scripts\build-android-ffi.ps1."
+        if ($StrictNative) { Add-CheckFailure $msg } else { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+    } elseif ($NewestRustUtc -gt $OldestSoUtc) {
+        $msg = "Android jniLibs/libcampus_core.so is older than rust-core/src or map_data changes ($($OldestSoUtc.ToString('u')) < $($NewestRustUtc.ToString('u'))). Run .\scripts\build-android-ffi.ps1."
+        if ($StrictNative) { Add-CheckFailure $msg } else { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+    } else {
+        Add-CheckPass "Android jniLibs/libcampus_core.so fresh for all $($ExpectedAbis.Count) ABIs."
     }
 }
 

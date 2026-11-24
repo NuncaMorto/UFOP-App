@@ -10,11 +10,11 @@
 ## 2. Versionamento
 - Para mudanças pequenas, correções e ajustes incrementais de UI/UX, usar versionamento patch no formato `x.x.y` (ex.: `1.9.12` -> `1.9.13`) em `android-app/app/build.gradle.kts`, incrementando `versionCode` a cada release.
 - **`BuildConfig.VERSION_NAME` é a fonte única de verdade em runtime no Android:** `CampusRepositoryHolder.CURRENT_APP_VERSION` e `FeedbackSender.kt` lêem diretamente `BuildConfig.VERSION_NAME` (não duplicar literais hardcoded nem em código nem em testes unitários).
-- Usar `.\scripts\bump-version.ps1 -Version <X.Y.Z> -Code <N>` para atualizar sincronizadamente `android-app/app/build.gradle.kts`, `ios-app/project.yml`, `docs/app.js`, `docs/index.html` e `ReleaseNotesSheetView.swift`.
-- Antes de fechar o release, garantir sincronismo das notas em `CHANGELOG.md` (com `<!-- versionCode: N -->` no rodapé de cada seção de versão, lido por `publish-release.ps1` / `LIVE_VERSION_CODES`), `ReleaseNotesDialog.kt` e `ReleaseNotesSheetView.swift`, validando com `.\scripts\bump-version.ps1 -Version <X.Y.Z> -Code <N> -CheckOnly -Strict`.
+- Usar `.\scripts\bump-version.ps1 -Version <X.Y.Z> -Code <N>` (ou `-BumpPatch` / `-BumpMinor` e `-Stable` quando sair do beta) para atualizar sincronizadamente `android-app/app/build.gradle.kts`, `ios-app/project.yml`, `docs/app.js`, `docs/index.html` e `ReleaseNotesSheetView.swift`.
+- Antes de fechar o release, garantir sincronismo das notas em `CHANGELOG.md` (com `<!-- versionCode: N -->` no rodapé de cada seção de versão, lido por `extract-release-notes.py` / `publish-release.ps1` / `LIVE_VERSION_CODES`), `ReleaseNotesDialog.kt` e `ReleaseNotesSheetView.swift`, validando com `.\scripts\bump-version.ps1 -CheckOnly -Strict`.
 
 ## 3. Privacidade e Higiene Pré-Commit (Repo Pronto para Público)
-- Nunca commitar binários de build ou distribuição (`dist/`, `*.apk`, `*.aab`), PDFs (`*.pdf`), arquivos locais de ambiente (`android-app/local.properties`, `.env*`) ou chaves/keystores (`*.jks`, `*.keystore`, `*.p12`, `*.pem`, `*.key`).
+- Nunca commitar binários de build ou distribuição (`dist/`, `*.apk`, `*.aab`, `*.so`, `*.a`, `*.xcframework`, `android-app/app/src/main/jniLibs/`), PDFs (`*.pdf`), arquivos locais de ambiente (`android-app/local.properties`, `.env*`) ou chaves/keystores (`*.jks`, `*.keystore`, `*.p12`, `*.pem`, `*.key`).
 - Nunca gravar e-mails pessoais, tokens ou caminhos absolutos com nome de usuário local no código-fonte, testes ou scripts rastreados pelo Git:
   - Configurar o destinatário de feedback via `feedback.recipient` em `android-app/local.properties` (ignorado pelo Git) ou variável `FEEDBACK_RECIPIENT`, consumido via `BuildConfig.FEEDBACK_ENDPOINT`.
   - Em scripts Python (`scripts/`), usar variáveis de ambiente ou `Path.home()`.
@@ -29,7 +29,29 @@
   - Não usar `LazyVerticalGrid` com spans dinâmicos alternando entre modo bloco e barra (causou travamento/desaparecimento de cards em `DisciplinesScreen.kt`); preferir `LazyColumn` com chaves distintas por modo de exibição.
   - Garantir alvo tátil mínimo de `48dp` com `minimumInteractiveComponentSize()` sem inflar desnecessariamente a altura visual de pílulas/filtros compactos quando a opção de acessibilidade de alvos grandes estiver desligada.
 
-## 5. Mapa Rápido do Projeto
+## 5. Fluxo Pós-Prompt, Matriz de Verificação & Paridade Android ↔ iOS
+- **Regra de Ouro Pós-Prompt:** sempre rodar o orquestrador `.\scripts\verify-all.ps1 -ChangedOnly` antes de finalizar uma tarefa (ou `-Full` antes de releases e merges para `main`).
+- **Matriz Objetiva (Área Alterada → Verificações Obrigatórias):**
+  | Área Alterada | Verificações Obrigatórias |
+  | :--- | :--- |
+  | **Rust Core** (`rust-core/`, `Cargo.*`) | `.\scripts\verify-core.ps1` (`cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace`) |
+  | **Mapa 2D / Assets** (`rust-core/assets/map_data/`, `domain/map/`) | `.\scripts\verify-core.ps1`; `.\scripts\check-map-assets.ps1`; recompilar `jniLibs` via `.\scripts\build-android-ffi.ps1` antes de gerar APK |
+  | **Contrato UniFFI** (`rust-core/src/ffi/`, `models.rs`, `uniffi.toml`) | `.\scripts\sync-uniffi-bindings.ps1` (gera Kotlin + Swift juntos); `.\scripts\sync-uniffi-bindings.ps1 -CheckOnly`; `.\scripts\check-map-assets.ps1`; recompilar `jniLibs` + testes Android + Swift hygiene |
+  | **Android** (`android-app/`) | `:app:testDebugUnitTest --no-daemon --offline` (e `.\scripts\build-apk.ps1` quando for empacotar APK com validação automática de `.so`, `aapt2` e `apksigner`) |
+  | **iOS** (`ios-app/`) | `.\scripts\check-swift-hygiene.ps1` + `bash -n scripts/build-ios-*.sh` (se scripts `.sh` forem alterados) |
+  | **Download Page** (`docs/`) | `node --check docs/app.js` + `.\scripts\bump-version.ps1 -CheckOnly` |
+  | **Versão / Release** (`CHANGELOG.md`, `build.gradle.kts`, `project.yml`) | `.\scripts\bump-version.ps1 -CheckOnly -Strict` + `python scripts/extract-release-notes.py --strict` |
+- **Checklist de Paridade Android ↔ iOS:**
+  - Contratos, estados e persistência equivalentes entre Android (`core/ffi/`, `core/map/`) e iOS (`CoreFFI/`, `Core/Map/`).
+  - Strings de interface em Português (PT-BR) sem vazar termos internos técnicos ao usuário final.
+  - Acessibilidade consistente: alvos táteis `>= 48dp` no Compose e rótulos/hierarquia VoiceOver no SwiftUI.
+  - Quando alterar FFI/modelos compartilhados: regenerar **Kotlin e Swift juntos** via `.\scripts\sync-uniffi-bindings.ps1` (nunca só uma plataforma).
+  - Quando incrementar versão: manter `CHANGELOG.md` (`<!-- versionCode: N -->`), `ReleaseNotesDialog.kt` e `ReleaseNotesSheetView.swift` sincronizados.
+- **Disciplina de Contexto e Turnos:**
+  - Agrupar buscas e leituras independentes em paralelo; ler apenas blocos necessários.
+  - Nunca abrir arquivos volumosos/gerados (lista abaixo); validar dados/bindings via `check-map-assets.ps1`, `sync-uniffi-bindings.ps1 -CheckOnly` e `git grep` pontual.
+
+## 6. Mapa Rápido do Projeto
 - **Diferenciação dos 4 Pilares (Grades, Matriz e Mapa):**
   - **Grade Dinâmica Interativa (Progresso & Pré-requisitos):**
     - Android: `android-app/app/src/main/java/br/ufop/campus/core/curriculum/DynamicCurriculumGrid.kt` + `ui/curriculum/DynamicCurriculumGridScreen.kt`
@@ -72,13 +94,16 @@
     - `ios-app/CampusUFOP/CoreFFI/Generated/*`
   - Para validar esses dados ou bindings sem inflar contexto, usar exclusivamente `.\scripts\check-map-assets.ps1`, `cargo test --workspace` (ou `.\scripts\verify-core.ps1`) e consultas pontuais com `git grep`.
 - **Comandos Prontos (Windows PowerShell):**
+  - Orquestrador único (change-aware / completo): `.\scripts\verify-all.ps1 -ChangedOnly` ou `.\scripts\verify-all.ps1 -Full -VerifyUniffiBindings`
   - Verificação completa do núcleo Rust: `.\scripts\verify-core.ps1`
-  - Validação de assets de mapa, JSON/GeoJSON, privacidade e bindings UniFFI: `.\scripts\check-map-assets.ps1`
-  - Compilação FFI Android + geração de bindings Kotlin: `.\scripts\build-android-ffi.ps1`
+  - Validação de assets de mapa, JSON/GeoJSON, privacidade, checksums UniFFI e frescor `jniLibs`: `.\scripts\check-map-assets.ps1` (adicione `-StrictNative` para exigir `.so` local atualizado)
+  - Sincronismo / verificação determinística UniFFI (Kotlin + Swift): `.\scripts\sync-uniffi-bindings.ps1` e `.\scripts\sync-uniffi-bindings.ps1 -CheckOnly`
+  - Compilação FFI Android (`.so`) + bindings Kotlin/Swift: `.\scripts\build-android-ffi.ps1`
   - Higiene Swift pré-push: `.\scripts\check-swift-hygiene.ps1`
-  - Atualizar/verificar versão: `.\scripts\bump-version.ps1 -Version X.Y.Z -Code N` e `-CheckOnly -Strict`
+  - Atualizar/verificar versão: `.\scripts\bump-version.ps1 -BumpPatch` (ou `-Version X.Y.Z -Code N`, `-Stable`), e `.\scripts\bump-version.ps1 -CheckOnly -Strict`
   - Testes JVM Android: `$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA "Android\Sdk"; Push-Location android-app; .\gradlew.bat :app:testDebugUnitTest --no-daemon --offline; $ec = $LASTEXITCODE; Pop-Location; exit $ec`
-  - Build & validação APK (`aapt2` / `apksigner`): `.\scripts\build-apk.ps1`; `& "$env:LOCALAPPDATA\Android\Sdk\build-tools\35.0.0\aapt2.exe" dump badging dist\Vida-Academica-vX.Y.Z-debug.apk | Select-String "package:"`; `& "$env:LOCALAPPDATA\Android\Sdk\build-tools\35.0.0\apksigner.bat" verify --print-certs dist\Vida-Academica-vX.Y.Z-debug.apk`
+  - Build & validação APK (verifica `.so` embutido, `aapt2` e `apksigner` automaticamente): `.\scripts\build-apk.ps1` (ou `-Release`, `-RebuildFfi`)
   - Validação JS Download Page: `node --check docs/app.js`
+  - Extração/validação de notas do `CHANGELOG.md`: `python scripts/extract-release-notes.py --strict`
   - Auditoria de privacidade pré-commit: `git status --short; git grep --cached -n -E 'C:\\Users\\|/Users/|/home/'`
-  - Publicação Pre-release Android (lê `CHANGELOG.md` com `<!-- versionCode: N -->`): `.\scripts\publish-release.ps1 -Tag vX.Y.Z -Prerelease -AndroidOnly`
+  - Publicação Pre-release Android (com guarda estrita de versão/branch e merge de `SHA256SUMS.txt`): `.\scripts\publish-release.ps1 -Tag vX.Y.Z -Prerelease -AndroidOnly`
