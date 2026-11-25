@@ -9,9 +9,10 @@ Fonte unica:
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BRAND_DIR = REPO_ROOT / "docs" / "brand"
@@ -136,9 +137,144 @@ def generate_ios_icon(master_rgb: Image.Image) -> None:
     )
 
 
+def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    win_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+    candidates = (
+        [
+            win_fonts / "segoeuib.ttf",
+            win_fonts / "arialbd.ttf",
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ]
+        if bold
+        else [
+            win_fonts / "segoeui.ttf",
+            win_fonts / "arial.ttf",
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        ]
+    )
+    for font_path in candidates:
+        if font_path.is_file():
+            return ImageFont.truetype(str(font_path), size=size)
+    return ImageFont.load_default()
+
+
+def make_rounded_rect_mask(size: int, radius: int) -> Image.Image:
+    ss = 4
+    mask = Image.new("L", (size * ss, size * ss), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle(
+        (0, 0, size * ss - 1, size * ss - 1), radius=radius * ss, fill=255
+    )
+    return mask.resize((size, size), LANCZOS)
+
+
+def generate_social_preview(master_rgb: Image.Image) -> None:
+    """Gera docs/brand/social-preview.png (1280x640) para GitHub Social Preview e og:image."""
+    width, height = 1280, 640
+    canvas = Image.new("RGBA", (width, height), (28, 25, 23, 255))
+
+    # Brilhos sutis nas cores oficiais (bordo e esmeralda)
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    gdraw = ImageDraw.Draw(glow)
+    gdraw.ellipse((-140, -180, 620, 560), fill=(139, 30, 63, 120))
+    gdraw.ellipse((860, 260, 1460, 860), fill=(46, 125, 50, 75))
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=110))
+    canvas = Image.alpha_composite(canvas, glow)
+
+    # Moldura sutil estilo card com alpha composite real
+    card_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    cdraw = ImageDraw.Draw(card_layer)
+    cdraw.rounded_rectangle(
+        (48, 48, width - 48, height - 48),
+        radius=36,
+        fill=(38, 33, 31, 215),
+        outline=(255, 255, 255, 34),
+        width=2,
+    )
+    canvas = Image.alpha_composite(canvas, card_layer)
+
+    # Icone oficial com sombra e cantos arredondados (260x260)
+    icon_size = 260
+    icon_x, icon_y = 124, (height - icon_size) // 2
+    mask = make_rounded_rect_mask(icon_size, radius=60)
+
+    shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    shadow_shape = Image.new("RGBA", (icon_size, icon_size), (0, 0, 0, 150))
+    shadow.paste(shadow_shape, (icon_x, icon_y + 14), mask)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=22))
+    canvas = Image.alpha_composite(canvas, shadow)
+
+    icon_rgba = master_rgb.resize((icon_size, icon_size), LANCZOS).convert("RGBA")
+    icon_rgba.putalpha(mask)
+    canvas.paste(icon_rgba, (icon_x, icon_y), icon_rgba)
+
+    # Tipografia a direita
+    text_x = icon_x + icon_size + 68
+
+    badge_font = load_font(20, bold=True)
+    title_font = load_font(74, bold=True)
+    sub_font = load_font(28, bold=False)
+    foot_font = load_font(22, bold=True)
+
+    # Pill superior com alpha composite real e centralizacao exata
+    badge_text = "OPEN SOURCE  ·  OFFLINE-FIRST"
+    pill_layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    pdraw = ImageDraw.Draw(pill_layer)
+    bbox = pdraw.textbbox((0, 0), badge_text, font=badge_font)
+    bw = bbox[2] - bbox[0]
+    bx, by, pill_w, pill_h = text_x, 166, bw + 40, 40
+    pdraw.rounded_rectangle(
+        (bx, by, bx + pill_w, by + pill_h),
+        radius=20,
+        fill=(139, 30, 63, 75),
+        outline=(214, 87, 127, 145),
+        width=1,
+    )
+    pdraw.text(
+        (bx + pill_w / 2, by + pill_h / 2),
+        badge_text,
+        font=badge_font,
+        fill=(245, 208, 218, 255),
+        anchor="mm",
+    )
+    canvas = Image.alpha_composite(canvas, pill_layer)
+
+    draw = ImageDraw.Draw(canvas)
+
+    # Titulo principal
+    draw.text((text_x, 224), "Vida Acadêmica", font=title_font, fill=(245, 245, 244, 255))
+
+    # Subtitulo em 2 linhas
+    draw.text(
+        (text_x, 326),
+        "Horários, faltas, notas, matrizes curriculares",
+        font=sub_font,
+        fill=(196, 189, 184, 255),
+    )
+    draw.text(
+        (text_x, 366),
+        "e mapa do campus 100% offline.",
+        font=sub_font,
+        fill=(196, 189, 184, 255),
+    )
+
+    # Rodape tecnico
+    draw.text(
+        (text_x, 438),
+        "Android  ·  iOS  ·  Rust Core  ·  GNU GPLv3",
+        font=foot_font,
+        fill=(102, 187, 106, 255),
+    )
+
+    canvas.convert("RGB").save(
+        BRAND_DIR / "social-preview.png", format="PNG", optimize=True
+    )
+
+
 def generate_web_icons(master_rgb: Image.Image) -> None:
     apple_touch = master_rgb.resize((180, 180), LANCZOS)
     apple_touch.save(DOCS_DIR / "apple-touch-icon.png", format="PNG", optimize=True)
+    generate_social_preview(master_rgb)
 
 
 def main() -> None:
