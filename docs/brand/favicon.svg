@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#581222"/>
+      <stop offset="100%" stop-color="#3E0B17"/>
+    </linearGradient>
+    <linearGradient id="foldShade" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0%" stop-color="#D2CFD4"/>
+      <stop offset="55%" stop-color="#F6F5F7"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+    <linearGradient id="rightLeg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#CFCBD1"/>
+      <stop offset="28%" stop-color="#F4F3F6"/>
+      <stop offset="100%" stop-color="#FFFFFF"/>
+    </linearGradient>
+  </defs>
+  <!-- Squircle background -->
+  <rect width="108" height="108" rx="26" fill="url(#bg)"/>
+  <!-- Right leg (behind fold) -->
+  <path d="M64 38 L80 46 L80 82.5 C80 84.5 78.2 85.7 76.4 84.8 L67.2 79.8 C65.2 78.7 64 76.7 64 74.4 Z" fill="url(#rightLeg)"/>
+  <!-- Top horizontal-to-arch fold -->
+  <path d="M54 22 C69 22 80 33.5 80 48 C80 42 74 38.5 64 38.5 L44 38.5 C44 29 48.5 22 54 22 Z" fill="url(#foldShade)"/>
+  <!-- Left leg (front, crisp white) -->
+  <path d="M54 22 C39 22 28 34 28 49 L28 82.5 C28 84.5 29.8 85.7 31.6 84.8 L40.8 79.8 C42.8 78.7 44 76.7 44 74.4 L44 38.5 C44 29.2 48.4 22 54 22 Z" fill="#FFFFFF"/>
+</svg>

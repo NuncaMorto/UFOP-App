@@ -10,14 +10,25 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.16"
+    public static let currentVersionString = "1.9.17"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.16",
-            title: "Proteção Reforçada de Dados & Abertura Mais Rápida",
+            version: "v1.9.17",
+            title: "Novo Ícone Oficial do Vida Acadêmica",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Novo ícone oficial do Vida Acadêmica em alta resolução (1024×1024) no catálogo AppIcon do iOS, sincronizado com Android e página de download.",
+                "Identidade visual unificada gerada a partir da arte oficial de marca sem canal alfa para total conformidade com a App Store.",
+                "Sincronização completa de versão com a atualização de ícone adaptativo e monocromático do Android 1.9.17."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.16",
+            title: "Proteção Reforçada de Dados & Abertura Mais Rápida",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Blindagem do Keychain: evita apagar ou substituir a chave de proteção em falhas temporárias, gerando cópia de segurança local (.bak) antes de cada atualização.",
                 "Proteção contra perda de dados: caso os arquivos locais não possam ser lidos ou descriptografados, as cópias originais são preservadas em quarentena e gravações futuras ficam travadas até recuperação.",

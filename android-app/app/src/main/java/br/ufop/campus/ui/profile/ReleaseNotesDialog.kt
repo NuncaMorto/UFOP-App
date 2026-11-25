@@ -55,10 +55,21 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.16",
-            title = "Proteção Reforçada de Dados & Abertura Mais Rápida",
+            version = "v1.9.17",
+            title = "Novo Ícone Oficial do Vida Acadêmica",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Novo ícone oficial em todo o ecossistema (Android, iOS e página de download), gerado a partir da arte oficial de identidade visual.",
+                "Ícone adaptativo atualizado com fundo sólido bordô (#4A0E1C), camada principal ajustada na área segura e suporte ao ícone monocromático temático no Android 13+.",
+                "Ícones legados e circulares regenerados em todas as densidades para maior nitidez em qualquer tela inicial."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.16",
+            title = "Proteção Reforçada de Dados & Abertura Mais Rápida",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Blindagem contra perda de dados: se houver falha temporária ao acessar a chave de proteção do aparelho ou ao abrir arquivos locais, seus dados originais são preservados intactos em quarentena sem sobrescrita automática.",
                 "Nova tela segura de recuperação: permite tentar carregar novamente, restaurar um backup (.ufopbackup) ou recomeçar do zero apenas após confirmação explícita.",

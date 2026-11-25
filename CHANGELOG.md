@@ -10,6 +10,17 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.17 — Novo Ícone Oficial (Android, iOS & Web)
+
+- **Android (`1.9.17` · Beta), iOS (`1.9.17`) & Site (`docs/`):**
+  - **Novo ícone oficial do Vida Acadêmica:** atualização completa da identidade visual usando `docs/brand/` como fonte única em todas as plataformas, com script reproduzível (`scripts/generate_brand_icons.py`) em Pillow/Lanczos.
+  - **Android Adaptive & Monochrome Icon:** novos `mipmap-{mdpi..xxxhdpi}/ic_launcher.png` e `ic_launcher_round.png`, fundo sólido `#4A0E1C`, foreground escalado na safe-zone de 66% (canvas `108dp`) e suporte a ícone temático monocromático (`ic_launcher_monochrome.xml`) no Android 13+.
+  - **iOS & Página de Download:** exportação do `AppIcon-1024.png` (1024×1024 RGB sem alfa) no `Assets.xcassets`, favicon vetorial `brand/favicon.svg`, logo atualizado na barra de navegação e `apple-touch-icon.png` (180×180).
+
+<!-- versionCode: 34 -->
+
+---
+
 ## v1.9.16 — Proteção Reforçada de Dados, Recuperação Segura & Abertura Mais Rápida
 
 - **Android (`1.9.16` · Beta) & iOS (`1.9.16`):**

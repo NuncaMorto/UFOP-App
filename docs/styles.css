@@ -14,7 +14,7 @@ a{color:var(--burg-l)}
 .bar{display:flex;align-items:center;justify-content:space-between;min-height:64px}
 .brand{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font-weight:700;min-height:48px}
 .brand b{color:var(--burg-l)}
-.logo{width:36px;height:36px;border-radius:10px;background:var(--burg);display:grid;place-items:center}.logo svg{width:24px}
+.logo{width:36px;height:36px;border-radius:10px;display:block;flex:none}
 .icon-btn{min-width:48px;min-height:48px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text);display:inline-grid;place-items:center;cursor:pointer}
 .icon-btn.small{min-width:48px}
 .moon{display:none}[data-theme=light] .moon{display:block}[data-theme=light] .sun{display:none}
