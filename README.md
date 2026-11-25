@@ -1,4 +1,8 @@
-# Vida Acadêmica
+<p align="center">
+  <img src="docs/brand/favicon.svg" alt="Ícone oficial do Vida Acadêmica" width="96" height="96" />
+</p>
+
+<h1 align="center">Vida Acadêmica</h1>
 
 > [!NOTE]
 > **Projeto Independente:** O **Vida Acadêmica** é um aplicativo independente e de código aberto (**GNU GPLv3**), feito por estudantes e **sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP)**, criado para ajudar na organização da vida acadêmica.
