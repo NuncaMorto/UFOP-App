@@ -10,6 +10,16 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.18 — Ajuste do Ícone Monocromático (Material You) & Favicon
+
+- **Android (`1.9.18` · Beta), iOS (`1.9.18`) & Site (`docs/`):**
+  - **Correção do ícone monocromático (Material You / Android 13+):** atualização de `ic_launcher_monochrome.xml` para renderização correta em temas dinâmicos do Android sem distorções.
+  - **Atualização do favicon oficial (`docs/brand/favicon.svg`):** sincronização do novo SVG na barra de navegação e aba do navegador na página de download.
+
+<!-- versionCode: 35 -->
+
+---
+
 ## v1.9.17 — Novo Ícone Oficial (Android, iOS & Web)
 
 - **Android (`1.9.17` · Beta), iOS (`1.9.17`) & Site (`docs/`):**

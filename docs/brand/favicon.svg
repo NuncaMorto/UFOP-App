@@ -1,26 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#581222"/>
-      <stop offset="100%" stop-color="#3E0B17"/>
-    </linearGradient>
-    <linearGradient id="foldShade" x1="0" y1="0" x2="1" y2="0.4">
-      <stop offset="0%" stop-color="#D2CFD4"/>
-      <stop offset="55%" stop-color="#F6F5F7"/>
-      <stop offset="100%" stop-color="#FFFFFF"/>
-    </linearGradient>
-    <linearGradient id="rightLeg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#CFCBD1"/>
-      <stop offset="28%" stop-color="#F4F3F6"/>
-      <stop offset="100%" stop-color="#FFFFFF"/>
+      <stop offset="0%" stop-color="#581222" />
+      <stop offset="100%" stop-color="#3E0B17" />
     </linearGradient>
   </defs>
-  <!-- Squircle background -->
-  <rect width="108" height="108" rx="26" fill="url(#bg)"/>
-  <!-- Right leg (behind fold) -->
-  <path d="M64 38 L80 46 L80 82.5 C80 84.5 78.2 85.7 76.4 84.8 L67.2 79.8 C65.2 78.7 64 76.7 64 74.4 Z" fill="url(#rightLeg)"/>
-  <!-- Top horizontal-to-arch fold -->
-  <path d="M54 22 C69 22 80 33.5 80 48 C80 42 74 38.5 64 38.5 L44 38.5 C44 29 48.5 22 54 22 Z" fill="url(#foldShade)"/>
-  <!-- Left leg (front, crisp white) -->
-  <path d="M54 22 C39 22 28 34 28 49 L28 82.5 C28 84.5 29.8 85.7 31.6 84.8 L40.8 79.8 C42.8 78.7 44 76.7 44 74.4 L44 38.5 C44 29.2 48.4 22 54 22 Z" fill="#FFFFFF"/>
+  <rect width="108" height="108" rx="28" fill="url(#bg)" />
+  <g transform="translate(54 54) scale(1.28) translate(-54 -54)">
+    
+    <path fill="#FFFFFF" d="M53.2,30.0 C42.5,30.2 35.0,39.0 35.0,49.8 L35.0,75.5 C35.0,77.2 36.6,78.1 38.0,77.3 L44.6,73.5 C45.8,72.8 46.5,71.5 46.5,70.0 L46.5,43.2 C46.5,36.2 49.4,31.2 53.2,30.0 Z" />
+    
+    <path fill="#F3ECEE" d="M56.2,30.2 C65.8,31.2 73.0,39.2 73.0,49.4 C72.2,44.6 67.8,42.2 61.2,42.2 L49.2,42.2 C49.4,35.8 52.4,31.2 56.2,30.2 Z" />
+    
+    <path fill="#E8DFE2" d="M61.5,44.8 C67.5,44.8 71.6,47.0 73.0,51.8 L73.0,75.5 C73.0,77.2 71.4,78.1 70.0,77.3 L63.4,73.5 C62.2,72.8 61.5,71.5 61.5,70.0 L61.5,44.8 Z" />
+  </g>
 </svg>

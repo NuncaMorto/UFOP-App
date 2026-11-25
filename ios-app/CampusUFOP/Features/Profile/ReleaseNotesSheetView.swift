@@ -10,14 +10,23 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.17"
+    public static let currentVersionString = "1.9.18"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.17",
-            title: "Novo Ícone Oficial do Vida Acadêmica",
+            version: "v1.9.18",
+            title: "Ajuste no Ícone Monocromático & Favicon",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Sincronização da versão 1.9.18 com a correção do ícone monocromático (Material You / Android 13+) e atualização do favicon oficial na página de download."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.17",
+            title: "Novo Ícone Oficial do Vida Acadêmica",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Novo ícone oficial do Vida Acadêmica em alta resolução (1024×1024) no catálogo AppIcon do iOS, sincronizado com Android e página de download.",
                 "Identidade visual unificada gerada a partir da arte oficial de marca sem canal alfa para total conformidade com a App Store.",

@@ -55,10 +55,20 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.17",
-            title = "Novo Ícone Oficial do Vida Acadêmica",
+            version = "v1.9.18",
+            title = "Ajuste no Ícone Monocromático (Material You)",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Correção do ícone monocromático (Material You / Android 13+) para exibição nítida e correta nos temas dinâmicos da tela inicial.",
+                "Atualização do favicon oficial e da identidade visual na página de download."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.17",
+            title = "Novo Ícone Oficial do Vida Acadêmica",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Novo ícone oficial em todo o ecossistema (Android, iOS e página de download), gerado a partir da arte oficial de identidade visual.",
                 "Ícone adaptativo atualizado com fundo sólido bordô (#4A0E1C), camada principal ajustada na área segura e suporte ao ícone monocromático temático no Android 13+.",
