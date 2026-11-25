@@ -55,10 +55,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.15",
-            title = "Matrizes Históricas, Resolução por Ingresso & PPCs Oficiais",
+            version = "v1.9.16",
+            title = "Proteção Reforçada de Dados & Abertura Mais Rápida",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Blindagem contra perda de dados: se houver falha temporária ao acessar a chave de proteção do aparelho ou ao abrir arquivos locais, seus dados originais são preservados intactos em quarentena sem sobrescrita automática.",
+                "Nova tela segura de recuperação: permite tentar carregar novamente, restaurar um backup (.ufopbackup) ou recomeçar do zero apenas após confirmação explícita.",
+                "Abertura do app mais fluida: carregamento do leitor de PDF e do catálogo oficial de salas movido para segundo plano fora da tela inicial.",
+                "Motor nativo do mapa otimizado com redução de ~28% no tamanho do componente arm64-v8a e ajustes equivalentes de proteção no iOS."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.15",
+            title = "Matrizes Históricas, Resolução por Ingresso & PPCs Oficiais",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Integração de 33 matrizes curriculares históricas completas de 21 cursos (1.650 componentes), preservando as matrizes curadas de Eng. de Controle e Automação (AUT 2024/1 e 2026/1).",
                 "Resolução automática por ano e semestre de ingresso na Matriz Curricular e na Grade Dinâmica (FAR, MED, AMB, LTP, EFB/EFL, ECO e outros), sem falso aviso de matriz legada.",

@@ -20,6 +20,85 @@ private struct PersistedCampusState: Codable {
     var turmaByCourseId: [String: String]
     var dynamicGridCompletedByMatrix: [String: [String]]?
     var friendSchedules: [FriendSchedule]?
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case studentProfile
+        case selectedSemesterFilter
+        case activeCampusId
+        case disciplines
+        case courseScheduleSlots
+        case timetableSlots
+        case assessmentsByDiscipline
+        case notesByDiscipline
+        case agendaItemsByDate
+        case recordedStatusByAgendaItem
+        case absenceHistoryBySession
+        case transcriptEntries
+        case isEadByCourseId
+        case turmaByCourseId
+        case dynamicGridCompletedByMatrix
+        case friendSchedules
+    }
+
+    init(
+        schemaVersion: Int = 5,
+        studentProfile: StudentProfile,
+        selectedSemesterFilter: String,
+        activeCampusId: String,
+        disciplines: [DisciplineSummaryCard],
+        courseScheduleSlots: [CourseScheduleSlotItem],
+        timetableSlots: [TimetableSlotCell],
+        assessmentsByDiscipline: [String: [AssessmentItem]],
+        notesByDiscipline: [String: String],
+        agendaItemsByDate: [String: [AgendaTimelineItem]],
+        recordedStatusByAgendaItem: [String: AttendanceStatus],
+        absenceHistoryBySession: [String: AbsenceHistoryEntry],
+        transcriptEntries: [TranscriptCourseEntry],
+        isEadByCourseId: [String: Bool],
+        turmaByCourseId: [String: String],
+        dynamicGridCompletedByMatrix: [String: [String]]?,
+        friendSchedules: [FriendSchedule]?
+    ) {
+        self.schemaVersion = schemaVersion
+        self.studentProfile = studentProfile
+        self.selectedSemesterFilter = selectedSemesterFilter
+        self.activeCampusId = activeCampusId
+        self.disciplines = disciplines
+        self.courseScheduleSlots = courseScheduleSlots
+        self.timetableSlots = timetableSlots
+        self.assessmentsByDiscipline = assessmentsByDiscipline
+        self.notesByDiscipline = notesByDiscipline
+        self.agendaItemsByDate = agendaItemsByDate
+        self.recordedStatusByAgendaItem = recordedStatusByAgendaItem
+        self.absenceHistoryBySession = absenceHistoryBySession
+        self.transcriptEntries = transcriptEntries
+        self.isEadByCourseId = isEadByCourseId
+        self.turmaByCourseId = turmaByCourseId
+        self.dynamicGridCompletedByMatrix = dynamicGridCompletedByMatrix
+        self.friendSchedules = friendSchedules
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        self.studentProfile = try container.decode(StudentProfile.self, forKey: .studentProfile)
+        self.selectedSemesterFilter = try container.decodeIfPresent(String.self, forKey: .selectedSemesterFilter) ?? "2026.2"
+        self.activeCampusId = try container.decodeIfPresent(String.self, forKey: .activeCampusId) ?? "op_cruzeiro"
+        self.disciplines = try container.decodeIfPresent([DisciplineSummaryCard].self, forKey: .disciplines) ?? []
+        self.courseScheduleSlots = try container.decodeIfPresent([CourseScheduleSlotItem].self, forKey: .courseScheduleSlots) ?? []
+        self.timetableSlots = try container.decodeIfPresent([TimetableSlotCell].self, forKey: .timetableSlots) ?? []
+        self.assessmentsByDiscipline = try container.decodeIfPresent([String: [AssessmentItem]].self, forKey: .assessmentsByDiscipline) ?? [:]
+        self.notesByDiscipline = try container.decodeIfPresent([String: String].self, forKey: .notesByDiscipline) ?? [:]
+        self.agendaItemsByDate = try container.decodeIfPresent([String: [AgendaTimelineItem]].self, forKey: .agendaItemsByDate) ?? [:]
+        self.recordedStatusByAgendaItem = try container.decodeIfPresent([String: AttendanceStatus].self, forKey: .recordedStatusByAgendaItem) ?? [:]
+        self.absenceHistoryBySession = try container.decodeIfPresent([String: AbsenceHistoryEntry].self, forKey: .absenceHistoryBySession) ?? [:]
+        self.transcriptEntries = try container.decodeIfPresent([TranscriptCourseEntry].self, forKey: .transcriptEntries) ?? []
+        self.isEadByCourseId = try container.decodeIfPresent([String: Bool].self, forKey: .isEadByCourseId) ?? [:]
+        self.turmaByCourseId = try container.decodeIfPresent([String: String].self, forKey: .turmaByCourseId) ?? [:]
+        self.dynamicGridCompletedByMatrix = try container.decodeIfPresent([String: [String]].self, forKey: .dynamicGridCompletedByMatrix)
+        self.friendSchedules = try container.decodeIfPresent([FriendSchedule].self, forKey: .friendSchedules)
+    }
 }
 
 public struct AgendaClassSpotlight: Equatable, Sendable {
@@ -52,8 +131,13 @@ public extension CampusStore {
         return dir.appendingPathComponent("campus_ufop_state.enc")
     }
 
+    private static var encryptedStateBackupFileUrl: URL {
+        let primary = encryptedStateFileUrl
+        return primary.deletingLastPathComponent().appendingPathComponent("campus_ufop_state.enc.bak")
+    }
+
     func persistEncryptedState() {
-        guard hasCompletedInit else { return }
+        guard hasCompletedInit, !persistenceBlockedDueToLoadError else { return }
         let snapshot = PersistedCampusState(
             studentProfile: studentProfile,
             selectedSemesterFilter: selectedSemesterFilter,
@@ -79,25 +163,144 @@ public extension CampusStore {
               let encrypted = try? CampusCryptoEngine.encryptStatePayload(json) else {
             return
         }
-        try? encrypted.write(to: Self.encryptedStateFileUrl, atomically: true, encoding: .utf8)
+
+        let fm = FileManager.default
+        let primaryUrl = Self.encryptedStateFileUrl
+        let backupUrl = Self.encryptedStateBackupFileUrl
+        if fm.fileExists(atPath: primaryUrl.path),
+           let attrs = try? fm.attributesOfItem(atPath: primaryUrl.path),
+           let size = (attrs[.size] as? NSNumber)?.int64Value,
+           size > 2,
+           let existingPayload = try? String(contentsOf: primaryUrl, encoding: .utf8) {
+            try? existingPayload.write(to: backupUrl, atomically: true, encoding: .utf8)
+            #if os(iOS)
+            try? (backupUrl as NSURL).setResourceValue(
+                URLFileProtection.completeUntilFirstUserAuthentication,
+                forKey: .fileProtectionKey
+            )
+            #endif
+        }
+
+        try? encrypted.write(to: primaryUrl, atomically: true, encoding: .utf8)
         #if os(iOS)
-        try? (Self.encryptedStateFileUrl as NSURL).setResourceValue(
+        try? (primaryUrl as NSURL).setResourceValue(
             URLFileProtection.completeUntilFirstUserAuthentication,
             forKey: .fileProtectionKey
         )
         #endif
     }
 
-    func loadPersistedEncryptedStateIfAvailable() {
-        let url = Self.encryptedStateFileUrl
-        guard FileManager.default.fileExists(atPath: url.path),
-              let raw = try? String(contentsOf: url, encoding: .utf8),
-              let plainJson = try? CampusCryptoEngine.decryptStatePayloadIfNeeded(raw),
-              let data = plainJson.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode(PersistedCampusState.self, from: data) else {
-            return
+    @discardableResult
+    func loadPersistedEncryptedStateIfAvailable(allowQuarantineCreation: Bool = true) -> Bool {
+        let fm = FileManager.default
+        let primaryUrl = Self.encryptedStateFileUrl
+        let backupUrl = Self.encryptedStateBackupFileUrl
+        let candidates = [primaryUrl, backupUrl].filter { fm.fileExists(atPath: $0.path) }
+
+        if candidates.isEmpty {
+            persistenceBlockedDueToLoadError = false
+            persistenceLoadErrorMessage = nil
+            quarantinedStateFilenames = []
+            return true
         }
-        applySnapshot(decoded)
+
+        var sawSecurityFailure = false
+        for candidate in candidates {
+            guard let raw = try? String(contentsOf: candidate, encoding: .utf8),
+                  !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                continue
+            }
+            let plainJson: String
+            do {
+                plainJson = try CampusCryptoEngine.decryptStatePayloadIfNeeded(raw)
+            } catch {
+                sawSecurityFailure = true
+                continue
+            }
+            guard let data = plainJson.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode(PersistedCampusState.self, from: data) else {
+                continue
+            }
+
+            applySnapshot(decoded)
+            persistenceBlockedDueToLoadError = false
+            persistenceLoadErrorMessage = nil
+            quarantinedStateFilenames = []
+
+            if candidate != primaryUrl {
+                try? raw.write(to: primaryUrl, atomically: true, encoding: .utf8)
+                #if os(iOS)
+                try? (primaryUrl as NSURL).setResourceValue(
+                    URLFileProtection.completeUntilFirstUserAuthentication,
+                    forKey: .fileProtectionKey
+                )
+                #endif
+            }
+            return true
+        }
+
+        if allowQuarantineCreation && quarantinedStateFilenames.isEmpty {
+            quarantinedStateFilenames = Self.createCorruptQuarantineCopies(for: candidates)
+        }
+        persistenceBlockedDueToLoadError = true
+        persistenceLoadErrorMessage = sawSecurityFailure
+            ? "Não foi possível descriptografar os dados salvos neste aparelho. Seus arquivos originais foram preservados em segurança."
+            : "Os arquivos locais salvos parecem incompletos ou corrompidos. Seus arquivos originais foram preservados em segurança."
+        return false
+    }
+
+    @discardableResult
+    func retryLoadPersistedEncryptedState() -> Bool {
+        let recovered = loadPersistedEncryptedStateIfAvailable(allowQuarantineCreation: false)
+        if recovered {
+            ensureOfficialCalendarEventsLoaded()
+            _ = applyRoomAllocationCatalog()
+        }
+        return recovered
+    }
+
+    func resetStateAfterLoadErrorAndUnlockPersistence() {
+        let fm = FileManager.default
+        let primaryUrl = Self.encryptedStateFileUrl
+        let backupUrl = Self.encryptedStateBackupFileUrl
+        let existing = [primaryUrl, backupUrl].filter { fm.fileExists(atPath: $0.path) }
+        if !existing.isEmpty && quarantinedStateFilenames.isEmpty {
+            _ = Self.createCorruptQuarantineCopies(for: existing)
+        }
+        try? fm.removeItem(at: primaryUrl)
+        try? fm.removeItem(at: backupUrl)
+        persistenceBlockedDueToLoadError = false
+        persistenceLoadErrorMessage = nil
+        quarantinedStateFilenames = []
+        studentProfile = StudentProfile(onboardingCompleted: false)
+        transcriptEntries = []
+        isEadByCourseId = [:]
+        turmaByCourseId = [:]
+        dynamicGridCompletedByMatrix = [:]
+        friendSchedules = []
+        selectedFriendScheduleId = nil
+        requestedTimetablePresentation = false
+        guidedTourCompleted = false
+        seedUFOP2026_2Data()
+        ensureOfficialCalendarEventsLoaded()
+        _ = applyRoomAllocationCatalog()
+    }
+
+    private static func createCorruptQuarantineCopies(for urls: [URL]) -> [String] {
+        let fm = FileManager.default
+        let stamp = Int64(Date().timeIntervalSince1970 * 1000.0)
+        var createdNames: [String] = []
+        for (idx, sourceUrl) in urls.enumerated() {
+            let dir = sourceUrl.deletingLastPathComponent()
+            var destUrl = dir.appendingPathComponent("\(sourceUrl.lastPathComponent).corrupt-\(stamp)")
+            if fm.fileExists(atPath: destUrl.path) {
+                destUrl = dir.appendingPathComponent("\(sourceUrl.lastPathComponent).corrupt-\(stamp)-\(idx)")
+            }
+            if (try? fm.copyItem(at: sourceUrl, to: destUrl)) != nil {
+                createdNames.append(destUrl.lastPathComponent)
+            }
+        }
+        return createdNames
     }
 
     func exportEncryptedBackup(password: String) throws -> String {
@@ -136,6 +339,9 @@ public extension CampusStore {
         }
         let decoded = try JSONDecoder().decode(PersistedCampusState.self, from: data)
         applySnapshot(decoded)
+        persistenceBlockedDueToLoadError = false
+        persistenceLoadErrorMessage = nil
+        quarantinedStateFilenames = []
         studentProfile.onboardingCompleted = true
         ensureOfficialCalendarEventsLoaded()
         _ = applyRoomAllocationCatalog()
@@ -145,6 +351,10 @@ public extension CampusStore {
 
     func signOutAndResetAllData(lockManager: AppLockManager, appearance: CampusAppearanceController) {
         try? FileManager.default.removeItem(at: Self.encryptedStateFileUrl)
+        try? FileManager.default.removeItem(at: Self.encryptedStateBackupFileUrl)
+        persistenceBlockedDueToLoadError = false
+        persistenceLoadErrorMessage = nil
+        quarantinedStateFilenames = []
         SecurePdfProcessor.purgeResidualTemporaryPdfs()
         lockManager.clearAllLockData()
         appearance.resetDefaults()

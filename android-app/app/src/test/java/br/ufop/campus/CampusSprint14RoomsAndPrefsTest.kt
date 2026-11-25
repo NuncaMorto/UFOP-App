@@ -12,6 +12,8 @@ import br.ufop.campus.core.ffi.InMemoryCampusRepository
 import br.ufop.campus.core.security.CampusCryptoEngine
 import br.ufop.campus.ui.activities.filterActivityEntries
 import br.ufop.campus.ui.activities.formatActivityTypeFilterLabel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -271,6 +273,52 @@ class CampusSprint14RoomsAndPrefsTest {
         val reloadedMtmSlots = bridgeReloaded.listCourseSlots(legacyMtm.courseId).associateBy { it.slotId }
         assertEquals("Sala 19", reloadedMtmSlots[mtmGenericSlot.slotId]?.room)
         assertEquals("Lab 03", reloadedMtmSlots[mtmCustomSlot.slotId]?.room)
+    }
+
+    @Test
+    fun backgroundRoomAllocationEnrichment_emitsReactiveMutationVersionThreadSafely() {
+        val index = loadRealRoomAllocationIndex()
+        val stateFile = File(tempFolder.root, "sprint14_async_rooms_state.json")
+        val bridge = CampusEngineBridgeRepository(dbPath = null, stateFile = stateFile)
+
+        val certText = """
+            UNIVERSIDADE FEDERAL DE OURO PRETO
+            ATESTADO DE MATRÍCULA 2026/2
+            Atestamos que GABRIEL HENRIQUE COSTA matrícula nº 24.1.5089 está regularmente matriculado no curso de CIÊNCIA DA COMPUTAÇÃO, cuja situação é regular no campus Ouro Preto.
+            Início das Aulas: 24 de agosto de 2026
+            Término das Aulas: 23 de dezembro de 2026
+
+            MTM124 64 ALGEBRA LINEAR ICEB PORTUGUES
+            BCC721 11 INTRODUCAO A CIENCIA DE DADOS ICEB PORTUGUES
+
+            Horário          Segunda        Terça          Quarta         Quinta         Sexta
+            15:20 - 16:10    MTM124-64T     BCC721-11T     MTM124-64T     BCC721-11T
+            16:10 - 17:00    MTM124-64T     BCC721-11T     MTM124-64T     BCC721-11T
+        """.trimIndent()
+
+        assertEquals(2, bridge.importEnrollmentCertificateText(certText))
+        assertTrue(bridge.listCourseSlots("mtm124_2026_2").all { it.room.isEmpty() })
+
+        val versionBefore = bridge.mutationVersion.value
+        val updatedCount = runBlocking(Dispatchers.IO) {
+            bridge.applyRoomAllocationIndex(index, enrichExisting = true)
+        }
+        assertEquals(4, updatedCount)
+        assertTrue(
+            "mutationVersion must advance after background room enrichment",
+            bridge.mutationVersion.value > versionBefore
+        )
+
+        val mtmSlots = bridge.listCourseSlots("mtm124_2026_2").sortedBy { it.dayOfWeek }
+        assertEquals("ICEB", mtmSlots[0].building)
+        assertEquals("Sala 19", mtmSlots[0].room)
+        assertEquals("ICEB", mtmSlots[1].building)
+        assertEquals("Sala 10", mtmSlots[1].room)
+
+        val coldReloaded = CampusEngineBridgeRepository(dbPath = null, stateFile = stateFile)
+        val persistedSlots = coldReloaded.listCourseSlots("mtm124_2026_2").sortedBy { it.dayOfWeek }
+        assertEquals("Sala 19", persistedSlots[0].room)
+        assertEquals("Sala 10", persistedSlots[1].room)
     }
 
     // ── d) Helpers de preferência em CampusRepositoryHolder ──────────────────────────────────────

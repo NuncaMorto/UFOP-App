@@ -39,6 +39,11 @@ object CampusRepositoryHolder {
     @Volatile
     private var instance: CampusCoreRepository? = null
 
+    private val roomAllocationWarmupLock = Any()
+
+    @Volatile
+    private var roomAllocationAppliedForInstance: CampusCoreRepository? = null
+
     fun getOrCreate(context: Context): CampusCoreRepository {
         instance?.let { return it }
         return synchronized(this) {
@@ -53,13 +58,26 @@ object CampusRepositoryHolder {
                         }
                     }
                 )
-                runCatching {
-                    val index = UfopRoomAllocationCatalog.loadFromAssets(appContext)
-                    created.applyRoomAllocationIndex(index, enrichExisting = true)
-                }
                 instance = created
                 created
             }
+        }
+    }
+
+    fun warmUpRoomAllocationsOnIo(
+        context: Context,
+        repository: CampusCoreRepository = getOrCreate(context)
+    ): Int {
+        if (roomAllocationAppliedForInstance === repository) return 0
+        val appContext = context.applicationContext
+        val index = UfopRoomAllocationCatalog.loadFromAssets(appContext)
+        return synchronized(roomAllocationWarmupLock) {
+            if (roomAllocationAppliedForInstance === repository) {
+                return@synchronized 0
+            }
+            val updated = repository.applyRoomAllocationIndex(index, enrichExisting = true)
+            roomAllocationAppliedForInstance = repository
+            updated
         }
     }
 

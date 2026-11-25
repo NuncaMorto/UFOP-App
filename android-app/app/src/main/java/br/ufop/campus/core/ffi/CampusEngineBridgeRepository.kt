@@ -5,6 +5,7 @@ import br.ufop.campus.ui.theme.CampusAccessibilitySettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.io.File
 
 /**
@@ -47,9 +48,31 @@ class CampusEngineBridgeRepository(
 
     private val fallback = InMemoryCampusRepository(
         stateFile = stateFile,
-        onMutation = { _mutationVersion.value += 1L },
+        onMutation = { _mutationVersion.update { it + 1L } },
         onStatePersisted = onStatePersisted
     )
+
+    override val persistenceLoadError: StateFlow<PersistenceLoadErrorState>
+        get() = fallback.persistenceLoadError
+
+    override fun isPersistenceBlockedDueToLoadError(): Boolean = synchronized(lock) {
+        fallback.isPersistenceBlockedDueToLoadError()
+    }
+
+    override fun retryLoadPersistedState(): Boolean = synchronized(lock) {
+        val recovered = fallback.retryLoadPersistedState()
+        if (recovered) {
+            _mutationVersion.update { it + 1L }
+        }
+        recovered
+    }
+
+    override fun resetStateAfterLoadErrorAndUnlockPersistence(): Unit = synchronized(lock) {
+        fallback.resetStateAfterLoadErrorAndUnlockPersistence()
+        _mutationVersion.update { it + 1L }
+        runCatching { onStatePersisted?.invoke() }
+        Unit
+    }
 
     @Volatile
     private var roomAllocationIndex: UfopRoomAllocationIndex? = null
@@ -770,7 +793,7 @@ class CampusEngineBridgeRepository(
         roomAllocationIndex = index
         val count = fallback.applyRoomAllocationIndex(index, enrichExisting)
         if (count > 0) {
-            _mutationVersion.value += 1L
+            _mutationVersion.update { it + 1L }
         }
         count
     }

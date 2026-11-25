@@ -57,6 +57,11 @@ public final class CampusStore {
     /// Sprint 4: Histórico de marcações (`.absent` / `.cancelled`) por sessão (`agendaItemId`).
     public internal(set) var absenceHistoryBySession: [String: AbsenceHistoryEntry] = [:]
 
+    /// Trava de persistência ativada quando arquivos locais existentes não puderam ser carregados/descriptografados.
+    public internal(set) var persistenceBlockedDueToLoadError: Bool = false
+    public internal(set) var persistenceLoadErrorMessage: String? = nil
+    public internal(set) var quarantinedStateFilenames: [String] = []
+
     internal var hasCompletedInit: Bool = false
 
     public init() {

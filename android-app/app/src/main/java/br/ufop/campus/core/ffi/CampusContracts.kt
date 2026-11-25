@@ -5,8 +5,19 @@ import br.ufop.campus.core.curriculum.UfopRoomAllocationIndex
 import br.ufop.campus.ui.theme.CampusAccessibilitySettings
 import kotlinx.coroutines.flow.StateFlow
 
+data class PersistenceLoadErrorState(
+    val hasError: Boolean = false,
+    val reason: String? = null,
+    val quarantinedFiles: List<String> = emptyList(),
+    val detectedAtEpochMs: Long = 0L
+)
+
 interface CampusCoreRepository {
     val mutationVersion: StateFlow<Long>
+    val persistenceLoadError: StateFlow<PersistenceLoadErrorState>
+    fun isPersistenceBlockedDueToLoadError(): Boolean
+    fun retryLoadPersistedState(): Boolean
+    fun resetStateAfterLoadErrorAndUnlockPersistence()
     fun getAgendaDay(isoDate: String): AgendaDayOverview
     fun getClassCheckIn(slotId: String, isoDate: String): ClassCheckInDetail
     fun saveClassCheckIn(

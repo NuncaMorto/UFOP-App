@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.15"
+    public static let currentVersionString = "1.9.16"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.15",
-            title: "Matrizes Históricas, Resolução por Ingresso & PPCs Oficiais",
+            version: "v1.9.16",
+            title: "Proteção Reforçada de Dados & Abertura Mais Rápida",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Blindagem do Keychain: evita apagar ou substituir a chave de proteção em falhas temporárias, gerando cópia de segurança local (.bak) antes de cada atualização.",
+                "Proteção contra perda de dados: caso os arquivos locais não possam ser lidos ou descriptografados, as cópias originais são preservadas em quarentena e gravações futuras ficam travadas até recuperação.",
+                "Compatibilidade garantida para restauração e leitura de estados legados sem schemaVersion.",
+                "Sincronização completa de versão com as melhorias de inicialização e otimização do Android 1.9.16."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.15",
+            title: "Matrizes Históricas, Resolução por Ingresso & PPCs Oficiais",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Integração de 33 matrizes curriculares históricas completas de 21 cursos (1.650 componentes), preservando as matrizes curadas de Eng. de Controle e Automação (AUT 2024/1 e 2026/1).",
                 "Resolução automática por ano e semestre de ingresso na Matriz Curricular e na Grade Dinâmica (FAR, MED, AMB, LTP, EFB/EFL, ECO e outros), sem falso aviso de matriz legada.",

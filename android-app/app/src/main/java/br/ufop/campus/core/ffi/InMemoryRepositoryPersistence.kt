@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import br.ufop.campus.core.security.CampusCryptoEngine
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -272,14 +273,62 @@ internal fun InMemoryCampusRepository.restoreFullAccountSnapshotJsonImpl(rawJson
         }.getOrDefault(false)
         if (!restored) return@synchronized false
 
-        persistStateLocked()
-        _mutationVersion.value += 1L
+        val wasBlocked = persistenceBlockedDueToLoadError
+        persistenceBlockedDueToLoadError = false
+        val persisted = persistStateLocked()
+        if (wasBlocked && stateFile != null && !persisted) {
+            persistenceBlockedDueToLoadError = true
+            applyVirginStateLocked()
+            return@synchronized false
+        }
+        _persistenceLoadError.value = PersistenceLoadErrorState()
+        _mutationVersion.update { it + 1L }
         true
     }
+
+internal fun InMemoryCampusRepository.retryLoadPersistedStateImpl(): Boolean =
+    synchronized(lock) {
+        val targetFile = stateFile ?: return@synchronized false
+        val recovered = loadPersistedStateOrFallbackLocked(
+            file = targetFile,
+            allowQuarantineCreation = false
+        )
+        if (recovered) {
+            _mutationVersion.update { it + 1L }
+        }
+        recovered
+    }
+
+internal fun InMemoryCampusRepository.resetStateAfterLoadErrorAndUnlockPersistenceImpl() {
+    synchronized(lock) {
+        stateFile?.let { targetFile ->
+            val parentDir = targetFile.absoluteFile.parentFile
+            val candidates = listOfNotNull(
+                targetFile,
+                parentDir?.let { File(it, "${targetFile.name}.bak") },
+                parentDir?.let { File(it, "${targetFile.name}.tmp") }
+            )
+            val existingCandidates = candidates.filter { it.exists() }
+            if (existingCandidates.isNotEmpty() && _persistenceLoadError.value.quarantinedFiles.isEmpty()) {
+                createCorruptQuarantineCopies(existingCandidates)
+            }
+            candidates.forEach { cand ->
+                runCatching { cand.delete() }
+            }
+        }
+        applyVirginStateLocked()
+        persistenceBlockedDueToLoadError = false
+        _persistenceLoadError.value = PersistenceLoadErrorState()
+        _mutationVersion.update { it + 1L }
+        runCatching { onStatePersisted?.invoke() }
+    }
+}
 
 internal fun InMemoryCampusRepository.wipeAllUserDataForLogoutImpl() {
     synchronized(lock) {
         applyVirginStateLocked()
+        persistenceBlockedDueToLoadError = false
+        _persistenceLoadError.value = PersistenceLoadErrorState()
         stateFile?.let { targetFile ->
             val parentDir = targetFile.absoluteFile.parentFile
             runCatching { targetFile.delete() }
@@ -288,41 +337,73 @@ internal fun InMemoryCampusRepository.wipeAllUserDataForLogoutImpl() {
                 runCatching { File(parentDir, "${targetFile.name}.tmp").delete() }
             }
         }
-        _mutationVersion.value += 1L
+        _mutationVersion.update { it + 1L }
         runCatching { onStatePersisted?.invoke() }
     }
 }
 
-internal fun InMemoryCampusRepository.loadPersistedStateOrFallbackLocked(file: File) {
+internal fun InMemoryCampusRepository.loadPersistedStateOrFallbackLocked(
+    file: File,
+    allowQuarantineCreation: Boolean = true
+): Boolean {
     val parentDir = file.absoluteFile.parentFile
     val candidates = listOf(
         file,
         File(parentDir, "${file.name}.bak"),
         File(parentDir, "${file.name}.tmp")
     )
-    for (candidate in candidates) {
-        if (!candidate.exists() || candidate.length() <= 2L) continue
+    val existingCandidates = candidates.filter { it.exists() }
+    if (existingCandidates.isEmpty()) {
+        persistenceBlockedDueToLoadError = false
+        _persistenceLoadError.value = PersistenceLoadErrorState()
+        applyVirginStateLocked()
+        return true
+    }
+
+    var sawSecurityFailure = false
+    var sawInvalidOrCorruptFormat = false
+
+    for (candidate in existingCandidates) {
+        if (candidate.length() <= 2L) {
+            sawInvalidOrCorruptFormat = true
+            continue
+        }
         var wasPlaintext = false
-        val root = runCatching {
+        val root = try {
             val raw = candidate.readText(Charsets.UTF_8)
-            if (raw.isBlank()) return@runCatching null
-            val decrypted = CampusCryptoEngine.decryptStatePayloadIfNeeded(raw)
-            wasPlaintext = (decrypted == raw)
-            JSONObject(decrypted)
-        }.getOrNull() ?: continue
+            if (raw.isBlank()) {
+                sawInvalidOrCorruptFormat = true
+                null
+            } else {
+                val decrypted = CampusCryptoEngine.decryptStatePayloadIfNeeded(raw)
+                wasPlaintext = (decrypted == raw)
+                JSONObject(decrypted)
+            }
+        } catch (_: SecurityException) {
+            sawSecurityFailure = true
+            null
+        } catch (_: Throwable) {
+            sawInvalidOrCorruptFormat = true
+            null
+        } ?: continue
 
         val schemaVersion = root.optInt("schemaVersion", -1)
         val hasValidData = schemaVersion >= 1 ||
             root.has("courses") ||
             root.has("studentProfile") ||
             root.has("transcriptEntries")
-        if (!hasValidData) continue
+        if (!hasValidData) {
+            sawInvalidOrCorruptFormat = true
+            continue
+        }
 
         val restored = runCatching {
             restoreStateFromJsonLocked(root)
             true
         }.getOrDefault(false)
         if (restored) {
+            persistenceBlockedDueToLoadError = false
+            _persistenceLoadError.value = PersistenceLoadErrorState()
             if (wasPlaintext) {
                 if (candidate != file) {
                     runCatching {
@@ -344,14 +425,66 @@ internal fun InMemoryCampusRepository.loadPersistedStateOrFallbackLocked(file: F
                     )
                 }
             }
-            return
+            return true
         }
+        sawInvalidOrCorruptFormat = true
     }
+
+    // Todos os candidatos existentes falharam: preserva os arquivos originais, cria cópia em quarentena
+    // e bloqueia gravações futuras para impedir sobrescrita silenciosa dos dados do estudante.
+    val quarantinedNames = if (allowQuarantineCreation && _persistenceLoadError.value.quarantinedFiles.isEmpty()) {
+        createCorruptQuarantineCopies(existingCandidates)
+    } else {
+        _persistenceLoadError.value.quarantinedFiles
+    }
+    persistenceBlockedDueToLoadError = true
     applyVirginStateLocked()
+    val reason = when {
+        sawSecurityFailure && !sawInvalidOrCorruptFormat ->
+            "A chave de proteção do aparelho está temporariamente indisponível ou foi alterada. Seus dados originais foram preservados intactos."
+        sawSecurityFailure ->
+            "Não foi possível descriptografar ou validar os arquivos salvos. Seus dados originais foram preservados em segurança."
+        else ->
+            "Os arquivos de dados salvos parecem incompletos ou corrompidos. Seus dados originais foram preservados em segurança."
+    }
+    _persistenceLoadError.value = PersistenceLoadErrorState(
+        hasError = true,
+        reason = reason,
+        quarantinedFiles = quarantinedNames,
+        detectedAtEpochMs = System.currentTimeMillis()
+    )
+    return false
 }
 
-internal fun InMemoryCampusRepository.persistStateLocked(encryptExistingPlaintextBackup: Boolean = false) {
-    val targetFile = stateFile ?: return
+private fun createCorruptQuarantineCopies(existingFiles: List<File>): List<String> {
+    val timestamp = System.currentTimeMillis()
+    val copiedNames = mutableListOf<String>()
+    existingFiles.forEachIndexed { idx, source ->
+        val parentDir = source.absoluteFile.parentFile ?: return@forEachIndexed
+        var dest = File(parentDir, "${source.name}.corrupt-$timestamp")
+        if (dest.exists()) {
+            dest = File(parentDir, "${source.name}.corrupt-$timestamp-$idx")
+        }
+        val copied = runCatching {
+            Files.copy(
+                source.toPath(),
+                dest.toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+            )
+            true
+        }.getOrDefault(false)
+        if (copied) {
+            copiedNames.add(dest.name)
+        }
+    }
+    return copiedNames
+}
+
+internal fun InMemoryCampusRepository.persistStateLocked(
+    encryptExistingPlaintextBackup: Boolean = false
+): Boolean {
+    if (persistenceBlockedDueToLoadError) return false
+    val targetFile = stateFile ?: return true
     var persisted = false
     try {
         val parentDir = targetFile.absoluteFile.parentFile
@@ -455,4 +588,5 @@ internal fun InMemoryCampusRepository.persistStateLocked(encryptExistingPlaintex
     if (persisted) {
         runCatching { onStatePersisted?.invoke() }
     }
+    return persisted
 }

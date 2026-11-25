@@ -38,6 +38,7 @@ import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.navigation.CampusNavigation
 import br.ufop.campus.ui.security.AppLockOverlay
+import br.ufop.campus.ui.security.PersistenceRecoveryScreen
 import br.ufop.campus.ui.theme.CampusAccentColor
 import br.ufop.campus.ui.theme.CampusTheme
 import br.ufop.campus.widget.VidaAcademicaWidgetProvider
@@ -82,6 +83,9 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching {
+                PDFBoxResourceLoader.init(applicationContext)
+            }
+            runCatching {
                 SecurePdfProcessor.purgeResidualPdfFiles(applicationContext)
             }
             runCatching {
@@ -90,18 +94,25 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        PDFBoxResourceLoader.init(applicationContext)
-
         setContent {
             val systemDark = isSystemInDarkTheme()
             val repository: CampusCoreRepository = remember {
                 CampusRepositoryHolder.getOrCreate(applicationContext)
             }
             val mutationVersion by repository.mutationVersion.collectAsState()
+            val persistenceLoadError by repository.persistenceLoadError.collectAsState()
 
-            // Pré-aquece o catálogo de cursos UFOP (~595 KB) em background antes da 1ª abertura da aba Perfil.
-            LaunchedEffect(Unit) {
-                withContext(Dispatchers.IO) {
+            // Pré-aquece o catálogo de salas e o catálogo de cursos UFOP (~595 KB) em I/O fora da Main Thread.
+            LaunchedEffect(repository) {
+                launch(Dispatchers.IO) {
+                    runCatching {
+                        CampusRepositoryHolder.warmUpRoomAllocationsOnIo(
+                            context = applicationContext,
+                            repository = repository
+                        )
+                    }
+                }
+                launch(Dispatchers.IO) {
                     runCatching {
                         UfopCurriculumCatalog.getAllCourses(applicationContext)
                     }
@@ -219,6 +230,11 @@ class MainActivity : ComponentActivity() {
                                 lastBackgroundElapsedMs = 0L
                                 isAppLockedState = false
                             }
+                        )
+                    } else if (persistenceLoadError.hasError) {
+                        PersistenceRecoveryScreen(
+                            repository = repository,
+                            errorState = persistenceLoadError
                         )
                     } else {
                         saveableStateHolder.SaveableStateProvider(key = "campus_main_content") {

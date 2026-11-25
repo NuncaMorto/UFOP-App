@@ -1,6 +1,7 @@
 package br.ufop.campus.core.ffi
 
 import br.ufop.campus.core.curriculum.UfopRoomAllocationIndex
+import kotlinx.coroutines.flow.update
 
 internal fun InMemoryCampusRepository.listDepartmentsImpl(): List<DepartmentColorOption> =
     departmentSwatches
@@ -485,7 +486,7 @@ internal fun InMemoryCampusRepository.applyRoomAllocationIndexImpl(
     val updatedCount = enrichExistingRoomAllocationsLocked(index)
     if (updatedCount > 0) {
         persistStateLocked()
-        _mutationVersion.value += 1L
+        _mutationVersion.update { it + 1L }
     }
     updatedCount
 }

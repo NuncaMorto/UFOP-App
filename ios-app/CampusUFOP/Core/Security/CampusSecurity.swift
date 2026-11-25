@@ -18,6 +18,7 @@ public enum CampusCryptoError: LocalizedError {
     case keyDerivationFailed
     case encryptionFailed
     case decryptionFailed
+    case keychainUnavailable(OSStatus)
 
     public var errorDescription: String? {
         switch self {
@@ -33,6 +34,8 @@ public enum CampusCryptoError: LocalizedError {
             return "Falha ao criptografar os dados locais."
         case .decryptionFailed:
             return "Senha incorreta ou arquivo adulterado."
+        case .keychainUnavailable(let status):
+            return "Chave de proteção do aparelho temporariamente indisponível (código \(status))."
         }
     }
 }
@@ -145,8 +148,16 @@ public enum CampusCryptoEngine {
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecSuccess, let keyData = item as? Data, keyData.count == aesKeyByteCount {
+        if status == errSecSuccess {
+            guard let keyData = item as? Data, keyData.count == aesKeyByteCount else {
+                throw CampusCryptoError.keychainUnavailable(status)
+            }
             return SymmetricKey(data: keyData)
+        }
+
+        // Nunca sobrescrever ou apagar a chave em falhas transitórias (ex.: errSecInteractionNotAllowed).
+        guard status == errSecItemNotFound else {
+            throw CampusCryptoError.keychainUnavailable(status)
         }
 
         let newKeyData = try randomBytes(count: aesKeyByteCount)
@@ -157,12 +168,21 @@ public enum CampusCryptoEngine {
             kSecValueData as String: newKeyData,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
-        SecItemDelete(addQuery as CFDictionary)
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        guard addStatus == errSecSuccess || addStatus == errSecDuplicateItem else {
-            throw CampusCryptoError.encryptionFailed
+        if addStatus == errSecSuccess {
+            return SymmetricKey(data: newKeyData)
         }
-        return SymmetricKey(data: newKeyData)
+        if addStatus == errSecDuplicateItem {
+            var retryItem: CFTypeRef?
+            let retryStatus = SecItemCopyMatching(query as CFDictionary, &retryItem)
+            guard retryStatus == errSecSuccess,
+                  let existingData = retryItem as? Data,
+                  existingData.count == aesKeyByteCount else {
+                throw CampusCryptoError.keychainUnavailable(retryStatus)
+            }
+            return SymmetricKey(data: existingData)
+        }
+        throw CampusCryptoError.keychainUnavailable(addStatus)
     }
 
     public static func randomBytes(count: Int) throws -> Data {

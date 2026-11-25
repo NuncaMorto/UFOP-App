@@ -5,6 +5,7 @@ import br.ufop.campus.ui.theme.CampusAccessibilitySettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.io.File
 import java.time.LocalDate
 
@@ -26,6 +27,12 @@ class InMemoryCampusRepository(
     internal val lock = Any()
     internal val _mutationVersion = MutableStateFlow(0L)
     override val mutationVersion: StateFlow<Long> = _mutationVersion.asStateFlow()
+
+    @Volatile
+    internal var persistenceBlockedDueToLoadError: Boolean = false
+    internal val _persistenceLoadError = MutableStateFlow(PersistenceLoadErrorState())
+    override val persistenceLoadError: StateFlow<PersistenceLoadErrorState> =
+        _persistenceLoadError.asStateFlow()
 
     // Estado mutável em memória sincronizado com mutações do usuário
     internal val courseColorOverrides = mutableMapOf<String, String>()
@@ -610,6 +617,15 @@ class InMemoryCampusRepository(
 
     override fun restoreFullAccountSnapshotJson(rawJson: String): Boolean =
         restoreFullAccountSnapshotJsonImpl(rawJson)
+
+    override fun isPersistenceBlockedDueToLoadError(): Boolean = synchronized(lock) {
+        persistenceBlockedDueToLoadError
+    }
+
+    override fun retryLoadPersistedState(): Boolean = retryLoadPersistedStateImpl()
+
+    override fun resetStateAfterLoadErrorAndUnlockPersistence() =
+        resetStateAfterLoadErrorAndUnlockPersistenceImpl()
 
     override fun wipeAllUserDataForLogout() = wipeAllUserDataForLogoutImpl()
 }

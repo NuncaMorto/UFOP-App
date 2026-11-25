@@ -5,6 +5,7 @@ import android.security.keystore.KeyProperties
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.security.SecureRandom
+import java.security.Security
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -51,6 +52,9 @@ object CampusCryptoEngine {
     private var testKeyOverride: SecretKey? = null
 
     @Volatile
+    private var androidKeyStoreLoaderForTest: (() -> SecretKey)? = null
+
+    @Volatile
     private var jvmFallbackKey: SecretKey? = null
 
     /**
@@ -60,6 +64,16 @@ object CampusCryptoEngine {
     internal fun setTestKeyOverrideForJvm(key: SecretKey?) {
         synchronized(keyLock) {
             testKeyOverride = key
+        }
+    }
+
+    /**
+     * Simula o provedor `AndroidKeyStore` em testes unitários JVM para validar que falhas reais
+     * lançam `SecurityException` sem cair silenciosamente em chave efêmera em memória.
+     */
+    internal fun setAndroidKeyStoreLoaderForTest(loader: (() -> SecretKey)?) {
+        synchronized(keyLock) {
+            androidKeyStoreLoaderForTest = loader
         }
     }
 
@@ -194,14 +208,46 @@ object CampusCryptoEngine {
         }
     }
 
+    private fun isAndroidKeyStoreProviderPresent(): Boolean {
+        if (Security.getProvider(ANDROID_KEYSTORE_PROVIDER) != null) {
+            return true
+        }
+        return runCatching {
+            KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER)
+            true
+        }.getOrDefault(false)
+    }
+
     private fun getOrCreateMasterKey(): SecretKey {
         testKeyOverride?.let { return it }
         synchronized(keyLock) {
             testKeyOverride?.let { return it }
-            val androidKey = runCatching { getOrCreateAndroidKeyStoreKey() }.getOrNull()
-            if (androidKey != null) {
-                return androidKey
+            val testLoader = androidKeyStoreLoaderForTest
+            if (testLoader != null) {
+                return try {
+                    testLoader()
+                } catch (err: SecurityException) {
+                    throw err
+                } catch (err: Throwable) {
+                    throw SecurityException(
+                        "Falha ao acessar a chave mestra no AndroidKeyStore.",
+                        err
+                    )
+                }
             }
+            if (isAndroidKeyStoreProviderPresent()) {
+                return try {
+                    getOrCreateAndroidKeyStoreKey()
+                } catch (err: SecurityException) {
+                    throw err
+                } catch (err: Throwable) {
+                    throw SecurityException(
+                        "Falha ao acessar ou gerar a chave mestra no AndroidKeyStore.",
+                        err
+                    )
+                }
+            }
+            // Fallback em memória permitido exclusivamente fora do Android (testes unitários JVM).
             val existingFallback = jvmFallbackKey
             if (existingFallback != null) {
                 return existingFallback
@@ -217,9 +263,11 @@ object CampusCryptoEngine {
     private fun getOrCreateAndroidKeyStoreKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER)
         keyStore.load(null)
-        val existing = keyStore.getKey(MASTER_KEY_ALIAS, null) as? SecretKey
-        if (existing != null) {
-            return existing
+        if (keyStore.containsAlias(MASTER_KEY_ALIAS)) {
+            val existing = keyStore.getKey(MASTER_KEY_ALIAS, null) as? SecretKey
+            return existing ?: throw SecurityException(
+                "A chave mestra no AndroidKeyStore existe, mas não pôde ser recuperada."
+            )
         }
         val keyGenerator = KeyGenerator.getInstance(
             KeyProperties.KEY_ALGORITHM_AES,

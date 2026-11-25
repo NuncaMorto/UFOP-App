@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.16 — Proteção Reforçada de Dados, Recuperação Segura & Abertura Mais Rápida
+
+- **Android (`1.9.16` · Beta) & iOS (`1.9.16`):**
+  - **Blindagem de chaves e proteção contra sobrescrita:** falha temporária na chave de proteção do aparelho não gera mais chave temporária nem sobrescreve dados locais; quando nenhum arquivo salvo puder ser aberto, os arquivos originais são preservados em quarentena e gravações ficam travadas até recuperação.
+  - **Tela de recuperação de dados (Android):** em caso de erro ao abrir dados locais, o app exibe tela dedicada com 3 ações seguras — **Tentar novamente**, **Restaurar backup (.ufopbackup)** ou **Recomeçar do zero** (somente após confirmação).
+  - **Paridade de proteção no iOS:** correção no acesso ao Keychain para não apagar a chave em falhas transitórias, backup local `.bak` automático antes de cada gravação e compatibilidade segura com dados legados sem `schemaVersion`.
+  - **Abertura mais rápida e app mais leve (Android):** inicialização do leitor de PDF e carregamento do catálogo oficial de salas movidos para segundo plano (sem travar o primeiro quadro) e otimização do motor nativo Rust com redução de ~28% no binário `arm64-v8a`.
+
+<!-- versionCode: 33 -->
+
+---
+
 ## v1.9.15 — Matrizes Curriculares Históricas, Resolução por Ingresso & Referências Oficiais
 
 - **Android (`1.9.15` · Beta) & iOS (`1.9.15`):**
