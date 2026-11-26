@@ -51,12 +51,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.AcademicCalendarEvent
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
 import br.ufop.campus.ui.theme.DarkWeatherBadgeText
 import br.ufop.campus.ui.theme.LightWeatherBadgeBg
 import br.ufop.campus.ui.theme.LightWeatherBadgeText
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
+import br.ufop.campus.ui.theme.tabularNums
 import java.time.LocalDate
 
 @Composable
@@ -120,7 +124,7 @@ internal fun WeatherPillBadge(
         ) {
             Text(
                 text = "☀ $tempC °C",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.tabularNums(),
                 color = textColor,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -160,7 +164,7 @@ internal fun AgendaBannerCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = containerColor,
-        border = BorderStroke(1.dp, borderColor)
+        border = if (isError) BorderStroke(1.dp, borderColor) else campusCardBorder()
     ) {
         Row(
             modifier = Modifier
@@ -224,9 +228,10 @@ internal fun AcademicEventsAccordionCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation()
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(

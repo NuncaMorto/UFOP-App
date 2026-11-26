@@ -1,11 +1,12 @@
 import SwiftUI
 
-// MARK: - Barra de Navegação Flutuante Liquid Glass (4 Abas + Botão Circular do Mapa)
+// MARK: - Barra de Navegação Flutuante Tonal/Liquid Glass (4 Abas + Avatar/Iniciais + Mapa)
 
 public struct FloatingCampusTabBarView: View {
     @Binding public var selectedTab: CampusTab
     public let accent: Color
     public let onPrimary: Color
+    public let studentName: String
     public let highContrast: Bool
     public let reduceMotion: Bool
     public let minTouch: CGFloat
@@ -13,12 +14,14 @@ public struct FloatingCampusTabBarView: View {
     public let onBeforeSelectMap: (() -> Void)?
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Namespace private var tabHighlightNamespace
 
     public init(
         selectedTab: Binding<CampusTab>,
         accent: Color,
         onPrimary: Color = .white,
+        studentName: String = "",
         highContrast: Bool = false,
         reduceMotion: Bool = false,
         minTouch: CGFloat = 48,
@@ -28,11 +31,16 @@ public struct FloatingCampusTabBarView: View {
         self._selectedTab = selectedTab
         self.accent = accent
         self.onPrimary = onPrimary
+        self.studentName = studentName
         self.highContrast = highContrast
         self.reduceMotion = reduceMotion
         self.minTouch = minTouch
         self.axis = axis
         self.onBeforeSelectMap = onBeforeSelectMap
+    }
+
+    private var activeAccentColor: CampusAccentColor {
+        appearance?.accentColor ?? .red
     }
 
     public var body: some View {
@@ -88,11 +96,15 @@ public struct FloatingCampusTabBarView: View {
             selectTab(tab)
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: isSelected ? tab.selectedSystemImage : tab.systemImage)
-                    .font(.system(size: 18, weight: isSelected ? .semibold : .medium))
+                if tab == .profile {
+                    profileAvatarBadge(isSelected: isSelected)
+                } else {
+                    Image(systemName: isSelected ? tab.selectedSystemImage : tab.systemImage)
+                        .font(.system(size: 18, weight: isSelected ? .semibold : .medium))
+                }
 
                 Text(tab.title)
-                    .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .font(CampusTheme.font(size: 10, weight: isSelected ? .bold : .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .allowsTightening(true)
@@ -112,6 +124,50 @@ public struct FloatingCampusTabBarView: View {
         .campusHoverLift()
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    @ViewBuilder
+    private func profileAvatarBadge(isSelected: Bool) -> some View {
+        let initials = Self.extractInitials(from: studentName)
+        let fg = foregroundColor(isSelected: isSelected)
+        if initials.isEmpty {
+            Image(systemName: isSelected ? "person.crop.circle.fill" : "person.crop.circle")
+                .font(.system(size: 19, weight: isSelected ? .semibold : .medium))
+        } else {
+            ZStack {
+                Circle()
+                    .fill(
+                        isSelected
+                            ? activeAccentColor.primary(for: colorScheme).opacity(0.18)
+                            : activeAccentColor.surface2(for: colorScheme)
+                    )
+                Circle()
+                    .strokeBorder(
+                        isSelected
+                            ? fg
+                            : CampusTheme.mutedText(for: colorScheme, highContrast: highContrast).opacity(0.45),
+                        lineWidth: isSelected ? 1.8 : 1.0
+                    )
+                Text(initials)
+                    .font(CampusTheme.font(size: 10, weight: .bold))
+                    .foregroundStyle(fg)
+            }
+            .frame(width: 24, height: 24)
+        }
+    }
+
+    private static func extractInitials(from rawName: String) -> String {
+        let parts = rawName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0.isWhitespace })
+        guard let first = parts.first else { return "" }
+        if parts.count == 1 {
+            return String(first.prefix(2)).uppercased()
+        }
+        guard let last = parts.last, let f = first.first, let l = last.first else {
+            return String(first.prefix(2)).uppercased()
+        }
+        return "\(f)\(l)".uppercased()
     }
 
     // MARK: - Botão Circular Flutuante Dedicado ao Mapa
@@ -149,12 +205,15 @@ public struct FloatingCampusTabBarView: View {
         if highContrast {
             return accent
         }
-        return accent.opacity(colorScheme == .dark ? 0.28 : 0.16)
+        return activeAccentColor.surface2(for: colorScheme)
     }
 
     private func foregroundColor(isSelected: Bool) -> Color {
         if isSelected {
-            return highContrast ? onPrimary : accent
+            if highContrast {
+                return onPrimary
+            }
+            return colorScheme == .dark ? activeAccentColor.highlight(for: .dark) : accent
         }
         return CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast)
     }
@@ -175,22 +234,24 @@ private struct FloatingBarGlassSurface<S: InsettableShape>: ViewModifier {
     let highContrast: Bool
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+
+    private var activeAccentColor: CampusAccentColor {
+        appearance?.accentColor ?? .red
+    }
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if highContrast {
             content
-                .background(shape.fill(CampusTheme.cardBackground(for: colorScheme, highContrast: true)))
+                .background(shape.fill(CampusTheme.cardBackground(for: colorScheme, highContrast: true, accent: activeAccentColor)))
                 .overlay(shape.strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 2))
         } else {
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
                 content
                     .background(
-                        shape.fill(
-                            CampusTheme.cardBackground(for: colorScheme)
-                                .opacity(colorScheme == .dark ? 0.46 : 0.62)
-                        )
+                        shape.fill(activeAccentColor.surface1(for: colorScheme).opacity(0.92))
                     )
                     .glassEffect(.regular.interactive(), in: shape)
             } else {
@@ -205,37 +266,19 @@ private struct FloatingBarGlassSurface<S: InsettableShape>: ViewModifier {
     private func fallbackSurface(content: Content) -> some View {
         content
             .background(
-                ZStack {
-                    shape.fill(.ultraThinMaterial)
-                    shape.fill(
-                        CampusTheme.cardBackground(for: colorScheme)
-                            .opacity(colorScheme == .dark ? 0.54 : 0.66)
-                    )
-                }
+                shape.fill(activeAccentColor.surface1(for: colorScheme).opacity(0.96))
             )
-            .overlay(
-                shape.strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.26 : 0.76),
-                            CampusTheme.cardBorder(for: colorScheme)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-            )
-            .shadow(color: CampusTheme.cardShadow(for: colorScheme), radius: 12, x: 0, y: 6)
+            .shadow(color: CampusTheme.cardShadow(for: colorScheme), radius: 12, x: 0, y: 5)
     }
 }
 
 #Preview("FloatingCampusTabBarView - Horizontal") {
     ZStack(alignment: .bottom) {
-        LiquidGlassBackdrop(accent: .green, highContrast: false)
+        LiquidGlassBackdrop(accent: .red, highContrast: false)
         FloatingCampusTabBarView(
             selectedTab: .constant(.agenda),
-            accent: CampusAccentColor.green.primary(for: .light)
+            accent: CampusAccentColor.red.primary(for: .light),
+            studentName: "Ana Carolina"
         )
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -244,10 +287,11 @@ private struct FloatingBarGlassSurface<S: InsettableShape>: ViewModifier {
 
 #Preview("FloatingCampusTabBarView - Vertical") {
     ZStack(alignment: .leading) {
-        LiquidGlassBackdrop(accent: .green, highContrast: false)
+        LiquidGlassBackdrop(accent: .red, highContrast: false)
         FloatingCampusTabBarView(
             selectedTab: .constant(.agenda),
-            accent: CampusAccentColor.green.primary(for: .light),
+            accent: CampusAccentColor.red.primary(for: .light),
+            studentName: "Ana Carolina",
             axis: .vertical
         )
         .padding(.leading, 12)

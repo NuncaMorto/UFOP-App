@@ -31,9 +31,12 @@ import br.ufop.campus.core.curriculum.DynamicCourseNode
 import br.ufop.campus.core.curriculum.DynamicCourseStatus
 import br.ufop.campus.core.curriculum.DynamicCurriculumMatrix
 import br.ufop.campus.core.curriculum.DynamicGridEngine
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.tabularNums
 
 @Composable
 internal fun DynamicGridScrollableBoard(
@@ -162,21 +165,22 @@ private fun PeriodHeaderCard(
     } else {
         MaterialTheme.colorScheme.surfaceContainerHigh
     }
-    val borderColor = if (allDone) {
-        accessibleTextColor(
-            if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen,
-            isDark,
-            container
-        ).copy(alpha = 0.65f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }
+    val greenCounterColor = accessibleTextColor(
+        if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen,
+        isDark,
+        container
+    )
+    val counterColor = if (allDone) greenCounterColor else MaterialTheme.colorScheme.onSurface
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = container,
-        border = BorderStroke(1.dp, borderColor)
+        border = if (allDone) {
+            BorderStroke(1.dp, greenCounterColor.copy(alpha = 0.5f))
+        } else {
+            campusCardBorder()
+        }
     ) {
         Row(
             modifier = Modifier
@@ -193,9 +197,9 @@ private fun PeriodHeaderCard(
             )
             Text(
                 text = "$completedCount/$totalCount",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.tabularNums(),
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = counterColor
             )
         }
     }
@@ -215,23 +219,24 @@ private fun PeriodRowBadgeCard(
     } else {
         MaterialTheme.colorScheme.surfaceContainerHigh
     }
-    val borderColor = if (allDone) {
-        accessibleTextColor(
-            if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen,
-            isDark,
-            container
-        ).copy(alpha = 0.65f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }
+    val greenCounterColor = accessibleTextColor(
+        if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen,
+        isDark,
+        container
+    )
+    val counterColor = if (allDone) greenCounterColor else MaterialTheme.colorScheme.onSurface
 
     Surface(
         modifier = Modifier
             .width(92.dp)
             .heightIn(min = 114.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = container,
-        border = BorderStroke(1.dp, borderColor)
+        border = if (allDone) {
+            BorderStroke(1.dp, greenCounterColor.copy(alpha = 0.5f))
+        } else {
+            campusCardBorder()
+        }
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
@@ -248,14 +253,14 @@ private fun PeriodRowBadgeCard(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "$completedCount/$totalCount",
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleSmall.tabularNums(),
                 fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
+                color = counterColor
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "${totalHours}h",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.tabularNums(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

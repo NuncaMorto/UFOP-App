@@ -136,7 +136,7 @@ internal fun normalizeAccentColorKey(raw: String?): String = when (raw?.trim()?.
     "BROWN" -> "BROWN"
     "PINK" -> "PINK"
     "BLUE" -> "BLUE"
-    else -> "GREEN"
+    else -> "RED"
 }
 
 internal fun InMemoryCampusRepository.getAccentColorPreferenceImpl(): String =

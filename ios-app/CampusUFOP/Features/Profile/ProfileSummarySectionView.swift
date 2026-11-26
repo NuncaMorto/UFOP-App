@@ -8,6 +8,8 @@ internal struct ProfileStudentIdentityCard: View {
     let primaryAccent: Color
     let onPrimaryAccent: Color
     let highContrast: Bool
+    var minTouch: CGFloat = 48
+    var onEditProfile: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -15,6 +17,8 @@ internal struct ProfileStudentIdentityCard: View {
         let displayName = profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "Estudante"
             : profile.fullName
+        let courseLabel = profile.courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let regLabel = profile.registrationNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let initials = displayName
             .split(separator: " ")
             .prefix(2)
@@ -25,40 +29,63 @@ internal struct ProfileStudentIdentityCard: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(primaryAccent)
-                    .frame(width: 54, height: 54)
+                    .fill(primaryAccent.opacity(colorScheme == .dark ? 0.28 : 0.16))
+                    .frame(width: 58, height: 58)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(primaryAccent.opacity(0.35), lineWidth: 1.5)
+                    )
                 Text(initials.isEmpty ? "VA" : initials)
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
-                    .foregroundStyle(onPrimaryAccent)
+                    .font(CampusTheme.font(size: 19, weight: .bold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayName)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 17, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                    .lineLimit(2)
 
-                if !profile.courseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(profile.courseName)
-                        .font(.system(size: 13, weight: .semibold))
+                if !courseLabel.isEmpty {
+                    Text(courseLabel)
+                        .font(CampusTheme.font(size: 13, weight: .medium))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                        .lineLimit(2)
+                }
+
+                HStack(spacing: 6) {
+                    if !regLabel.isEmpty {
+                        Text("Mat. \(regLabel)")
+                            .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
+                            .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                    }
+                    Text("· \(summary.semester) · \(summary.activeCampus.city)")
+                        .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                 }
-
-                HStack(spacing: 8) {
-                    if !profile.registrationNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("Mat. \(profile.registrationNumber)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
-                    }
-                    Text("• \(summary.semester)")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
-                }
+                .lineLimit(1)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
+
+            if let onEditProfile {
+                Button {
+                    onEditProfile()
+                } label: {
+                    Label("Editar", systemImage: "pencil")
+                        .font(CampusTheme.font(size: 12, weight: .bold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 36)
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Editar perfil acadêmico")
+            }
         }
         .padding(16)
-        .liquidGlassCard(cornerRadius: 22, tint: primaryAccent, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
     }
 }
 
@@ -136,6 +163,7 @@ internal struct ProfileSummarySectionView: View {
     let onOpenMatrix: () -> Void
     let onOpenDynamicGrid: () -> Void
     let onOpenShare: () -> Void
+    var onEditProfile: () -> Void = {}
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -183,7 +211,9 @@ internal struct ProfileSummarySectionView: View {
                     summary: summary,
                     primaryAccent: primaryAccent,
                     onPrimaryAccent: onPrimaryAccent,
-                    highContrast: highContrast
+                    highContrast: highContrast,
+                    minTouch: minTouch,
+                    onEditProfile: onEditProfile
                 )
                 ProfileCampusSelectorCard(
                     store: store,
@@ -195,6 +225,8 @@ internal struct ProfileSummarySectionView: View {
                 )
             }
 
+            bentoOverviewRow(summary: summary, creReport: cachedCreReport, gridSummary: cachedGridSummary)
+            absenceRiskOrAttentionBanner(summary: summary)
             metricsGrid(summary: summary)
             creAndTranscriptCard(creReport: cachedCreReport)
             dynamicGridShortcutCard(
@@ -220,6 +252,165 @@ internal struct ProfileSummarySectionView: View {
         )
     }
 
+    private func bentoOverviewRow(
+        summary: AcademicProfileSummary,
+        creReport: AcademicCreReport,
+        gridSummary: DynamicGridSummary
+    ) -> some View {
+        let isCreInProgressOnly = creReport.overallCre == 0
+            && !creReport.semesters.isEmpty
+            && creReport.semesters.allSatisfy { $0.approvedCount == 0 && $0.failedCount == 0 && $0.inProgressCount > 0 }
+        let creValue = isCreInProgressOnly ? "Em curso" : String(format: "%.2f", creReport.overallCre)
+        let integralPercent: Int = {
+            if creReport.completedHours > 0 {
+                return min(100, max(0, (creReport.completedHours * 100) / max(1, creReport.totalRequiredHours)))
+            }
+            return gridSummary.completionPercent
+        }()
+        let integralHours = creReport.completedHours > 0
+            ? "\(creReport.completedHours)/\(creReport.totalRequiredHours)h"
+            : "\(gridSummary.completedHours)/\(gridSummary.totalGridHours)h"
+
+        let semesterDisciplines = store.disciplines.filter { $0.semester == summary.semester }
+        let attentionCount = semesterDisciplines.filter { disc in
+            guard disc.maxAbsences > 0 else { return false }
+            let ratio = Double(disc.currentAbsences) / Double(disc.maxAbsences)
+            return ratio >= 0.50 && ratio < 0.75
+        }.count
+        let freqStatus: String = {
+            if summary.coursesAtRisk > 0 { return "\(summary.coursesAtRisk) em risco" }
+            if attentionCount > 0 { return "\(attentionCount) em atenção" }
+            return "Controlada"
+        }()
+        let freqTint: Color = summary.coursesAtRisk > 0
+            ? Color(hex: colorScheme == .dark ? 0xEF9A9A : 0xC62828)
+            : (attentionCount > 0
+                ? Color(hex: colorScheme == .dark ? 0xFFB74D : 0xEF6C00)
+                : Color(hex: colorScheme == .dark ? 0x81C784 : 0x2E7D32))
+
+        return HStack(spacing: 10) {
+            Button {
+                onOpenMatrix()
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("CRE Geral")
+                        .font(CampusTheme.font(size: 11, weight: .semibold))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    Text(creValue)
+                        .font(CampusTheme.tabularFont(size: isCreInProgressOnly ? 16 : 20, weight: .bold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        .lineLimit(1)
+                    Text("\(creReport.totalApproved) aprov.")
+                        .font(CampusTheme.tabularFont(size: 11, weight: .medium))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+                .padding(12)
+                .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, interactive: true, highContrast: highContrast)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+
+            Button {
+                onOpenDynamicGrid()
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Integralizado")
+                        .font(CampusTheme.font(size: 11, weight: .semibold))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    Text("\(integralPercent)%")
+                        .font(CampusTheme.tabularFont(size: 20, weight: .bold))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                        .lineLimit(1)
+                    Text(integralHours)
+                        .font(CampusTheme.tabularFont(size: 11, weight: .medium))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+                .padding(12)
+                .liquidGlassCard(cornerRadius: 24, tint: nil, interactive: true, highContrast: highContrast)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+
+            Button {
+                onOpenMatrix()
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Frequência")
+                        .font(CampusTheme.font(size: 11, weight: .semibold))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    Text("\(summary.totalAbsences)/\(summary.totalMaxAbsences)")
+                        .font(CampusTheme.tabularFont(size: 20, weight: .bold))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                        .lineLimit(1)
+                    Text(freqStatus)
+                        .font(CampusTheme.font(size: 11, weight: .bold))
+                        .foregroundStyle(freqTint)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+                .padding(12)
+                .liquidGlassCard(
+                    cornerRadius: 24,
+                    tint: summary.coursesAtRisk > 0 || attentionCount > 0 ? freqTint : nil,
+                    interactive: true,
+                    highContrast: highContrast
+                )
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+        }
+    }
+
+    @ViewBuilder
+    private func absenceRiskOrAttentionBanner(summary: AcademicProfileSummary) -> some View {
+        let semesterDisciplines = store.disciplines.filter { $0.semester == summary.semester }
+        let attentionCount = semesterDisciplines.filter { disc in
+            guard disc.maxAbsences > 0 else { return false }
+            let ratio = Double(disc.currentAbsences) / Double(disc.maxAbsences)
+            return ratio >= 0.50 && ratio < 0.75
+        }.count
+
+        if summary.coursesAtRisk > 0 {
+            let riskTint = Color(hex: colorScheme == .dark ? 0xEF9A9A : 0xC62828)
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(riskTint)
+                Text("Alerta de risco: \(summary.coursesAtRisk) disciplina(s) atingiu(ram) >= 75% do limite máximo de faltas.")
+                    .font(CampusTheme.font(size: 12.5, weight: .semibold))
+                    .foregroundStyle(riskTint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(riskTint.opacity(colorScheme == .dark ? 0.18 : 0.11))
+            )
+        } else if attentionCount > 0 {
+            let amberTint = Color(hex: colorScheme == .dark ? 0xFFB74D : 0xEF6C00)
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(amberTint)
+                Text("Atenção: \(attentionCount) disciplina(s) atingiu(ram) >= 50% do limite máximo de faltas.")
+                    .font(CampusTheme.font(size: 12.5, weight: .semibold))
+                    .foregroundStyle(amberTint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(amberTint.opacity(colorScheme == .dark ? 0.18 : 0.12))
+            )
+        }
+    }
+
     private func metricsGrid(summary: AcademicProfileSummary) -> some View {
         let columns = [GridItem(.adaptive(minimum: isRegular ? 180 : 150), spacing: 10)]
         return LazyVGrid(columns: columns, spacing: 10) {
@@ -233,45 +424,67 @@ internal struct ProfileSummarySectionView: View {
     private func metricTile(title: String, value: String, subtitle: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(CampusTheme.font(size: 11, weight: .semibold))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
             Text(value)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(CampusTheme.tabularFont(size: 22, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
             Text(subtitle)
-                .font(.system(size: 11))
+                .font(CampusTheme.tabularFont(size: 11, weight: .medium))
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .liquidGlassCard(cornerRadius: 18, tint: tint, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: 24, tint: tint, highContrast: highContrast)
     }
 
     private func creAndTranscriptCard(creReport: AcademicCreReport) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let isAllInProgressWithoutGrades = creReport.overallCre == 0
+            && !creReport.semesters.isEmpty
+            && creReport.semesters.allSatisfy { $0.approvedCount == 0 && $0.failedCount == 0 && $0.inProgressCount > 0 }
+
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Coeficiente de Rendimento (CRE)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 15, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     Text("Integralizado: \(creReport.completedHours)h / \(creReport.totalRequiredHours)h · Aprovadas: \(creReport.totalApproved)")
-                        .font(.system(size: 12))
+                        .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 }
                 Spacer()
-                Text(String(format: "%.2f", creReport.overallCre))
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                if isAllInProgressWithoutGrades {
+                    Text("Em curso")
+                        .font(CampusTheme.font(size: 12, weight: .bold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(primaryAccent.opacity(colorScheme == .dark ? 0.22 : 0.14))
+                        )
+                } else {
+                    Text(String(format: "%.2f", creReport.overallCre))
+                        .font(CampusTheme.tabularFont(size: 26, weight: .bold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                }
+            }
+
+            if isAllInProgressWithoutGrades {
+                Text("Semestre atual sem notas lançadas. Abra o simulador para projetar seu CRE.")
+                    .font(CampusTheme.font(size: 12))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
             }
 
             if let transcriptMessage {
                 Text(transcriptMessage)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(CampusTheme.font(size: 12, weight: .semibold))
                     .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
             }
             if let transcriptError {
                 Text(transcriptError)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(CampusTheme.font(size: 12, weight: .semibold))
                     .foregroundStyle(Color(hex: 0xDC2626))
             }
 
@@ -280,7 +493,7 @@ internal struct ProfileSummarySectionView: View {
                     onImportTranscript()
                 } label: {
                     Label("Histórico PDF", systemImage: "doc.badge.plus")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -291,8 +504,8 @@ internal struct ProfileSummarySectionView: View {
                 Button {
                     onOpenMatrix()
                 } label: {
-                    Label("Matriz & Simulador", systemImage: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                    Label(isAllInProgressWithoutGrades ? "Simular CRE" : "Matriz & Simulador", systemImage: "slider.horizontal.3")
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(onPrimaryAccent)
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -302,7 +515,7 @@ internal struct ProfileSummarySectionView: View {
             }
         }
         .padding(16)
-        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
     }
 
     private func computeDynamicMatrixResolution() -> DynamicMatrixResolution {
@@ -419,9 +632,173 @@ internal struct ProfileSummarySectionView: View {
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
             }
             .padding(16)
-            .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, interactive: true, highContrast: highContrast)
+            .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, interactive: true, highContrast: highContrast)
         }
         .buttonStyle(.plain)
         .minimumTouchTarget(minTouch)
+    }
+}
+
+// MARK: - Edit Profile Modal Sheet (iOS)
+
+internal struct ProfileEditSheetView: View {
+    @Bindable var store: CampusStore
+    @Bindable var appearance: CampusAppearanceController
+    let onDismiss: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    @State private var fullName: String
+    @State private var registrationNumber: String
+    @State private var courseName: String
+    @State private var activeSemester: String
+    @State private var selectedCampus: String
+
+    init(
+        store: CampusStore,
+        appearance: CampusAppearanceController,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.store = store
+        self.appearance = appearance
+        self.onDismiss = onDismiss
+        _fullName = State(initialValue: store.studentProfile.fullName)
+        _registrationNumber = State(initialValue: store.studentProfile.registrationNumber)
+        _courseName = State(initialValue: store.studentProfile.courseName)
+        _activeSemester = State(initialValue: store.studentProfile.activeSemester.isEmpty ? "2026.2" : store.studentProfile.activeSemester)
+        let savedCampus = store.studentProfile.campusName.trimmingCharacters(in: .whitespacesAndNewlines)
+        _selectedCampus = State(initialValue: savedCampus.isEmpty ? store.activeCampus.city : savedCampus)
+    }
+
+    var body: some View {
+        let hc = appearance.accessibility.highContrastMode
+        let accent = appearance.accentColor.primary(for: colorScheme)
+        let onPrimary = appearance.accentColor.onPrimary(for: colorScheme)
+        let minTouch = appearance.accessibility.minTouchHeight
+
+        NavigationStack {
+            ZStack {
+                LiquidGlassBackdrop(accent: appearance.accentColor, highContrast: hc)
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Nome completo")
+                                .font(CampusTheme.font(size: 13, weight: .semibold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            TextField("Ex.: Lucas Almeida", text: $fullName)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                )
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Matrícula")
+                                .font(CampusTheme.font(size: 13, weight: .semibold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            TextField("Ex.: 24.2.1165", text: $registrationNumber)
+                                .font(CampusTheme.tabularFont(size: 14, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                )
+                        }
+
+                        if !UfopCurriculumCatalog.allCourses.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Curso")
+                                    .font(CampusTheme.font(size: 13, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                Picker("Curso", selection: $courseName) {
+                                    if !courseName.isEmpty && !UfopCurriculumCatalog.allCourses.contains(where: { $0.name == courseName }) {
+                                        Text(courseName).tag(courseName)
+                                    }
+                                    ForEach(UfopCurriculumCatalog.allCourses) { course in
+                                        Text("\(course.name) (\(course.campus))").tag(course.name)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .tint(accent)
+                            }
+                        } else {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Curso")
+                                    .font(CampusTheme.font(size: 13, weight: .semibold))
+                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                TextField("Ex.: Ciência da Computação", text: $courseName)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                    )
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Semestre letivo")
+                                .font(CampusTheme.font(size: 13, weight: .semibold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            Picker("Semestre", selection: $activeSemester) {
+                                Text("2026.2").tag("2026.2")
+                                Text("2027.1").tag("2027.1")
+                                Text("2027.2").tag("2027.2")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Campus")
+                                .font(CampusTheme.font(size: 13, weight: .semibold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            Picker("Campus", selection: $selectedCampus) {
+                                Text("Ouro Preto").tag("Ouro Preto")
+                                Text("Mariana").tag("Mariana")
+                                Text("João Monlevade").tag("João Monlevade")
+                            }
+                            .pickerStyle(.segmented)
+                        }
+
+                        LiquidGlassPrimaryButton(
+                            tint: accent,
+                            foreground: onPrimary,
+                            minHeight: minTouch
+                        ) {
+                            let cleanName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !cleanName.isEmpty {
+                                store.studentProfile.fullName = cleanName
+                            }
+                            store.studentProfile.registrationNumber = registrationNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+                            store.studentProfile.courseName = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            store.studentProfile.activeSemester = activeSemester
+                            store.studentProfile.campusName = selectedCampus
+                            _ = store.setActiveCampus(campusId: selectedCampus)
+                            store.persistEncryptedState()
+                            onDismiss()
+                        } label: {
+                            Label("Salvar alterações", systemImage: "checkmark.circle.fill")
+                                .font(CampusTheme.font(size: 15, weight: .bold))
+                        }
+                        .padding(.top, 8)
+                    }
+                    .padding(18)
+                    .liquidGlassCard(cornerRadius: 24, tint: accent, highContrast: hc)
+                    .padding(20)
+                }
+            }
+            .navigationTitle("Editar perfil")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar", action: onDismiss)
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                }
+            }
+        }
     }
 }

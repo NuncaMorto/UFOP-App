@@ -51,6 +51,7 @@ import br.ufop.campus.core.ffi.TimetableCell
 import br.ufop.campus.core.ffi.TimetableRow
 import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.parseHexColor
 
 @Composable
@@ -578,26 +579,7 @@ private fun EmptyTimetableCellCard(
             .fillMaxWidth()
             .height(cellHeight),
         shape = RoundedCornerShape(if (isReducedMode) 10.dp else 14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
-        )
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "—",
-                style = if (isReducedMode) {
-                    MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
-                } else {
-                    MaterialTheme.typography.bodyMedium
-                },
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.32f),
+        border = campusCardBorder(1.dp)
+    ) {}
 }

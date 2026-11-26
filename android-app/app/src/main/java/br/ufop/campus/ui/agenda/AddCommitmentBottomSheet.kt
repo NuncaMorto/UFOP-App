@@ -3,11 +3,10 @@ package br.ufop.campus.ui.agenda
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -57,15 +56,16 @@ import br.ufop.campus.ui.components.CampusDatePickerField
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.components.defaultTodayIsoDate
 import br.ufop.campus.ui.components.isEndTimeAfterStart
-import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
-import br.ufop.campus.ui.theme.DarkWeatherBadgeText
-import br.ufop.campus.ui.theme.LightWeatherBadgeBg
-import br.ufop.campus.ui.theme.LightWeatherBadgeText
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.parseHexColor
+import br.ufop.campus.ui.theme.tabularNums
 
 private data class CommitmentCategoryChip(
     val label: String,
@@ -91,7 +91,7 @@ private val ufopCategoryChips = listOf(
     )
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddCommitmentBottomSheet(
     formattedDate: String,
@@ -149,7 +149,7 @@ fun AddCommitmentBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -159,50 +159,30 @@ fun AddCommitmentBottomSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp)
         ) {
-            // Header: Tag + Pílula de clima + Título + Botão Fechar (>= 48.dp unclipped)
+            // Header: Eyebrow limpo + Título + Botão Fechar (>= 48.dp unclipped)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "AGENDA ACADÊMICA · $campusLabel",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = accessibleTextColor(MaterialTheme.colorScheme.primary, isDark),
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = if (isDark) DarkWeatherBadgeBg else LightWeatherBadgeBg
-                        ) {
-                            Text(
-                                text = "☀ $weatherTempC °C",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isDark) DarkWeatherBadgeText else LightWeatherBadgeText,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
-                            )
-                        }
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (campusLabel.isNotBlank()) "AGENDA · $campusLabel" else "AGENDA ACADÊMICA",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = accessibleTextColor(MaterialTheme.colorScheme.primary, isDark),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -250,35 +230,30 @@ fun AddCommitmentBottomSheet(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 ufopCategoryChips.forEach { chip ->
                     val isSelected = selectedCategory == chip.label
                     Surface(
                         modifier = Modifier
                             .defaultMinSize(minHeight = minTouchTarget)
-                            .clip(RoundedCornerShape(50))
+                            .clip(RoundedCornerShape(CampusPillRadius))
                             .clickable(role = Role.Button) {
                                 selectedCategory = if (isSelected) null else chip.label
                                 showTitleError = false
                             },
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(CampusPillRadius),
                         color = if (isSelected) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surfaceVariant
+                            MaterialTheme.colorScheme.surfaceContainerHigh
                         },
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outline
-                            }
-                        )
+                        border = campusCardBorder()
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -290,6 +265,8 @@ fun AddCommitmentBottomSheet(
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                maxLines = 1,
+                                softWrap = false,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                             )
                         }
@@ -482,7 +459,7 @@ fun CommitmentDetailBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -547,9 +524,9 @@ fun CommitmentDetailBottomSheet(
             // Metadados do compromisso
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.55f else 0.7f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder()
             ) {
                 Column(
                     modifier = Modifier
@@ -564,33 +541,12 @@ fun CommitmentDetailBottomSheet(
                         fontWeight = FontWeight.SemiBold
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${item.startTime}–${item.endTime}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Medium
-                        )
-
-                        item.weatherTempC?.let { tempC ->
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = if (isDark) DarkWeatherBadgeBg else LightWeatherBadgeBg
-                            ) {
-                                Text(
-                                    text = "☀ $tempC °C",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (isDark) DarkWeatherBadgeText else LightWeatherBadgeText,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = "${item.startTime}–${item.endTime}",
+                        style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium
+                    )
 
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),

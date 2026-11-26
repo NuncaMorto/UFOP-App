@@ -23,7 +23,7 @@ public struct AgendaView: View {
     }
 
     private var accent: Color {
-        (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        (appearance?.accentColor ?? .red).primary(for: colorScheme)
     }
 
     private var hc: Bool {
@@ -42,7 +42,7 @@ public struct AgendaView: View {
 
         NavigationStack {
             ZStack {
-                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .red, highContrast: hc)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     if isRegular {
@@ -119,7 +119,7 @@ public struct AgendaView: View {
                 )
                 .presentationDetents([.large, .fraction(0.88)])
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
+                .presentationCornerRadius(30)
             }
             .sheet(isPresented: $viewModel.isAddCommitmentPresented) {
                 AddCommitmentSheetView(
@@ -143,7 +143,7 @@ public struct AgendaView: View {
                 )
                 .presentationDetents([.large, .fraction(0.86)])
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
+                .presentationCornerRadius(30)
             }
             .confirmationDialog(
                 "Excluir compromisso?",
@@ -304,13 +304,13 @@ public struct AgendaView: View {
         } label: {
             VStack(spacing: 4) {
                 Text(chip.weekdayShort)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 10, weight: .bold))
                     .foregroundStyle(chip.isSelected ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
 
                 Text(chip.dayNumber)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 15, weight: .bold))
                     .foregroundStyle(chip.isSelected ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Circle()
@@ -319,17 +319,17 @@ public struct AgendaView: View {
                             ? accent
                             : (chip.hasEvents ? CampusTheme.mutedText(for: colorScheme).opacity(0.55) : .clear)
                     )
-                    .frame(width: 5, height: 5)
+                    .frame(width: 4, height: 4)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(chip.isSelected ? accent.opacity(colorScheme == .dark ? 0.22 : 0.14) : Color.clear)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(chip.isSelected ? (appearance?.accentColor ?? .red).surface2(for: colorScheme) : Color.clear)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(chip.isSelected ? accent.opacity(0.45) : .clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(hc ? CampusTheme.cardBorder(for: colorScheme, highContrast: true) : .clear, lineWidth: chip.isSelected ? 1.5 : 1)
             )
         }
         .buttonStyle(.plain)
@@ -409,14 +409,17 @@ public struct AgendaView: View {
     // MARK: Day Summary Header
 
     private func dayHeaderSection(overview: AgendaDayOverview) -> some View {
-        HStack(alignment: .center, spacing: 10) {
+        let safeDateHeader = Self.formatDateHeaderNoOrphan(overview.fullDateHeader)
+        return HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(overview.fullDateHeader)
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                Text(safeDateHeader)
+                    .font(CampusTheme.font(size: 18, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.92)
 
                 Text(overview.summarySubtitle)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(CampusTheme.tabularFont(size: 13, weight: .medium))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
             }
 
@@ -429,12 +432,12 @@ public struct AgendaView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
                     Text("Compromisso")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 12, weight: .bold))
                 }
-                .foregroundStyle(accent)
+                .foregroundStyle((appearance?.accentColor ?? .red).textOnHighlightSurface(for: colorScheme))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .liquidGlassCapsule(selected: true, accent: accent, highContrast: hc)
+                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
             }
             .buttonStyle(.plain)
             .minimumTouchTarget(minTouch)
@@ -453,11 +456,11 @@ public struct AgendaView: View {
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                 Text("Dia livre no campus")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(CampusTheme.font(size: 16, weight: .semibold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Text("Nenhuma aula ou compromisso agendado para este dia.")
-                    .font(.system(size: 13))
+                    .font(CampusTheme.font(size: 13, weight: .regular))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     .multilineTextAlignment(.center)
 
@@ -465,7 +468,7 @@ public struct AgendaView: View {
                     viewModel.openAddCommitmentSheet()
                 } label: {
                     Label("Agendar grupo de estudos ou monitoria", systemImage: "plus.circle.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .semibold))
                         .foregroundStyle(accent)
                 }
                 .buttonStyle(.plain)
@@ -477,17 +480,42 @@ public struct AgendaView: View {
             .liquidGlassCard(highContrast: hc)
         } else {
             VStack(spacing: 12) {
-                ForEach(items) { item in
-                    let isHighlightedNow = spotlight != nil
-                        && spotlight!.dateIso == selectedDateIso
-                        && spotlight!.item.disciplineId == item.disciplineId
-                        && spotlight!.item.startTime == item.startTime
-                    let highlightLabel: String? = isHighlightedNow ? (spotlight!.isOngoing ? "Agora" : "Próxima aula") : nil
-
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    let previousItem = index > 0 ? items[index - 1] : nil
+                    if let freeGap = Self.freeWindowMinutesBetween(previous: previousItem, current: item) {
+                        freeWindowDivider(gapMinutes: freeGap)
+                    }
+                    let highlightLabel = Self.resolveTodayHighlightLabel(
+                        item: item,
+                        spotlight: spotlight,
+                        selectedDateIso: selectedDateIso
+                    )
                     timelineRow(item: item, inlineSpotlightBadge: highlightLabel)
                 }
             }
         }
+    }
+
+    private func freeWindowDivider(gapMinutes: Int) -> some View {
+        HStack(spacing: 10) {
+            Rectangle()
+                .fill(CampusTheme.mutedText(for: colorScheme, highContrast: hc).opacity(0.28))
+                .frame(height: 1)
+
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                    .font(.system(size: 10, weight: .semibold))
+                Text("Janela livre · \(Self.formatFreeWindowDuration(gapMinutes))")
+                    .font(CampusTheme.tabularFont(size: 11, weight: .medium))
+            }
+            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+            .fixedSize(horizontal: true, vertical: false)
+
+            Rectangle()
+                .fill(CampusTheme.mutedText(for: colorScheme, highContrast: hc).opacity(0.28))
+                .frame(height: 1)
+        }
+        .padding(.vertical, 2)
     }
 
     private func timelineRow(item: AgendaTimelineItem, inlineSpotlightBadge: String?) -> some View {
@@ -495,6 +523,7 @@ public struct AgendaView: View {
             CampusTheme.departmentColor(for: item.colorKey),
             scheme: colorScheme
         )
+        let isHighlightedClass = inlineSpotlightBadge != nil
         let isEad = (item.disciplineId.map { viewModel.store.isCourseEad($0) } ?? false)
             || item.location.lowercased().contains("ead")
             || item.location.lowercased().contains("distância")
@@ -502,10 +531,10 @@ public struct AgendaView: View {
         return HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .trailing, spacing: 3) {
                 Text(item.startTime)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 14, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                 Text(item.endTime)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
             }
             .frame(width: 44, alignment: .trailing)
@@ -516,43 +545,47 @@ public struct AgendaView: View {
                     viewModel.openCheckInSheet(for: item)
                 }
             } label: {
-                AccentBarCardContainer(accentColor: CampusTheme.departmentColor(for: item.colorKey), highContrast: hc) {
+                AccentBarCardContainer(
+                    accentColor: CampusTheme.departmentColor(for: item.colorKey),
+                    highContrast: hc,
+                    useSurface2: isHighlightedClass
+                ) {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top, spacing: 8) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 6) {
-                                    Text(item.department)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(deptColor)
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(item.department)
+                                    .font(CampusTheme.font(size: 12, weight: .semibold))
+                                    .foregroundStyle(deptColor)
 
-                                    if let inlineSpotlightBadge {
-                                        Text(inlineSpotlightBadge.uppercased())
-                                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                                            .foregroundStyle(.white)
-                                            .padding(.horizontal, 7)
-                                            .padding(.vertical, 2)
-                                            .background(Capsule().fill(accent))
-                                    }
-
-                                    if isEad {
-                                        Text("EAD")
-                                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                                            .foregroundStyle(CampusTheme.mathBlue)
-                                            .padding(.horizontal, 7)
-                                            .padding(.vertical, 2)
-                                            .background(Capsule().fill(CampusTheme.selectedPillBackground(for: colorScheme)))
-                                    }
+                                if let inlineSpotlightBadge {
+                                    let isNow = inlineSpotlightBadge == "AGORA"
+                                    Text(inlineSpotlightBadge)
+                                        .font(CampusTheme.tabularFont(size: 9, weight: .bold))
+                                        .foregroundStyle(isNow ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : (appearance?.accentColor ?? .red).textOnHighlightSurface(for: colorScheme))
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            Capsule().fill(
+                                                isNow ? accent : (appearance?.accentColor ?? .red).highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.35)
+                                            )
+                                        )
                                 }
 
-                                Text(item.title)
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                                    .multilineTextAlignment(.leading)
+                                if isEad {
+                                    Text("EAD")
+                                        .font(CampusTheme.font(size: 9, weight: .bold))
+                                        .foregroundStyle(CampusTheme.mathBlue)
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(CampusTheme.selectedPillBackground(for: colorScheme)))
+                                }
                             }
 
-                            Spacer(minLength: 4)
-
-                            WeatherPillBadge(label: item.weatherBadgeLabel)
+                            Text(item.title)
+                                .font(CampusTheme.font(size: 16, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
                         }
 
                         HStack(spacing: 8) {
@@ -560,20 +593,20 @@ public struct AgendaView: View {
                                 isEad ? "A distância (EAD)" : (item.location.isEmpty ? "Local não definido" : item.location),
                                 systemImage: isEad ? "laptopcomputer" : "mappin.and.ellipse"
                             )
-                            .font(.system(size: 13, weight: .medium))
+                            .font(CampusTheme.font(size: 13, weight: .medium))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                             Spacer()
 
                             Text(item.timeRangeLabel)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                         }
 
                         HStack(spacing: 8) {
                             if !item.professor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 Text(item.professor)
-                                    .font(.system(size: 12))
+                                    .font(CampusTheme.font(size: 12, weight: .regular))
                                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                             }
 
@@ -587,7 +620,7 @@ public struct AgendaView: View {
                                         Image(systemName: "trash")
                                             .font(.system(size: 11, weight: .semibold))
                                         Text("Excluir")
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(CampusTheme.font(size: 11, weight: .semibold))
                                     }
                                     .foregroundStyle(Color(hex: 0xEF4444))
                                     .padding(.horizontal, 9)
@@ -606,6 +639,73 @@ public struct AgendaView: View {
             .buttonStyle(.plain)
             .campusHoverLift()
         }
+    }
+
+    private static func formatDateHeaderNoOrphan(_ raw: String) -> String {
+        guard let range = raw.range(of: " de ", options: .backwards) else {
+            return raw
+        }
+        return raw.replacingCharacters(in: range, with: " de\u{00A0}")
+    }
+
+    private static func parseMinutes(_ hhmm: String) -> Int? {
+        let parts = hhmm.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+        guard parts.count >= 2, let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
+        return h * 60 + m
+    }
+
+    private static func freeWindowMinutesBetween(previous: AgendaTimelineItem?, current: AgendaTimelineItem) -> Int? {
+        guard let previous,
+              previous.kind == .lecture,
+              current.kind == .lecture,
+              previous.attendanceStatus != .cancelled,
+              current.attendanceStatus != .cancelled,
+              let prevEnd = parseMinutes(previous.endTime),
+              let currStart = parseMinutes(current.startTime) else {
+            return nil
+        }
+        let gap = currStart - prevEnd
+        return gap >= 50 ? gap : nil
+    }
+
+    private static func formatFreeWindowDuration(_ gapMinutes: Int) -> String {
+        let hours = gapMinutes / 60
+        let mins = gapMinutes % 60
+        if hours == 0 { return "\(mins)min" }
+        if mins == 0 { return "\(hours)h" }
+        return String(format: "%dh%02d", hours, mins)
+    }
+
+    private static func resolveTodayHighlightLabel(
+        item: AgendaTimelineItem,
+        spotlight: AgendaClassSpotlight?,
+        selectedDateIso: String
+    ) -> String? {
+        guard let spotlight,
+              spotlight.dateIso == selectedDateIso,
+              item.kind == .lecture,
+              item.attendanceStatus != .cancelled,
+              spotlight.item.disciplineId == item.disciplineId,
+              spotlight.item.startTime == item.startTime else {
+            return nil
+        }
+        if spotlight.isOngoing {
+            return "AGORA"
+        }
+        let now = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        let nowMin = (now.hour ?? 0) * 60 + (now.minute ?? 0)
+        guard let startMin = parseMinutes(item.startTime) else {
+            return "PRÓXIMA"
+        }
+        let diff = startMin - nowMin
+        if diff <= 0 { return "AGORA" }
+        if diff < 60 { return "EM \(diff) MIN" }
+        if diff < 360 {
+            let h = diff / 60
+            let m = diff % 60
+            return m == 0 ? "EM \(h)H" : String(format: "EM %dH%02d", h, m)
+        }
+        return "PRÓXIMA"
     }
 
     private func statusBadge(for status: AttendanceStatus) -> some View {
@@ -690,11 +790,12 @@ public struct AddCommitmentSheetView: View {
     }
 
     public var body: some View {
-        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        let accentObj = appearance?.accentColor ?? .red
+        let accent = accentObj.primary(for: colorScheme)
         let hc = appearance?.accessibility.highContrastMode ?? false
 
         ZStack {
-            LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+            LiquidGlassBackdrop(accent: accentObj, highContrast: hc)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -780,7 +881,7 @@ public struct AddCommitmentSheetView: View {
 
                     LiquidGlassPrimaryButton(
                         tint: accent,
-                        foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                        foreground: accentObj.onPrimary(for: colorScheme),
                         minHeight: appearance?.accessibility.minTouchHeight ?? 48
                     ) {
                         let fmt = DateFormatter()

@@ -478,16 +478,6 @@ fun CurriculumMatrixModal(
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (availableVersions.size > 1) {
-                            item(key = "curriculum_version_selector") {
-                                CurriculumVersionSelectorCard(
-                                    availableVersions = availableVersions,
-                                    selectedCurriculumVersion = selectedCourse.curriculumVersion,
-                                    onSelectVersion = { selectedCurriculumVersion = it }
-                                )
-                            }
-                        }
-
                         if (compatibility != null && compatibility.isLegacyMatrixMismatch) {
                             item(key = "legacy_consultation_banner") {
                                 LegacyMatrixConsultationBanner(
@@ -513,13 +503,16 @@ fun CurriculumMatrixModal(
                             }
                         }
 
-                        // Resumo oficial do curso
+                        // Resumo oficial do curso (com versões embutidas)
                         item(key = "course_header") {
                             CourseWorkloadSummaryCard(
                                 course = selectedCourse,
                                 evaluatedSubjects = evaluatedSubjects,
                                 isConsultationMode = isConsultationMode,
-                                isDark = isDark
+                                isDark = isDark,
+                                availableVersions = availableVersions,
+                                selectedCurriculumVersion = selectedCourse.curriculumVersion,
+                                onSelectVersion = { selectedCurriculumVersion = it }
                             )
                         }
 

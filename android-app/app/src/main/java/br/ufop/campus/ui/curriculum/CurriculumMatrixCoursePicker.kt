@@ -63,11 +63,16 @@ import br.ufop.campus.core.curriculum.CurriculumCompatibilityStatus
 import br.ufop.campus.core.curriculum.UfopCourseCurriculum
 import br.ufop.campus.core.curriculum.UfopCourseOfficialLinks
 import br.ufop.campus.core.curriculum.UfopLegacyReference
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
+import br.ufop.campus.ui.theme.tabularNums
 
 internal fun openExternalCurriculumUrl(context: Context, rawUrl: String) {
     val cleanUrl = rawUrl.trim()
@@ -92,24 +97,31 @@ internal fun CurriculumMatrixTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            onClick = onDismiss,
-            modifier = Modifier.size(minTouchTarget),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        Box(
+            modifier = Modifier
+                .defaultMinSize(minWidth = minTouchTarget, minHeight = minTouchTarget)
+                .clip(CircleShape)
+                .clickable(onClickLabel = "Voltar", onClick = onDismiss),
+            contentAlignment = Alignment.Center
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(18.dp)
-                )
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -314,9 +326,10 @@ internal fun CurriculumLegacyReferencesCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = containerColor,
-        border = BorderStroke(1.dp, borderColor)
+        border = if (isLegacyAlertContext) BorderStroke(1.dp, borderColor) else campusCardBorder(),
+        shadowElevation = if (isLegacyAlertContext) 0.dp else campusCardElevation()
     ) {
         Column(
             modifier = Modifier
@@ -516,7 +529,10 @@ internal fun CourseWorkloadSummaryCard(
     course: UfopCourseCurriculum,
     evaluatedSubjects: List<EvaluatedSubject>,
     isConsultationMode: Boolean,
-    isDark: Boolean
+    isDark: Boolean,
+    availableVersions: List<UfopCourseCurriculum> = emptyList(),
+    selectedCurriculumVersion: String = course.curriculumVersion,
+    onSelectVersion: (String) -> Unit = {}
 ) {
     val approvedCount = evaluatedSubjects.count { it.status == SubjectProgressStatus.APPROVED }
     val inProgressCount = evaluatedSubjects.count { it.status == SubjectProgressStatus.IN_PROGRESS }
@@ -526,9 +542,10 @@ internal fun CourseWorkloadSummaryCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {},
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation()
     ) {
         Column(
             modifier = Modifier
@@ -607,6 +624,56 @@ internal fun CourseWorkloadSummaryCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                if (availableVersions.size > 1) {
+                    Column(
+                        modifier = Modifier.padding(top = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "Versão da matriz",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            availableVersions.forEach { version ->
+                                val isVersionSelected = version.curriculumVersion == selectedCurriculumVersion
+                                val versionLabel = version.curriculumVersion.ifBlank {
+                                    "${version.effectiveFromYear}/${version.effectiveFromSemester}"
+                                }
+                                FilterChip(
+                                    selected = isVersionSelected,
+                                    onClick = { onSelectVersion(version.curriculumVersion) },
+                                    label = {
+                                        Text(
+                                            text = versionLabel,
+                                            fontWeight = if (isVersionSelected) {
+                                                FontWeight.Bold
+                                            } else {
+                                                FontWeight.Medium
+                                            }
+                                        )
+                                    },
+                                    leadingIcon = if (isVersionSelected) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
@@ -646,23 +713,23 @@ private fun WorkloadPill(
     highlighted: Boolean = false
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(CampusPillRadius),
         color = if (highlighted) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+            MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            MaterialTheme.colorScheme.surfaceContainerHigh
         }
     ) {
         Text(
             text = "$label ${formatHoursPtBr(hours)}h",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.tabularNums(),
             fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
             color = if (highlighted) {
                 MaterialTheme.colorScheme.onPrimaryContainer
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }

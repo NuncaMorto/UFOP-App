@@ -45,9 +45,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.curriculum.DynamicCurriculumMatrix
 import br.ufop.campus.core.curriculum.DynamicGridSummary
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
+import br.ufop.campus.ui.theme.tabularNums
 
 @Composable
 internal fun DynamicGridPortraitTopBar(
@@ -56,41 +60,41 @@ internal fun DynamicGridPortraitTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            onClick = onBack,
-            modifier = Modifier.minimumInteractiveComponentSize(),
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        Box(
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .clip(CircleShape)
+                .clickable(onClickLabel = "Voltar para Perfil", onClick = onBack)
+                .semantics {
+                    role = Role.Button
+                    contentDescription = "Voltar para Perfil"
+                },
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder()
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Voltar para Perfil",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Voltar para Perfil",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
 
         Text(
             text = "Grade Dinâmica",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
@@ -215,10 +219,11 @@ internal fun DynamicGridLandscapeToolbar(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount}",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount} · Compl./TCC ${matrix.requiredActivitiesHours}h · Curso ${matrix.totalCourseHours}h",
+                            style = MaterialTheme.typography.labelMedium.tabularNums(),
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2
                         )
                         LinearProgressIndicator(
                             progress = { progressRatio },
@@ -296,9 +301,10 @@ internal fun DynamicGridSummaryCard(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(if (isCollapsed) 18.dp else 22.dp),
+        shape = RoundedCornerShape(if (isCollapsed) 18.dp else CampusCardRadius),
         color = surfaceColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation()
     ) {
         Column(
             modifier = Modifier
@@ -320,8 +326,8 @@ internal fun DynamicGridSummaryCard(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount}",
-                            style = MaterialTheme.typography.labelLarge,
+                            text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount} disc.",
+                            style = MaterialTheme.typography.labelLarge.tabularNums(),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
@@ -374,10 +380,15 @@ internal fun DynamicGridSummaryCard(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
-                            text = "${summary.completedHours}/${summary.totalGridHours}h (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount} disciplinas",
-                            style = MaterialTheme.typography.labelLarge,
+                            text = "${summary.completedHours}/${summary.totalGridHours}h da grade (${summary.completionPercent}%) · ${summary.completedCount}/${summary.totalCount} disc.",
+                            style = MaterialTheme.typography.labelLarge.tabularNums(),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Grade: ${summary.totalGridHours}h · Compl./TCC: ${matrix.requiredActivitiesHours}h · Total curso: ${matrix.totalCourseHours}h",
+                            style = MaterialTheme.typography.labelSmall.tabularNums(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         LinearProgressIndicator(
                             progress = { progressRatio },

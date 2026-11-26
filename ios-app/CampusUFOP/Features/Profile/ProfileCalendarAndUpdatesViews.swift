@@ -114,21 +114,23 @@ internal struct ProfileUpdatesSectionView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let greenCheckTint = Color(hex: colorScheme == .dark ? 0x81C784 : 0x2E7D32)
+
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Versão Atual")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 16, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     Text("Vida Acadêmica v\(CampusReleaseNotesData.currentVersionString)")
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(CampusTheme.tabularFont(size: 12.5, weight: .semibold))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 }
 
                 Spacer()
 
                 Text("v\(CampusReleaseNotesData.currentVersionString)")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                     .foregroundStyle(onPrimaryAccent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -139,7 +141,7 @@ internal struct ProfileUpdatesSectionView: View {
                 onOpenReleaseNotes()
             } label: {
                 Label("Abrir resumo em janela", systemImage: "sparkles")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
                     .foregroundStyle(onPrimaryAccent)
                     .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
                     .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -148,10 +150,10 @@ internal struct ProfileUpdatesSectionView: View {
             .minimumTouchTarget(minTouch)
         }
         .padding(16)
-        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: 24, tint: nil, highContrast: highContrast)
 
         Text("HISTÓRICO DE PATCHES")
-            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .font(CampusTheme.font(size: 11, weight: .bold))
             .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
             .padding(.horizontal, 4)
 
@@ -160,16 +162,16 @@ internal struct ProfileUpdatesSectionView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("\(entry.version) · \(entry.title)")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 14, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                         Spacer()
 
                         Text(entry.badge)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 10, weight: .bold))
                             .foregroundStyle(
                                 entry.isLatest
-                                    ? onPrimaryAccent
+                                    ? primaryAccent
                                     : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast)
                             )
                             .padding(.horizontal, 8)
@@ -177,7 +179,7 @@ internal struct ProfileUpdatesSectionView: View {
                             .background(
                                 Capsule(style: .continuous).fill(
                                     entry.isLatest
-                                        ? primaryAccent
+                                        ? primaryAccent.opacity(colorScheme == .dark ? 0.22 : 0.14)
                                         : CampusTheme.secondarySurface(for: colorScheme, highContrast: highContrast)
                                 )
                             )
@@ -187,18 +189,18 @@ internal struct ProfileUpdatesSectionView: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 12))
-                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                                .foregroundStyle(greenCheckTint)
                                 .padding(.top, 2)
 
                             Text(item)
-                                .font(.system(size: 12.5))
+                                .font(CampusTheme.font(size: 12.5))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
-                .padding(14)
-                .liquidGlassCard(cornerRadius: 18, tint: entry.isLatest ? primaryAccent : nil, highContrast: highContrast)
+                .padding(16)
+                .liquidGlassCard(cornerRadius: 24, tint: nil, highContrast: highContrast)
             }
         }
     }

@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.map.CampusMapController
@@ -59,7 +60,10 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 fun CampusMapCanvas(
     controller: CampusMapController,
     modifier: Modifier = Modifier,
-    showBuiltInHud: Boolean = true
+    showBuiltInHud: Boolean = true,
+    topHudInsetDp: Dp = 0.dp,
+    bottomHudInsetDp: Dp = 0.dp,
+    startHudInsetDp: Dp = 0.dp
 ) {
     val canvasState by controller.canvasState.collectAsState()
     val isDark = LocalCampusThemeController.current.isDark
@@ -107,7 +111,10 @@ fun CampusMapCanvas(
                 ),
                 viewportWidthPx = viewportSize.width.toFloat(),
                 viewportHeightPx = viewportSize.height.toFloat(),
-                density = density
+                density = density,
+                topInsetDp = topHudInsetDp.value,
+                bottomInsetDp = bottomHudInsetDp.value,
+                startInsetDp = startHudInsetDp.value
             )
             hasInitialFit = true
         }
@@ -536,7 +543,7 @@ private fun DrawScope.drawCachedLabels(
     selectedId: String?
 ) {
     collisionBuffer.reset()
-    val marginPx = 4f * density
+    val marginPx = 8f * density
 
     if (selectedId != null) {
         labelCache.byId[selectedId]?.let { selectedLabel ->
@@ -622,11 +629,18 @@ private fun DrawScope.tryDrawCachedLabel(
         )
     ) {
         val secLeft = screenPt.x - secW * 0.5f
-        val secTop = screenPt.y + primaryH * 0.55f
+        val secTop = bottom + 2f * density
         val secRight = secLeft + secW
         val secBottom = secTop + secH
         if (secRight >= 0f && secLeft <= size.width && secBottom >= 0f && secTop <= size.height &&
-            collisionBuffer.tryPlace(secLeft, secTop, secRight, secBottom, paddingPx = paddingPx)
+            collisionBuffer.tryPlace(
+                left = secLeft,
+                top = secTop,
+                right = secRight,
+                bottom = secBottom,
+                paddingPx = paddingPx,
+                ignoreLastPlaced = true
+            )
         ) {
             drawText(
                 textLayoutResult = secLayout,

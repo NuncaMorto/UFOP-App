@@ -74,17 +74,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.AssessmentWithCourse
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
+import br.ufop.campus.core.ffi.formatAcademicAssessmentTitle
 import br.ufop.campus.ui.components.CampusDatePickerField
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.components.defaultTodayIsoDate
 import br.ufop.campus.ui.components.formatIsoToBrDate
 import br.ufop.campus.ui.disciplines.normalizeAssessmentDateInput
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.parseHexColor
+import br.ufop.campus.ui.theme.tabularNums
 
 private val ASSESSMENT_KIND_OPTIONS = listOf(
     "Prova",
@@ -193,7 +199,7 @@ fun AssessmentDetailBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -229,7 +235,7 @@ fun AssessmentDetailBottomSheet(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (isEditing) "Editar avaliação" else item.title,
+                        text = if (isEditing) "Editar avaliação" else formatAcademicAssessmentTitle(item.title),
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
@@ -289,11 +295,9 @@ fun AssessmentDetailBottomSheet(
                         // Card de metadados ricos
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(
-                                alpha = if (isDark) 0.55f else 0.7f
-                            ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            shape = RoundedCornerShape(CampusCardRadius),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = campusCardBorder()
                         ) {
                             Column(
                                 modifier = Modifier
@@ -307,9 +311,9 @@ fun AssessmentDetailBottomSheet(
                                 ) {
                                     Surface(
                                         modifier = Modifier.size(width = 56.dp, height = 56.dp),
-                                        shape = RoundedCornerShape(14.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         color = rawBadgeColor.copy(alpha = 0.14f),
-                                        border = BorderStroke(1.dp, rawBadgeColor.copy(alpha = 0.30f))
+                                        border = campusCardBorder(1.dp)
                                     ) {
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -317,7 +321,7 @@ fun AssessmentDetailBottomSheet(
                                         ) {
                                             Text(
                                                 text = item.dayNumber,
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = MaterialTheme.typography.titleMedium.tabularNums(),
                                                 fontWeight = FontWeight.Bold,
                                                 color = badgeColor
                                             )
@@ -347,7 +351,7 @@ fun AssessmentDetailBottomSheet(
                                             )
                                             Text(
                                                 text = "Data: ${formatIsoToBrDate(item.dueDate)}",
-                                                style = MaterialTheme.typography.bodyMedium,
+                                                style = MaterialTheme.typography.bodyMedium.tabularNums(),
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
@@ -368,7 +372,7 @@ fun AssessmentDetailBottomSheet(
                                                 } else {
                                                     "Horário: Não informado"
                                                 },
-                                                style = MaterialTheme.typography.bodyMedium,
+                                                style = MaterialTheme.typography.bodyMedium.tabularNums(),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -388,9 +392,9 @@ fun AssessmentDetailBottomSheet(
                                     // Chip do tipo de avaliação (compacto 32.dp)
                                     Surface(
                                         modifier = Modifier.heightIn(min = tagVisualHeight),
-                                        shape = RoundedCornerShape(50),
+                                        shape = RoundedCornerShape(CampusPillRadius),
                                         color = accentColor.copy(alpha = 0.14f),
-                                        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.32f))
+                                        border = campusCardBorder(1.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -405,28 +409,16 @@ fun AssessmentDetailBottomSheet(
                                         }
                                     }
 
-                                    // Chip interativo de conclusão (compacto 32.dp visual, >= 48.dp toque)
+                                    // Chip de status (pendente / concluída)
                                     Surface(
-                                        onClick = { onToggleCompleted(!isCompleted) },
-                                        modifier = if (a11y.largeTouchTargets) {
-                                            Modifier.defaultMinSize(minHeight = minTouchTarget)
-                                        } else {
-                                            Modifier.minimumInteractiveComponentSize()
-                                        },
-                                        shape = RoundedCornerShape(50),
+                                        modifier = Modifier.heightIn(min = tagVisualHeight),
+                                        shape = RoundedCornerShape(CampusPillRadius),
                                         color = if (isCompleted) {
                                             StatusAttendingGreen.copy(alpha = 0.16f)
                                         } else {
                                             MaterialTheme.colorScheme.surface
                                         },
-                                        border = BorderStroke(
-                                            width = 1.dp,
-                                            color = if (isCompleted) {
-                                                StatusAttendingGreen.copy(alpha = 0.45f)
-                                            } else {
-                                                MaterialTheme.colorScheme.outlineVariant
-                                            }
-                                        )
+                                        border = campusCardBorder(1.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier
@@ -462,51 +454,99 @@ fun AssessmentDetailBottomSheet(
                                         }
                                     }
                                 }
+
+                                if (onOpenDiscipline != null) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                                        thickness = 1.dp
+                                    )
+                                    Surface(
+                                        onClick = onOpenDiscipline,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .defaultMinSize(minHeight = minTouchTarget),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = MaterialTheme.colorScheme.surface
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                                                contentDescription = null,
+                                                tint = accessibleAccent,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(
+                                                text = "Ver disciplina",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = accessibleAccent,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        // Linha superior secundária: Ver disciplina + Excluir
+                        // Ações secundárias limpas e neutras: Editar + Excluir (sem conflito vermelho)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            if (onOpenDiscipline != null) {
-                                OutlinedButton(
-                                    onClick = onOpenDiscipline,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .defaultMinSize(minHeight = secondaryButtonHeight),
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.45f)),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = accessibleAccent)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Ver disciplina",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                            FilledTonalButton(
+                                onClick = {
+                                    editCourseId = item.courseId
+                                    editTitle = item.title
+                                    editKind = item.kind
+                                    editDueDate = normalizeAssessmentDateInput(item.dueDate)
+                                        .ifBlank { defaultTodayIsoDate() }
+                                    editDueTime = item.dueTime
+                                    editCompleted = item.completed
+                                    showTitleError = false
+                                    isEditing = true
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .defaultMinSize(minHeight = secondaryButtonHeight),
+                                shape = RoundedCornerShape(CampusPillRadius),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Editar",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
 
-                            OutlinedButton(
+                            FilledTonalButton(
                                 onClick = { showDeleteConfirmDialog = true },
                                 modifier = Modifier
                                     .weight(1f)
                                     .defaultMinSize(minHeight = secondaryButtonHeight),
-                                shape = RoundedCornerShape(50),
+                                shape = RoundedCornerShape(CampusPillRadius),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                border = BorderStroke(1.dp, accessibleRed.copy(alpha = 0.45f)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = accessibleRed)
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = accessibleRed
+                                )
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Delete,
@@ -526,64 +566,29 @@ fun AssessmentDetailBottomSheet(
                             }
                         }
 
-                        // Linha principal inferior: Editar + Concluído
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        // Único CTA primário claro para concluir / reabrir
+                        Button(
+                            onClick = {
+                                onToggleCompleted(!isCompleted)
+                                onDismiss()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = primaryButtonHeight),
+                            shape = RoundedCornerShape(CampusPillRadius),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
-                            FilledTonalButton(
-                                onClick = {
-                                    editCourseId = item.courseId
-                                    editTitle = item.title
-                                    editKind = item.kind
-                                    editDueDate = normalizeAssessmentDateInput(item.dueDate)
-                                        .ifBlank { defaultTodayIsoDate() }
-                                    editDueTime = item.dueTime
-                                    editCompleted = item.completed
-                                    showTitleError = false
-                                    isEditing = true
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .defaultMinSize(minHeight = primaryButtonHeight),
-                                shape = RoundedCornerShape(50),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Edit,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Editar",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-
-                            Button(
-                                onClick = onDismiss,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .defaultMinSize(minHeight = primaryButtonHeight),
-                                shape = RoundedCornerShape(50),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                )
-                            ) {
-                                Text(
-                                    text = "Concluído",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
+                            Text(
+                                text = if (isCompleted) "Reabrir atividade" else "Marcar como concluída",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
                 } else {

@@ -27,7 +27,7 @@ public struct DisciplinesView: View {
         self.onOpenLocationInMap = onOpenLocationInMap
     }
 
-    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
+    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .red }
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
     private var isBarsMode: Bool { viewModel.store.disciplinesLayoutMode == "bars" }
@@ -112,6 +112,7 @@ public struct DisciplinesView: View {
                     viewModel.dismissDisciplineDetail()
                 }
             )
+            .presentationCornerRadius(30)
         }
         .sheet(isPresented: $viewModel.isTimetablePresented) {
             TimetableGridView(
@@ -186,21 +187,20 @@ public struct DisciplinesView: View {
 
     private var headerSection: some View {
         let primary = resolvedAccent.primary(for: colorScheme)
-        let onPrimary = resolvedAccent.onPrimary(for: colorScheme)
 
         return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("SEMESTRE \(viewModel.semesterFilter)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 11, weight: .bold))
                     .tracking(1.0)
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                 Text("Disciplinas")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 30, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Text("Seu acompanhamento de faltas")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(CampusTheme.font(size: 14, weight: .medium))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
             }
 
@@ -209,69 +209,83 @@ public struct DisciplinesView: View {
             Button {
                 viewModel.openAddCourseSheet()
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("Disciplina")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(onPrimary)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 42)
-                .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(resolvedAccent.textOnHighlightSurface(for: colorScheme))
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(resolvedAccent.surface2(for: colorScheme)))
+                    .overlay(Circle().strokeBorder(hc ? CampusTheme.cardBorder(for: colorScheme, highContrast: true) : .clear, lineWidth: 1.5))
             }
             .buttonStyle(.plain)
             .minimumTouchTarget(minTouch)
-            .padding(.top, 10)
+            .padding(.top, 8)
             .accessibilityLabel("Adicionar nova disciplina")
         }
     }
 
-    // MARK: - Quick Actions ("Matriz" + "Grade")
+    // MARK: - Bento Shortcuts ("Matriz" + "Grade")
 
     private var quickActionsRow: some View {
         let primary = resolvedAccent.primary(for: colorScheme)
 
-        return LiquidGlassGroup(spacing: 10) {
-            HStack(spacing: 10) {
-                Button {
-                    isMatrixPresented = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "book.pages.fill")
-                            .font(.system(size: 13, weight: .semibold))
+        return HStack(spacing: 10) {
+            Button {
+                isMatrixPresented = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "book.pages.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(primary)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(resolvedAccent.surface2(for: colorScheme)))
+
+                    VStack(alignment: .leading, spacing: 1) {
                         Text("Matriz")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 14, weight: .bold))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        Text("Cursos & PPCs")
+                            .font(CampusTheme.font(size: 11, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(1)
                     }
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 40)
-                    .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.plain)
-                .minimumTouchTarget(minTouch)
-                .accessibilityLabel("Abrir matriz curricular e cálculo de CRE")
-
-                Button {
-                    viewModel.openTimetable()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tablecells.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Grade")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(resolvedAccent.onPrimary(for: colorScheme))
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 40)
-                    .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
-                }
-                .buttonStyle(.plain)
-                .minimumTouchTarget(minTouch)
-                .accessibilityLabel("Abrir grade horária semanal")
-
-                Spacer(minLength: 0)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: max(56, minTouch))
+                .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, highContrast: hc)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Abrir matriz curricular e cálculo de CRE")
+
+            Button {
+                viewModel.openTimetable()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "tablecells.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(resolvedAccent.textOnHighlightSurface(for: colorScheme))
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(resolvedAccent.surface2(for: colorScheme)))
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Grade")
+                            .font(CampusTheme.font(size: 14, weight: .bold))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        Text("Horários semanais")
+                            .font(CampusTheme.font(size: 11, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: max(56, minTouch))
+                .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, highContrast: hc)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Abrir grade horária semanal")
         }
     }
 
@@ -467,6 +481,14 @@ public struct DisciplinesView: View {
 
     // MARK: - Grid Card (2 columns, compact, no "f..." clipping or "Controlada" clutter)
 
+    private static func absenceSlackLabel(currentAbsences: Int, maxAbsences: Int) -> String {
+        let remaining = maxAbsences - currentAbsences
+        if remaining > 1 { return "restam \(remaining) aulas" }
+        if remaining == 1 { return "resta 1 aula" }
+        if remaining == 0 { return "no limite" }
+        return "limite excedido"
+    }
+
     private func disciplineGridCard(_ card: DisciplineSummaryCard) -> some View {
         let deptColor = CampusTheme.departmentColor(for: card.colorKey)
         let riskLevel = CampusTheme.semanticAbsenceRiskLevel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences)
@@ -474,6 +496,10 @@ public struct DisciplinesView: View {
         let barColor = riskLevel > 0 ? riskColor : deptColor
         let progress = card.maxAbsences > 0 ? min(1.0, max(0.0, Double(card.currentAbsences) / Double(card.maxAbsences))) : 0
         let isEad = viewModel.store.isCourseEad(card.id)
+        let slack = Self.absenceSlackLabel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences)
+        let cardTint: Color = riskLevel >= 2
+            ? Color(hex: 0xBE123C)
+            : (riskLevel == 1 ? Color(hex: 0xD97706) : deptColor)
 
         return HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -485,7 +511,7 @@ public struct DisciplinesView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 5) {
                     Text(card.code)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 11, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -496,7 +522,7 @@ public struct DisciplinesView: View {
 
                     if isEad {
                         Text("EAD")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 10, weight: .bold))
                             .foregroundStyle(CampusTheme.mathBlue)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
@@ -510,7 +536,7 @@ public struct DisciplinesView: View {
                 }
 
                 Text(card.name)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 16, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -520,24 +546,28 @@ public struct DisciplinesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(card.currentAbsences)")
-                            .font(.system(size: 21, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 21, weight: .bold))
                             .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                        Text("/\(card.maxAbsences) faltas")
-                            .font(.system(size: 12, weight: .medium))
+                        Text("/\(card.maxAbsences)")
+                            .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                             .lineLimit(1)
-                            .minimumScaleFactor(0.8)
 
                         Spacer(minLength: 2)
                     }
+
+                    Text(slack)
+                        .font(CampusTheme.tabularFont(size: 11, weight: riskLevel > 0 ? .semibold : .regular))
+                        .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        .lineLimit(1)
 
                     if riskLevel > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: CampusTheme.semanticAbsenceRiskIcon(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
                                 .font(.system(size: 10, weight: .bold))
                             Text(CampusTheme.semanticAbsenceRiskLabel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 10, weight: .bold))
                         }
                         .foregroundStyle(riskColor)
                         .padding(.horizontal, 7)
@@ -568,9 +598,9 @@ public struct DisciplinesView: View {
             .padding(.vertical, 14)
         }
         .frame(maxWidth: .infinity, minHeight: 162, alignment: .topLeading)
-        .liquidGlassCard(cornerRadius: 20, tint: deptColor, interactive: true, highContrast: hc)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: cardTint, interactive: true, highContrast: hc)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(card.name), código \(card.code), \(card.currentAbsences) de \(card.maxAbsences) faltas")
+        .accessibilityLabel("\(card.name), código \(card.code), \(card.currentAbsences) de \(card.maxAbsences) faltas, \(slack)")
     }
 
     // MARK: - Bar Card (Full width)
@@ -583,6 +613,10 @@ public struct DisciplinesView: View {
         let progress = card.maxAbsences > 0 ? min(1.0, max(0.0, Double(card.currentAbsences) / Double(card.maxAbsences))) : 0
         let isEad = viewModel.store.isCourseEad(card.id)
         let cleanProf = card.professor.trimmingCharacters(in: .whitespacesAndNewlines)
+        let slack = Self.absenceSlackLabel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences)
+        let cardTint: Color = riskLevel >= 2
+            ? Color(hex: 0xBE123C)
+            : (riskLevel == 1 ? Color(hex: 0xD97706) : deptColor)
 
         return HStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -596,7 +630,7 @@ public struct DisciplinesView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 6) {
                             Text(card.code)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 11, weight: .bold))
                                 .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -607,7 +641,7 @@ public struct DisciplinesView: View {
 
                             if isEad {
                                 Text("A distância (EAD)")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.font(size: 10, weight: .bold))
                                     .foregroundStyle(CampusTheme.mathBlue)
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 3)
@@ -619,7 +653,7 @@ public struct DisciplinesView: View {
                         }
 
                         Text(card.name)
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 17, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
@@ -629,7 +663,7 @@ public struct DisciplinesView: View {
                                 Image(systemName: isEad ? "laptopcomputer" : "clock")
                                     .font(.system(size: 11))
                                 Text(cleanProf.isEmpty ? card.location : "\(card.location) · \(cleanProf)")
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(CampusTheme.font(size: 12, weight: .medium))
                                     .lineLimit(1)
                             }
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
@@ -641,22 +675,22 @@ public struct DisciplinesView: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         HStack(alignment: .firstTextBaseline, spacing: 1) {
                             Text("\(card.currentAbsences)")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .font(CampusTheme.tabularFont(size: 22, weight: .bold))
                                 .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             Text("/\(card.maxAbsences)")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(CampusTheme.tabularFont(size: 13, weight: .medium))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                         }
-                        Text("faltas")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                        Text(slack)
+                            .font(CampusTheme.tabularFont(size: 11, weight: riskLevel > 0 ? .semibold : .regular))
+                            .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                         if riskLevel > 0 {
                             HStack(spacing: 4) {
                                 Image(systemName: CampusTheme.semanticAbsenceRiskIcon(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
                                     .font(.system(size: 10, weight: .bold))
                                 Text(CampusTheme.semanticAbsenceRiskLabel(currentAbsences: card.currentAbsences, maxAbsences: card.maxAbsences))
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.font(size: 10, weight: .bold))
                             }
                             .foregroundStyle(riskColor)
                             .padding(.horizontal, 7)
@@ -688,9 +722,9 @@ public struct DisciplinesView: View {
             .padding(.vertical, 14)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlassCard(cornerRadius: 20, tint: deptColor, interactive: true, highContrast: hc)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: cardTint, interactive: true, highContrast: hc)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(card.name), \(card.currentAbsences) de \(card.maxAbsences) faltas")
+        .accessibilityLabel("\(card.name), \(card.currentAbsences) de \(card.maxAbsences) faltas, \(slack)")
     }
 
     // MARK: - Footer

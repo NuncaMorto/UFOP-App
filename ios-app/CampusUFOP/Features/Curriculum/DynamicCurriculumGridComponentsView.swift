@@ -161,10 +161,10 @@ internal struct DynamicGridHeaderCard: View {
                     .frame(height: 8)
                     .accessibilityHidden(true)
 
-                    Text("Atividades/TCC/Estágio: \(matrix.requiredActivitiesHours)h · Total do curso: \(matrix.totalCourseHours)h")
-                        .font(.system(size: 10.5, weight: .medium))
+                    Text("Grade: \(summary.completedHours)/\(summary.totalGridHours)h · Compl./TCC: \(matrix.requiredActivitiesHours)h · Total: \(matrix.totalCourseHours)h")
+                        .font(CampusTheme.tabularFont(size: 11, weight: .medium))
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
-                        .lineLimit(1)
+                        .lineLimit(2)
 
                     if let resolution = autoResolution, resolution.matrix.id == matrix.id, let note = resolution.note {
                         Text(note)
@@ -339,20 +339,24 @@ internal struct DynamicGridContentView: View {
                     let periodCourses = matrix.courses(inPeriod: period)
                     let doneCount = periodCourses.filter { completedSet.contains($0.code) }.count
                     let periodHours = periodCourses.reduce(0) { $0 + $1.workloadHours }
+                    let allDone = !periodCourses.isEmpty && doneCount == periodCourses.count
+                    let counterColor = allDone
+                        ? CampusTheme.accessibleTextColor(palette.completed, scheme: colorScheme)
+                        : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Text("\(period)º Período")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 12, weight: .bold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                             Text("\(doneCount)/\(periodCourses.count) · \(periodHours)h")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                                .font(CampusTheme.tabularFont(size: 11, weight: .semibold))
+                                .foregroundStyle(counterColor)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: highContrast)
+                        .liquidGlassCapsule(selected: false, accent: allDone ? palette.completed : primaryAccent, interactive: false, highContrast: highContrast)
 
                         HStack(alignment: .top, spacing: gridSpacing) {
                             ForEach(periodCourses) { course in
@@ -376,20 +380,24 @@ internal struct DynamicGridContentView: View {
                 ForEach(1...max(1, matrix.totalPeriods), id: \.self) { period in
                     let periodCourses = matrix.courses(inPeriod: period)
                     let doneCount = periodCourses.filter { completedSet.contains($0.code) }.count
+                    let allDone = !periodCourses.isEmpty && doneCount == periodCourses.count
+                    let counterColor = allDone
+                        ? CampusTheme.accessibleTextColor(palette.completed, scheme: colorScheme)
+                        : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
 
                     VStack(alignment: .leading, spacing: gridSpacing) {
                         HStack {
                             Text("\(period)º Per.")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 12, weight: .bold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                             Spacer(minLength: 4)
                             Text("\(doneCount)/\(periodCourses.count)")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                                .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                                .foregroundStyle(counterColor)
                         }
                         .padding(.horizontal, 12)
                         .frame(width: cardWidth, height: 34)
-                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: false, highContrast: highContrast)
+                        .liquidGlassCapsule(selected: false, accent: allDone ? palette.completed : primaryAccent, interactive: false, highContrast: highContrast)
 
                         VStack(spacing: gridSpacing) {
                             ForEach(periodCourses) { course in

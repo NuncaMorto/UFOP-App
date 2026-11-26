@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.19 — Redesign Completo de UI/UX, Tipografia Onest & 9 Escadas Tonais
+
+- **Android (`1.9.19` · Beta), iOS (`1.9.19`) & Mapa 2D (`rust-core`):**
+  - **Tipografia `Onest` offline & numerais tabulares:** incorporação local da família `Onest` (`400`–`800`) no Android e no iOS, com alinhamento tabular em horários, contadores de faltas, cargas horárias, porcentagens e CRE.
+  - **9 escadas tonais curadas (WCAG 2.1 AA) & elevação tonal:** novas paletas *Mata*, *Vinho* (padrão inicial), *Terracota*, *Ametista*, *Ouro Velho*, *Mineral*, *Cacau*, *Rubi* e *Cobalto* com degraus `Canvas -> Surface 1 -> Surface 2`, preservando preferências já salvas e bordas explícitas no modo de Alto Contraste.
+  - **Agenda, Atividades, Disciplinas, Matriz & Grade Dinâmica:** destaque ao vivo de aulas em andamento/próximas, divisores de janela livre (`>= 50 min`), check-in em 3 cartões semânticos, agrupamento temporal de prazos com normalização de títulos em caixa alta, seções agrupadas (`26dp`) no detalhe da disciplina e seletor de versão integrado ao resumo da Matriz Curricular.
+  - **Perfil, Personalização 3x3 & Mapa 2D Offline:** cartão horizontal de identificação acadêmica com edição em ambas as plataformas, 3 blocos Bento rápidos, alerta âmbar (`>= 50%` de faltas), estado `"Em curso"` com simulação direta de CRE, pré-visualização ao vivo com grade 3x3 de esferas cromáticas, créditos discretos `© OSM · UFOP ⓘ`, categorias em português e busca interna PT-BR no Mapa 2D.
+
+<!-- versionCode: 36 -->
+
+---
+
 ## v1.9.18 — Ajuste do Ícone Monocromático (Material You) & Favicon
 
 - **Android (`1.9.18` · Beta), iOS (`1.9.18`) & Site (`docs/`):**

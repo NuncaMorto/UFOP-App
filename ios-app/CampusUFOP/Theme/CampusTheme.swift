@@ -33,7 +33,7 @@ public extension Color {
     }
 }
 
-// MARK: - 9 Accent Palettes (Verde, Vermelho, Laranja, Roxo, Amarelo, Ciano, Marrom, Rosa, Azul)
+// MARK: - 9 Curated Tonal Accent Palettes (Preserving Declaration Order & storageKeys)
 
 public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Sendable {
     case green = "GREEN"
@@ -51,59 +51,167 @@ public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Send
 
     public var displayName: String {
         switch self {
-        case .green: return "Verde"
-        case .red: return "Vermelho"
-        case .orange: return "Laranja"
-        case .purple: return "Roxo"
-        case .yellow: return "Amarelo"
-        case .cyan: return "Ciano"
-        case .brown: return "Marrom"
-        case .pink: return "Rosa"
-        case .blue: return "Azul"
+        case .green: return "Mata"
+        case .red: return "Vinho"
+        case .orange: return "Terracota"
+        case .purple: return "Ametista"
+        case .yellow: return "Ouro Velho"
+        case .cyan: return "Mineral"
+        case .brown: return "Cacau"
+        case .pink: return "Rubi"
+        case .blue: return "Cobalto"
+        }
+    }
+
+    public var previewHex: String {
+        switch self {
+        case .green: return "#216B4A"
+        case .red: return "#8C1D35"
+        case .orange: return "#B54717"
+        case .purple: return "#5F3DC4"
+        case .yellow: return "#9A680E"
+        case .cyan: return "#126E7B"
+        case .brown: return "#734A34"
+        case .pink: return "#A62660"
+        case .blue: return "#2557B8"
+        }
+    }
+
+    public func canvas(for scheme: ColorScheme) -> Color {
+        switch (self, scheme) {
+        case (.green, .dark): return Color(hex: 0x101513)
+        case (.green, _): return Color(hex: 0xF3F9F6)
+        case (.red, .dark): return Color(hex: 0x151112)
+        case (.red, _): return Color(hex: 0xFBF5F6)
+        case (.orange, .dark): return Color(hex: 0x161210)
+        case (.orange, _): return Color(hex: 0xFBF6F3)
+        case (.purple, .dark): return Color(hex: 0x131117)
+        case (.purple, _): return Color(hex: 0xF7F5FC)
+        case (.yellow, .dark): return Color(hex: 0x15130F)
+        case (.yellow, _): return Color(hex: 0xFAF7F0)
+        case (.cyan, .dark): return Color(hex: 0x101517)
+        case (.cyan, _): return Color(hex: 0xF2F9FA)
+        case (.brown, .dark): return Color(hex: 0x151210)
+        case (.brown, _): return Color(hex: 0xFAF6F3)
+        case (.pink, .dark): return Color(hex: 0x161114)
+        case (.pink, _): return Color(hex: 0xFCF4F8)
+        case (.blue, .dark): return Color(hex: 0x101318)
+        case (.blue, _): return Color(hex: 0xF3F7FC)
+        }
+    }
+
+    public func surface1(for scheme: ColorScheme) -> Color {
+        if scheme != .dark {
+            return Color(hex: 0xFFFFFF)
+        }
+        switch self {
+        case .green: return Color(hex: 0x1A2520)
+        case .red: return Color(hex: 0x231A1D)
+        case .orange: return Color(hex: 0x261E19)
+        case .purple: return Color(hex: 0x201C29)
+        case .yellow: return Color(hex: 0x242017)
+        case .cyan: return Color(hex: 0x192428)
+        case .brown: return Color(hex: 0x241E1B)
+        case .pink: return Color(hex: 0x261B21)
+        case .blue: return Color(hex: 0x1A212D)
+        }
+    }
+
+    public func surface2(for scheme: ColorScheme) -> Color {
+        switch (self, scheme) {
+        case (.green, .dark): return Color(hex: 0x25352E)
+        case (.green, _): return Color(hex: 0xE1EFE8)
+        case (.red, .dark): return Color(hex: 0x312428)
+        case (.red, _): return Color(hex: 0xF2E4E7)
+        case (.orange, .dark): return Color(hex: 0x362A23)
+        case (.orange, _): return Color(hex: 0xF4E6DD)
+        case (.purple, .dark): return Color(hex: 0x2D273B)
+        case (.purple, _): return Color(hex: 0xEAE4F7)
+        case (.yellow, .dark): return Color(hex: 0x332D20)
+        case (.yellow, _): return Color(hex: 0xF0E7D1)
+        case (.cyan, .dark): return Color(hex: 0x233339)
+        case (.cyan, _): return Color(hex: 0xDFEEF1)
+        case (.brown, .dark): return Color(hex: 0x332B26)
+        case (.brown, _): return Color(hex: 0xEFE6E0)
+        case (.pink, .dark): return Color(hex: 0x36252F)
+        case (.pink, _): return Color(hex: 0xF4E2EB)
+        case (.blue, .dark): return Color(hex: 0x252F40)
+        case (.blue, _): return Color(hex: 0xE2EBF8)
         }
     }
 
     public func primary(for scheme: ColorScheme) -> Color {
         switch (self, scheme) {
-        case (.green, .dark): return Color(hex: 0x4E854B)
-        case (.green, _): return Color(hex: 0x3B6939)
-        case (.red, .dark): return Color(hex: 0xCF443C)
-        case (.red, _): return Color(hex: 0xB3261E)
-        case (.orange, .dark): return Color(hex: 0xD06A14)
-        case (.orange, _): return Color(hex: 0xC75B00)
-        case (.purple, .dark): return Color(hex: 0x9368C8)
-        case (.purple, _): return Color(hex: 0x6B3FA0)
-        case (.yellow, .dark): return Color(hex: 0xFFD54F)
-        case (.yellow, _): return Color(hex: 0xB58500)
-        case (.cyan, .dark): return Color(hex: 0x4DD0E1)
-        case (.cyan, _): return Color(hex: 0x006874)
-        case (.brown, .dark): return Color(hex: 0xD7CCC8)
-        case (.brown, _): return Color(hex: 0x6D4C41)
-        case (.pink, .dark): return Color(hex: 0xF48FB1)
-        case (.pink, _): return Color(hex: 0xC2185B)
-        case (.blue, .dark): return Color(hex: 0x8AB4F8)
-        case (.blue, _): return Color(hex: 0x1D5BD6)
+        case (.green, .dark): return Color(hex: 0x267A54)
+        case (.green, _): return Color(hex: 0x216B4A)
+        case (.red, .dark): return Color(hex: 0xA82E42)
+        case (.red, _): return Color(hex: 0x8C1D35)
+        case (.orange, .dark): return Color(hex: 0xBD501E)
+        case (.orange, _): return Color(hex: 0xB54717)
+        case (.purple, .dark): return Color(hex: 0x7554D1)
+        case (.purple, _): return Color(hex: 0x5F3DC4)
+        case (.yellow, .dark): return Color(hex: 0xE0AE43)
+        case (.yellow, _): return Color(hex: 0x9A680E)
+        case (.cyan, .dark): return Color(hex: 0x177C8A)
+        case (.cyan, _): return Color(hex: 0x126E7B)
+        case (.brown, .dark): return Color(hex: 0x8F6249)
+        case (.brown, _): return Color(hex: 0x734A34)
+        case (.pink, .dark): return Color(hex: 0xC43E78)
+        case (.pink, _): return Color(hex: 0xA62660)
+        case (.blue, .dark): return Color(hex: 0x356AD1)
+        case (.blue, _): return Color(hex: 0x2557B8)
         }
     }
 
     public func onPrimary(for scheme: ColorScheme) -> Color {
         switch (self, scheme) {
-        case (.yellow, _): return Color(hex: 0x1A1500)
-        case (.cyan, .dark): return Color(hex: 0x002022)
-        case (.brown, .dark): return Color(hex: 0x271B17)
-        case (.pink, .dark): return Color(hex: 0x3E001D)
-        case (.blue, .dark): return Color(hex: 0x001D3D)
+        case (.yellow, .dark): return Color(hex: 0x211602)
         default: return .white
         }
     }
 
+    public func highlight(for scheme: ColorScheme) -> Color {
+        if scheme != .dark {
+            return primary(for: scheme)
+        }
+        switch self {
+        case .green: return Color(hex: 0xA6DFC3)
+        case .red: return Color(hex: 0xF2B8C1)
+        case .orange: return Color(hex: 0xF7C4A8)
+        case .purple: return Color(hex: 0xCFC0FA)
+        case .yellow: return Color(hex: 0xF2D591)
+        case .cyan: return Color(hex: 0x9EE0E8)
+        case .brown: return Color(hex: 0xDFC2B2)
+        case .pink: return Color(hex: 0xF5B8D2)
+        case .blue: return Color(hex: 0xB3CCF8)
+        }
+    }
+
+    public func ink(for scheme: ColorScheme) -> Color {
+        if scheme == .dark {
+            return Color(hex: 0xF6F4F5)
+        }
+        switch self {
+        case .green: return Color(hex: 0x11291F)
+        case .red: return Color(hex: 0x2B1217)
+        case .orange: return Color(hex: 0x2E170D)
+        case .purple: return Color(hex: 0x1E1438)
+        case .yellow: return Color(hex: 0x2E2107)
+        case .cyan: return Color(hex: 0x0D282D)
+        case .brown: return Color(hex: 0x291A12)
+        case .pink: return Color(hex: 0x300F1E)
+        case .blue: return Color(hex: 0x121F3B)
+        }
+    }
+
     public func softTint(for scheme: ColorScheme) -> Color {
-        primary(for: scheme).opacity(scheme == .dark ? 0.24 : 0.14)
+        surface2(for: scheme)
     }
 
     public static func fromKey(_ raw: String?) -> CampusAccentColor {
-        guard let raw else { return .green }
-        return Self.allCases.first { $0.rawValue.caseInsensitiveCompare(raw.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame } ?? .green
+        guard let raw else { return .red }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Self.allCases.first { $0.rawValue.caseInsensitiveCompare(trimmed) == .orderedSame } ?? .red
     }
 }
 
@@ -209,14 +317,39 @@ public final class CampusAppearanceController {
 
     public func resetDefaults() {
         appearanceModeRaw = "system"
-        accentColor = .green
+        accentColor = .red
         accessibility = CampusAccessibilitySettings()
     }
 }
 
-// MARK: - Campus UFOP Design System, WCAG Helpers & Apple Liquid Glass Tokens
+// MARK: - Campus UFOP Design System, Typography (Onest), WCAG Helpers & Tonal Elevation
 
 public enum CampusTheme {
+
+    // MARK: Typography (Onest)
+
+    public static func fontName(for weight: Font.Weight, boldBoost: Bool = false) -> String {
+        switch weight {
+        case .black, .heavy:
+            return "Onest-ExtraBold"
+        case .bold:
+            return boldBoost ? "Onest-ExtraBold" : "Onest-Bold"
+        case .semibold:
+            return boldBoost ? "Onest-Bold" : "Onest-SemiBold"
+        case .medium:
+            return boldBoost ? "Onest-SemiBold" : "Onest-Medium"
+        default:
+            return boldBoost ? "Onest-Medium" : "Onest-Regular"
+        }
+    }
+
+    public static func font(size: CGFloat, weight: Font.Weight = .regular, boldBoost: Bool = false) -> Font {
+        Font.custom(fontName(for: weight, boldBoost: boldBoost), size: size)
+    }
+
+    public static func tabularFont(size: CGFloat, weight: Font.Weight = .semibold, boldBoost: Bool = false) -> Font {
+        Font.custom(fontName(for: weight, boldBoost: boldBoost), size: size).monospacedDigit()
+    }
 
     // MARK: Department Palette
 
@@ -239,63 +372,79 @@ public enum CampusTheme {
         return base.opacity(scheme == .dark ? 0.24 : 0.14)
     }
 
-    // MARK: Light / Dark Adaptive Tokens
+    // MARK: Light / Dark Adaptive Tonal Tokens
 
-    public static func appBackground(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
+    public static func appBackground(
+        for scheme: ColorScheme,
+        highContrast: Bool = false,
+        accent: CampusAccentColor = .red
+    ) -> Color {
         if highContrast {
             return scheme == .dark ? Color(hex: 0x050607) : Color(hex: 0xFFFFFF)
         }
-        return scheme == .dark ? Color(hex: 0x0C0F14) : Color(hex: 0xF4F7FB)
+        return accent.canvas(for: scheme)
     }
 
-    public static func cardBackground(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
+    public static func cardBackground(
+        for scheme: ColorScheme,
+        highContrast: Bool = false,
+        accent: CampusAccentColor = .red
+    ) -> Color {
         if highContrast {
             return scheme == .dark ? Color(hex: 0x050607) : Color(hex: 0xFFFFFF)
         }
-        return scheme == .dark ? Color(hex: 0x161B23) : Color(hex: 0xFFFFFF)
+        return accent.surface1(for: scheme)
     }
 
-    public static func secondarySurface(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
+    public static func secondarySurface(
+        for scheme: ColorScheme,
+        highContrast: Bool = false,
+        accent: CampusAccentColor = .red
+    ) -> Color {
         if highContrast {
             return scheme == .dark ? Color(hex: 0x181A1D) : Color(hex: 0xEEEEEE)
         }
-        return scheme == .dark ? Color(hex: 0x1E2532) : Color(hex: 0xEAF0F7)
+        return accent.surface2(for: scheme)
     }
 
     public static func cardBorder(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
         if highContrast {
-            return scheme == .dark ? Color.white.opacity(0.85) : Color.black.opacity(0.85)
+            return scheme == .dark ? Color.white.opacity(0.90) : Color.black.opacity(0.90)
         }
-        return scheme == .dark ? Color.white.opacity(0.14) : Color(hex: 0xD9E2EF)
+        return scheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06)
     }
 
-    public static func primaryText(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
+    public static func primaryText(
+        for scheme: ColorScheme,
+        highContrast: Bool = false,
+        accent: CampusAccentColor = .red
+    ) -> Color {
         if highContrast {
             return scheme == .dark ? .white : .black
         }
-        return scheme == .dark ? Color(hex: 0xF8FAFC) : Color(hex: 0x0F172A)
+        return accent.ink(for: scheme)
     }
 
     public static func secondaryText(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
         if highContrast {
             return scheme == .dark ? Color(hex: 0xE0E0E0) : Color(hex: 0x212121)
         }
-        return scheme == .dark ? Color(hex: 0xB8C2D1) : Color(hex: 0x475569)
+        return scheme == .dark ? Color(hex: 0xCCC6CA) : Color(hex: 0x524B4E)
     }
 
     public static func mutedText(for scheme: ColorScheme, highContrast: Bool = false) -> Color {
         if highContrast {
             return scheme == .dark ? Color(hex: 0xD4D4D4) : Color(hex: 0x333333)
         }
-        return scheme == .dark ? Color(hex: 0x8F9BB0) : Color(hex: 0x64748B)
+        return scheme == .dark ? Color(hex: 0xB8B0B5) : Color(hex: 0x625A5D)
     }
 
-    public static func selectedPillBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: 0x1E2E52) : Color(hex: 0xDCE7FF)
+    public static func selectedPillBackground(for scheme: ColorScheme, accent: CampusAccentColor = .red) -> Color {
+        accent.surface2(for: scheme)
     }
 
-    public static func selectedPillText(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: 0x93C5FD) : Color(hex: 0x1D4ED8)
+    public static func selectedPillText(for scheme: ColorScheme, accent: CampusAccentColor = .red) -> Color {
+        accent.highlight(for: scheme)
     }
 
     public static func weatherBadgeBackground(for scheme: ColorScheme) -> Color {
@@ -306,12 +455,12 @@ public enum CampusTheme {
         scheme == .dark ? Color(hex: 0xFDE047) : Color(hex: 0x5C4800)
     }
 
-    public static func floatingButtonBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: 0x2A3140) : Color(hex: 0x141821)
+    public static func floatingButtonBackground(for scheme: ColorScheme, accent: CampusAccentColor = .red) -> Color {
+        accent.surface1(for: scheme)
     }
 
     public static func cardShadow(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.black.opacity(0.38) : Color(hex: 0x0F172A, alpha: 0.06)
+        scheme == .dark ? Color.black.opacity(0.32) : Color.black.opacity(0.05)
     }
 
     // MARK: WCAG Contrast & Absence Semantics (IHC Sprint 13+)
@@ -330,8 +479,13 @@ public enum CampusTheme {
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
     }
 
-    public static func accessibleTextColor(_ base: Color, scheme: ColorScheme, minContrast: Double = 4.5) -> Color {
-        let surface = cardBackground(for: scheme)
+    public static func accessibleTextColor(
+        _ base: Color,
+        scheme: ColorScheme,
+        minContrast: Double = 4.5,
+        accent: CampusAccentColor = .red
+    ) -> Color {
+        let surface = accent.surface1(for: scheme)
         if contrastRatio(base, against: surface) >= minContrast {
             return base
         }
@@ -385,51 +539,53 @@ public enum CampusTheme {
         }
     }
 
-    // MARK: Layout Metrics
+    // MARK: Layout Metrics (Fase 1 Organic Radii)
 
-    public static let cardCornerRadius: CGFloat = 20
-    public static let pillCornerRadius: CGFloat = 14
+    public static let cardCornerRadius: CGFloat = 24
+    public static let groupedCornerRadius: CGFloat = 26
+    public static let sheetCornerRadius: CGFloat = 30
+    public static let pillCornerRadius: CGFloat = 999
     public static let leftAccentBarWidth: CGFloat = 5
 }
 
-// MARK: - Apple Liquid Glass Containers & Modifiers
+// MARK: - Atmospheric Tonal Backdrop & Tonal Card Modifiers
 
-/// Fundo atmosférico com reflexos suaves da cor de destaque para valorizar o Liquid Glass do iOS 26.
+/// Fundo tonal derivado exclusivamente da cor de destaque ativa (`Canvas` + brilho sutil da paleta).
 public struct LiquidGlassBackdrop: View {
     public let accent: CampusAccentColor
     public let highContrast: Bool
     @Environment(\.colorScheme) private var colorScheme
 
-    public init(accent: CampusAccentColor = .green, highContrast: Bool = false) {
+    public init(accent: CampusAccentColor = .red, highContrast: Bool = false) {
         self.accent = accent
         self.highContrast = highContrast
     }
 
     public var body: some View {
         ZStack {
-            CampusTheme.appBackground(for: colorScheme, highContrast: highContrast)
+            CampusTheme.appBackground(for: colorScheme, highContrast: highContrast, accent: accent)
                 .ignoresSafeArea()
 
             if !highContrast {
                 RadialGradient(
                     colors: [
-                        accent.primary(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.14),
+                        accent.primary(for: colorScheme).opacity(colorScheme == .dark ? 0.16 : 0.08),
                         Color.clear
                     ],
                     center: .topTrailing,
-                    startRadius: 20,
+                    startRadius: 24,
                     endRadius: 360
                 )
                 .ignoresSafeArea()
 
                 RadialGradient(
                     colors: [
-                        CampusTheme.mathBlue.opacity(colorScheme == .dark ? 0.14 : 0.08),
+                        accent.highlight(for: colorScheme).opacity(colorScheme == .dark ? 0.08 : 0.06),
                         Color.clear
                     ],
                     center: .bottomLeading,
-                    startRadius: 20,
-                    endRadius: 380
+                    startRadius: 24,
+                    endRadius: 340
                 )
                 .ignoresSafeArea()
             }
@@ -437,7 +593,7 @@ public struct LiquidGlassBackdrop: View {
     }
 }
 
-/// Agrupa múltiplos controles Liquid Glass no iOS 26 para mesclagem/morphing fluido.
+/// Agrupa múltiplos controles Liquid Glass flutuantes no iOS 26.
 public struct LiquidGlassGroup<Content: View>: View {
     public let spacing: CGFloat?
     public let content: Content
@@ -467,68 +623,64 @@ private struct LiquidGlassCardModifier: ViewModifier {
     let tint: Color?
     let interactive: Bool
     let highContrast: Bool
+    let floating: Bool
+    let useSurface2: Bool
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+
+    private var activeAccent: CampusAccentColor {
+        appearance?.accentColor ?? .red
+    }
 
     @ViewBuilder
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if highContrast {
             content
                 .background(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(CampusTheme.cardBackground(for: colorScheme, highContrast: true))
+                    shape.fill(CampusTheme.cardBackground(for: colorScheme, highContrast: true, accent: activeAccent))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 2)
+                    shape.strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 2)
                 )
-        } else {
+        } else if floating {
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                let tinted = tint.map { Glass.regular.tint($0.opacity(0.18)) } ?? Glass.regular
-                let configured = interactive ? tinted.interactive() : tinted
+                let glassBase = tint.map { Glass.regular.tint($0.opacity(0.16)) } ?? Glass.regular
+                let configured = interactive ? glassBase.interactive() : glassBase
                 content
                     .background(
-                        shape
-                            .fill(CampusTheme.cardBackground(for: colorScheme).opacity(colorScheme == .dark ? 0.42 : 0.56))
+                        shape.fill(activeAccent.surface1(for: colorScheme).opacity(colorScheme == .dark ? 0.60 : 0.76))
                     )
                     .glassEffect(configured, in: shape)
             } else {
-                fallbackGlassCard(content: content)
+                tonalCard(content: content, shape: shape)
             }
             #else
-            fallbackGlassCard(content: content)
+            tonalCard(content: content, shape: shape)
             #endif
+        } else {
+            tonalCard(content: content, shape: shape)
         }
     }
 
-    private func fallbackGlassCard(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    private func tonalCard(content: Content, shape: RoundedRectangle) -> some View {
+        let baseFill = useSurface2 ? activeAccent.surface2(for: colorScheme) : activeAccent.surface1(for: colorScheme)
         return content
             .background(
                 ZStack {
-                    shape.fill(.ultraThinMaterial)
+                    shape.fill(baseFill)
                     if let tint {
-                        shape.fill(tint.opacity(colorScheme == .dark ? 0.12 : 0.07))
-                    } else {
-                        shape.fill(CampusTheme.cardBackground(for: colorScheme).opacity(colorScheme == .dark ? 0.55 : 0.65))
+                        shape.fill(tint.opacity(colorScheme == .dark ? 0.08 : 0.035))
                     }
                 }
             )
-            .overlay(
-                shape.strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.24 : 0.72),
-                            CampusTheme.cardBorder(for: colorScheme)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            .shadow(
+                color: colorScheme == .dark ? Color.clear : CampusTheme.cardShadow(for: colorScheme),
+                radius: floating ? 10 : 3,
+                x: 0,
+                y: floating ? 4 : 1
             )
-            .shadow(color: CampusTheme.cardShadow(for: colorScheme), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -537,7 +689,13 @@ private struct LiquidGlassCapsuleModifier: ViewModifier {
     let accent: Color
     let interactive: Bool
     let highContrast: Bool
+    let floating: Bool
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+
+    private var activeAccent: CampusAccentColor {
+        appearance?.accentColor ?? .red
+    }
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -545,50 +703,39 @@ private struct LiquidGlassCapsuleModifier: ViewModifier {
             content
                 .background(
                     Capsule(style: .continuous)
-                        .fill(selected ? accent : CampusTheme.cardBackground(for: colorScheme, highContrast: true))
+                        .fill(selected ? accent : CampusTheme.cardBackground(for: colorScheme, highContrast: true, accent: activeAccent))
                 )
                 .overlay(
                     Capsule(style: .continuous)
                         .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: selected ? 2 : 1.5)
                 )
-        } else {
+        } else if floating {
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                let baseGlass = selected ? Glass.regular.tint(accent.opacity(0.32)) : Glass.regular
+                let baseGlass = selected ? Glass.regular.tint(accent.opacity(0.28)) : Glass.regular
                 let configured = interactive ? baseGlass.interactive() : baseGlass
                 content
                     .background(
                         Capsule(style: .continuous)
-                            .fill(selected ? accent.opacity(colorScheme == .dark ? 0.28 : 0.18) : Color.clear)
+                            .fill(selected ? activeAccent.surface2(for: colorScheme).opacity(0.85) : activeAccent.surface1(for: colorScheme).opacity(0.70))
                     )
                     .glassEffect(configured, in: .capsule)
             } else {
-                fallbackCapsule(content: content)
+                tonalCapsule(content: content)
             }
             #else
-            fallbackCapsule(content: content)
+            tonalCapsule(content: content)
             #endif
+        } else {
+            tonalCapsule(content: content)
         }
     }
 
-    private func fallbackCapsule(content: Content) -> some View {
+    private func tonalCapsule(content: Content) -> some View {
         content
             .background(
-                ZStack {
-                    Capsule(style: .continuous).fill(.ultraThinMaterial)
-                    Capsule(style: .continuous).fill(
-                        selected
-                            ? accent.opacity(colorScheme == .dark ? 0.30 : 0.18)
-                            : CampusTheme.cardBackground(for: colorScheme).opacity(colorScheme == .dark ? 0.45 : 0.55)
-                    )
-                }
-            )
-            .overlay(
                 Capsule(style: .continuous)
-                    .strokeBorder(
-                        selected ? accent.opacity(0.45) : CampusTheme.cardBorder(for: colorScheme),
-                        lineWidth: 1
-                    )
+                    .fill(selected ? accent : activeAccent.surface2(for: colorScheme))
             )
     }
 }
@@ -598,30 +745,36 @@ public extension View {
         cornerRadius: CGFloat = CampusTheme.cardCornerRadius,
         tint: Color? = nil,
         interactive: Bool = false,
-        highContrast: Bool = false
+        highContrast: Bool = false,
+        floating: Bool = false,
+        useSurface2: Bool = false
     ) -> some View {
         modifier(
             LiquidGlassCardModifier(
                 cornerRadius: cornerRadius,
                 tint: tint,
                 interactive: interactive,
-                highContrast: highContrast
+                highContrast: highContrast,
+                floating: floating,
+                useSurface2: useSurface2
             )
         )
     }
 
     func liquidGlassCapsule(
         selected: Bool = false,
-        accent: Color = CampusAccentColor.green.primary(for: .light),
+        accent: Color = CampusAccentColor.red.primary(for: .light),
         interactive: Bool = true,
-        highContrast: Bool = false
+        highContrast: Bool = false,
+        floating: Bool = false
     ) -> some View {
         modifier(
             LiquidGlassCapsuleModifier(
                 selected: selected,
                 accent: accent,
                 interactive: interactive,
-                highContrast: highContrast
+                highContrast: highContrast,
+                floating: floating
             )
         )
     }
@@ -697,7 +850,7 @@ public struct LiquidGlassPrimaryButton<Label: View>: View {
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: minHeight)
                 .background(
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(tint)
                 )
         }
@@ -717,15 +870,13 @@ public struct WeatherPillBadge: View {
 
     public var body: some View {
         Text(label)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
             .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .liquidGlassCapsule(
-                selected: true,
-                accent: Color(hex: 0xFACC15),
-                interactive: false,
-                highContrast: false
+            .background(
+                Capsule(style: .continuous)
+                    .fill(CampusTheme.weatherBadgeBackground(for: colorScheme))
             )
     }
 }
@@ -733,15 +884,18 @@ public struct WeatherPillBadge: View {
 public struct AccentBarCardContainer<Content: View>: View {
     public let accentColor: Color
     public let highContrast: Bool
+    public let useSurface2: Bool
     public let content: Content
 
     public init(
         accentColor: Color,
         highContrast: Bool = false,
+        useSurface2: Bool = false,
         @ViewBuilder content: () -> Content
     ) {
         self.accentColor = accentColor
         self.highContrast = highContrast
+        self.useSurface2 = useSurface2
         self.content = content()
     }
 
@@ -762,7 +916,8 @@ public struct AccentBarCardContainer<Content: View>: View {
             cornerRadius: CampusTheme.cardCornerRadius,
             tint: accentColor,
             interactive: false,
-            highContrast: highContrast
+            highContrast: highContrast,
+            useSurface2: useSurface2
         )
     }
 }

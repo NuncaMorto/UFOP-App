@@ -51,6 +51,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -99,6 +100,9 @@ import br.ufop.campus.ui.activities.AssessmentDetailBottomSheet
 import br.ufop.campus.ui.components.CampusDatePickerField
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.components.defaultTodayIsoDate
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
@@ -106,10 +110,13 @@ import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.parseHexColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLabel
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLevel
+import br.ufop.campus.ui.theme.tabularNums
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -775,9 +782,10 @@ fun DisciplineDetailBottomSheet(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation()
             ) {
                 Column(
                     modifier = Modifier
@@ -790,49 +798,52 @@ fun DisciplineDetailBottomSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = buildAnnotatedString {
-                                    withStyle(
-                                        SpanStyle(
-                                            fontSize = 30.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    ) {
-                                        append("$currentAbsences")
-                                    }
-                                    withStyle(
-                                        SpanStyle(
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    ) {
-                                        append(" / $maxAbsences")
-                                    }
-                                    withStyle(
-                                        SpanStyle(
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    ) {
-                                        append(" faltas")
-                                    }
-                                },
+                            Row(
                                 modifier = Modifier
                                     .defaultMinSize(minHeight = minTouchTarget)
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable(onClick = openEditAbsencesDialog)
-                                    .padding(vertical = 4.dp),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = buildAnnotatedString {
+                                        withStyle(
+                                            SpanStyle(
+                                                fontSize = 30.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (riskLevel > 0) indicatorColor else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        ) {
+                                            append("$currentAbsences")
+                                        }
+                                        withStyle(
+                                            SpanStyle(
+                                                fontSize = 20.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        ) {
+                                            append(" / $maxAbsences")
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.headlineMedium.tabularNums(),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = "Editar faltas manualmente",
+                                    tint = accessibleAccent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
 
                             Surface(
-                                shape = RoundedCornerShape(999.dp),
+                                shape = RoundedCornerShape(CampusPillRadius),
                                 color = indicatorColor.copy(alpha = 0.14f),
-                                border = BorderStroke(1.dp, indicatorColor.copy(alpha = 0.32f))
+                                border = campusCardBorder(1.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -861,7 +872,7 @@ fun DisciplineDetailBottomSheet(
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             IconButton(
                                 onClick = { handleUpdateAbsences((currentAbsences - 1).coerceAtLeast(0)) },
@@ -869,11 +880,12 @@ fun DisciplineDetailBottomSheet(
                                 modifier = Modifier.size(minTouchTarget)
                             ) {
                                 Surface(
-                                    modifier = Modifier.size(if (a11y.largeTouchTargets) 44.dp else 38.dp),
+                                    modifier = Modifier.size(if (a11y.largeTouchTargets) 46.dp else 40.dp),
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.surface.copy(
                                         alpha = if (currentAbsences > 0) 1f else 0.5f
-                                    )
+                                    ),
+                                    border = campusCardBorder(1.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
@@ -888,58 +900,21 @@ fun DisciplineDetailBottomSheet(
                                 }
                             }
 
-                            Surface(
-                                onClick = openEditAbsencesDialog,
-                                modifier = if (a11y.largeTouchTargets) {
-                                    Modifier.defaultMinSize(minHeight = minTouchTarget)
-                                } else {
-                                    Modifier.minimumInteractiveComponentSize()
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                color = accentColor.copy(alpha = 0.14f),
-                                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.30f))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .heightIn(min = secondaryChipHeight)
-                                        .padding(
-                                            horizontal = 10.dp,
-                                            vertical = if (a11y.largeTouchTargets) 10.dp else 6.dp
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Edit,
-                                        contentDescription = "Editar faltas manualmente",
-                                        tint = accessibleAccent,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Text(
-                                        text = "Editar",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = accessibleAccent,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            }
-
                             IconButton(
                                 onClick = { handleUpdateAbsences(currentAbsences + 1) },
                                 modifier = Modifier.size(minTouchTarget)
                             ) {
                                 Surface(
-                                    modifier = Modifier.size(if (a11y.largeTouchTargets) 44.dp else 38.dp),
+                                    modifier = Modifier.size(if (a11y.largeTouchTargets) 46.dp else 40.dp),
                                     shape = CircleShape,
-                                    color = accentColor.copy(alpha = 0.16f)
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    border = campusCardBorder(1.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Rounded.Add,
                                             contentDescription = "Adicionar falta",
-                                            tint = accessibleAccent,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -990,25 +965,35 @@ fun DisciplineDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // 1. Acordeão: Histórico de marcações (Faltas e Cancelamentos) — fechado por padrão
             val totalAbsenceWeight = resolvedAbsenceHistory.sumOf { it.classWeight }
             val historySummaryText = if (resolvedAbsenceHistory.isEmpty()) {
-                "0 registros"
+                "0 reg."
             } else {
-                val regWord = if (resolvedAbsenceHistory.size == 1) "registro" else "registros"
-                "${resolvedAbsenceHistory.size} $regWord ($totalAbsenceWeight faltas)"
+                "${resolvedAbsenceHistory.size} (${totalAbsenceWeight}f)"
+            }
+            val slotsSummaryPill = "${resolvedScheduleSlots.size}"
+            val completedAssessmentsCount = resolvedAssessments.count { it.completed }
+            val assessmentsSummaryPill = "$completedAssessmentsCount/${resolvedAssessments.size}"
+            val hasUnsavedNotesChanges = notesDraft != effectiveDetail.notes
+            val notesSummaryPill = when {
+                hasUnsavedNotesChanges -> "Editando"
+                notesDraft.isBlank() -> "Sem notas"
+                else -> "Salva"
             }
 
-            DisciplineAccordionCard(
-                title = "Histórico de marcações",
-                summaryPillText = historySummaryText,
-                accentColor = accentColor,
-                accessibleAccent = accessibleAccent,
-                expanded = historyExpanded,
-                reduceMotion = a11y.reduceMotion,
-                minTouchTarget = minTouchTarget,
-                onToggle = { historyExpanded = !historyExpanded }
-            ) {
+            // Container agrupado 26.dp reunindo as 4 seções com divisórias finas e títulos sem truncamento
+            DisciplineGroupedSectionContainer {
+                DisciplineAccordionCard(
+                    title = "Histórico de faltas",
+                    summaryPillText = historySummaryText,
+                    accentColor = accentColor,
+                    accessibleAccent = accessibleAccent,
+                    expanded = historyExpanded,
+                    reduceMotion = a11y.reduceMotion,
+                    minTouchTarget = minTouchTarget,
+                    grouped = true,
+                    onToggle = { historyExpanded = !historyExpanded }
+                ) {
                 Text(
                     text = if (resolvedAbsenceHistory.isEmpty()) {
                         "Nenhuma sessão marcada como falta ou cancelada"
@@ -1044,15 +1029,12 @@ fun DisciplineDetailBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                thickness = 1.dp
+            )
 
-            // 2. Acordeão: Horários semanais — fechado por padrão
-            val slotsSummaryPill = if (resolvedScheduleSlots.size == 1) {
-                "1 horário"
-            } else {
-                "${resolvedScheduleSlots.size} horários"
-            }
-
+            // 2. Acordeão: Horários semanais
             DisciplineAccordionCard(
                 title = "Horários semanais",
                 summaryPillText = slotsSummaryPill,
@@ -1061,6 +1043,7 @@ fun DisciplineDetailBottomSheet(
                 expanded = slotsExpanded,
                 reduceMotion = a11y.reduceMotion,
                 minTouchTarget = minTouchTarget,
+                grouped = true,
                 onToggle = { slotsExpanded = !slotsExpanded }
             ) {
                 Row(
@@ -1309,12 +1292,12 @@ fun DisciplineDetailBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                thickness = 1.dp
+            )
 
-            // 3. Acordeão: Prazos e avaliações — fechado por padrão
-            val completedAssessmentsCount = resolvedAssessments.count { it.completed }
-            val assessmentsSummaryPill = "$completedAssessmentsCount/${resolvedAssessments.size} concluídas"
-
+            // 3. Acordeão: Prazos e avaliações
             DisciplineAccordionCard(
                 title = "Prazos e avaliações",
                 summaryPillText = assessmentsSummaryPill,
@@ -1323,6 +1306,7 @@ fun DisciplineDetailBottomSheet(
                 expanded = assessmentsExpanded,
                 reduceMotion = a11y.reduceMotion,
                 minTouchTarget = minTouchTarget,
+                grouped = true,
                 onToggle = { assessmentsExpanded = !assessmentsExpanded }
             ) {
                 Row(
@@ -1481,16 +1465,12 @@ fun DisciplineDetailBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                thickness = 1.dp
+            )
 
-            // 4. Acordeão: Anotações — fechado por padrão
-            val hasUnsavedNotesChanges = notesDraft != effectiveDetail.notes
-            val notesSummaryPill = when {
-                hasUnsavedNotesChanges -> "Editando"
-                notesDraft.isBlank() -> "Sem notas"
-                else -> "Salva"
-            }
-
+            // 4. Acordeão: Anotações
             DisciplineAccordionCard(
                 title = "Anotações",
                 summaryPillText = notesSummaryPill,
@@ -1499,6 +1479,7 @@ fun DisciplineDetailBottomSheet(
                 expanded = notesExpanded,
                 reduceMotion = a11y.reduceMotion,
                 minTouchTarget = minTouchTarget,
+                grouped = true,
                 onToggle = { notesExpanded = !notesExpanded }
             ) {
                 if (hasUnsavedNotesChanges || savedConfirmation) {
@@ -1557,6 +1538,7 @@ fun DisciplineDetailBottomSheet(
                     textStyle = MaterialTheme.typography.bodyMedium
                 )
             }
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -1611,7 +1593,7 @@ fun DisciplineDetailBottomSheet(
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
         ) {
             detailBody()
         }

@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.18"
+    public static let currentVersionString = "1.9.19"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.18",
-            title: "Ajuste no Ícone Monocromático & Favicon",
+            version: "v1.9.19",
+            title: "Redesign Completo de UI/UX, Onest & 9 Escadas Tonais",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Tipografia Onest offline (400–800) com dígitos tabulares em horários, faltas, cargas horárias, porcentagens e CRE no iOS e Android.",
+                "9 escadas tonais WCAG 2.1 AA (Mata, Vinho padrão, Terracota, Ametista, Ouro Velho, Mineral, Cacau, Rubi e Cobalto) com degraus Canvas -> Surface 1 -> Surface 2.",
+                "Agenda, Atividades, Disciplinas, Matriz e Grade Dinâmica renovadas com destaque ao vivo de aulas, janelas livres, check-in em 3 cartões, agrupamento temporal e seção agrupada de 26pt.",
+                "Perfil horizontal com edição, 3 blocos Bento, alerta âmbar (>= 50% faltas), CRE \"Em curso\" simulável, grade 3x3 com pré-visualização e Mapa 2D com créditos discretos e busca PT-BR."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.18",
+            title: "Ajuste no Ícone Monocromático & Favicon",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Sincronização da versão 1.9.18 com a correção do ícone monocromático (Material You / Android 13+) e atualização do favicon oficial na página de download."
             ]
@@ -203,6 +215,7 @@ public struct ReleaseNotesSheetView: View {
     public var body: some View {
         let accent = appearance.accentColor.primary(for: colorScheme)
         let hc = appearance.accessibility.highContrastMode
+        let greenCheckTint = Color(hex: colorScheme == .dark ? 0x81C784 : 0x2E7D32)
 
         ZStack {
             LiquidGlassBackdrop(accent: appearance.accentColor, highContrast: hc)
@@ -249,42 +262,42 @@ public struct ReleaseNotesSheetView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack {
                                     Text(release.version)
-                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .font(CampusTheme.tabularFont(size: 16, weight: .bold))
                                         .foregroundStyle(release.isLatest ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                                     Spacer()
 
                                     Text(release.badge)
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundStyle(release.isLatest ? appearance.accentColor.onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                        .font(CampusTheme.font(size: 10, weight: .bold))
+                                        .foregroundStyle(release.isLatest ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
                                         .background(
                                             Capsule(style: .continuous)
-                                                .fill(release.isLatest ? accent : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                                .fill(release.isLatest ? accent.opacity(colorScheme == .dark ? 0.22 : 0.14) : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
                                         )
                                 }
 
                                 Text(release.title)
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(CampusTheme.font(size: 14, weight: .semibold))
                                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                                 ForEach(release.items, id: \.self) { bullet in
                                     HStack(alignment: .top, spacing: 8) {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 13))
-                                            .foregroundStyle(release.isLatest ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                            .foregroundStyle(greenCheckTint)
                                             .padding(.top, 2)
 
                                         Text(bullet)
-                                            .font(.system(size: 13))
+                                            .font(CampusTheme.font(size: 13))
                                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                                             .fixedSize(horizontal: false, vertical: true)
                                     }
                                 }
                             }
                             .padding(16)
-                            .liquidGlassCard(cornerRadius: 20, tint: release.isLatest ? accent : nil, highContrast: hc)
+                            .liquidGlassCard(cornerRadius: 24, tint: nil, highContrast: hc)
                         }
                     }
                     .padding(.horizontal, 20)

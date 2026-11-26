@@ -131,6 +131,9 @@ internal struct CampusMapDetailSheetView: View {
 
     private var subtitleText: String? {
         var parts: [String] = []
+        if let category = CampusMapPresentationHelpers.localizeCategory(feature.category) {
+            parts.append(category)
+        }
         if let floor = feature.floor {
             parts.append("Andar: \(floor == 0 ? "Térreo" : "\(floor + 1)º Pav")")
         }

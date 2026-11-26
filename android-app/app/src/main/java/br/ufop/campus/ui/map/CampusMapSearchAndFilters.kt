@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import br.ufop.campus.core.map.localizeCampusMapCategory
 import br.ufop.campus.core.uniffi.CampusMapSummary
 import br.ufop.campus.core.uniffi.FloorLabel
 import br.ufop.campus.core.uniffi.PoiType
@@ -280,7 +281,7 @@ internal fun CampusMapSearchResultsCard(
                     }
                     val subtitleParts = buildList {
                         feat.code?.takeIf { it.isNotBlank() }?.let { add(it) }
-                        feat.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+                        localizeCampusMapCategory(feat.category)?.let { add(it) }
                         floorText?.let { add(it) }
                     }
                     val switchesFloor = feat.floor != null && feat.floor != activeFloor

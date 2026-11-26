@@ -9,9 +9,16 @@ public struct ActivitiesView: View {
     @State private var selectedTypes: Set<String> = []
     @State private var onlyCompleted: Bool = false
     @State private var selectedDisciplineFilter: String = "Todas as disciplinas"
+    @State private var isCompletedExpanded: Bool = false
     @State private var isAddAssessmentSheetPresented: Bool = false
     @State private var activeAssessmentDetail: AcademicActivityItem?
     @State private var assessmentPendingDelete: AcademicActivityItem?
+
+    private enum ActivityHorizon: String, CaseIterable {
+        case overdue = "Em atraso"
+        case thisWeek = "Esta semana"
+        case upcoming = "Próximos prazos"
+    }
 
     private let activityTypes = ["Prova", "Trabalho", "Seminário"]
 
@@ -26,7 +33,7 @@ public struct ActivitiesView: View {
     }
 
     private var accent: Color {
-        (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        (appearance?.accentColor ?? .red).primary(for: colorScheme)
     }
 
     private var hc: Bool {
@@ -58,21 +65,70 @@ public struct ActivitiesView: View {
         return "\(parts.count) filtros"
     }
 
-    private var filteredActivities: [AcademicActivityItem] {
+    private var baseFilteredActivities: [AcademicActivityItem] {
         store.academicActivities.filter { item in
-            let matchesStatus = onlyCompleted ? item.isCompleted : !item.isCompleted
             let matchesType = selectedTypes.isEmpty
                 || selectedTypes.contains(where: { $0.caseInsensitiveCompare(item.kind) == .orderedSame })
             let matchesCourse = selectedDisciplineFilter == "Todas as disciplinas"
                 || item.disciplineName == selectedDisciplineFilter
-            return matchesStatus && matchesType && matchesCourse
+            return matchesType && matchesCourse
         }
+    }
+
+    private var filteredActivities: [AcademicActivityItem] {
+        baseFilteredActivities.filter { item in
+            onlyCompleted ? item.isCompleted : !item.isCompleted
+        }
+    }
+
+    private var completedMatchingActivities: [AcademicActivityItem] {
+        baseFilteredActivities.filter(\.isCompleted)
+    }
+
+    private var groupedPendingHorizons: [(horizon: ActivityHorizon, items: [AcademicActivityItem])] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekCutoff = calendar.date(byAdding: .day, value: 7, to: today) ?? today
+        var overdue: [AcademicActivityItem] = []
+        var thisWeek: [AcademicActivityItem] = []
+        var upcoming: [AcademicActivityItem] = []
+
+        for item in filteredActivities {
+            if let due = CampusStore.parseIsoDate(item.dueDate) {
+                let dueStart = calendar.startOfDay(for: due)
+                if dueStart < today {
+                    overdue.append(item)
+                } else if dueStart <= weekCutoff {
+                    thisWeek.append(item)
+                } else {
+                    upcoming.append(item)
+                }
+            } else {
+                upcoming.append(item)
+            }
+        }
+
+        var result: [(horizon: ActivityHorizon, items: [AcademicActivityItem])] = []
+        if !overdue.isEmpty { result.append((.overdue, overdue)) }
+        if !thisWeek.isEmpty { result.append((.thisWeek, thisWeek)) }
+        if !upcoming.isEmpty { result.append((.upcoming, upcoming)) }
+        return result
+    }
+
+    private func overdueDays(for item: AcademicActivityItem) -> Int? {
+        guard !item.isCompleted, let due = CampusStore.parseIsoDate(item.dueDate) else { return nil }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let dueStart = calendar.startOfDay(for: due)
+        guard dueStart < today else { return nil }
+        let diff = calendar.dateComponents([.day], from: dueStart, to: today).day ?? 0
+        return diff > 0 ? diff : nil
     }
 
     public var body: some View {
         NavigationStack {
             ZStack {
-                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .red, highContrast: hc)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
@@ -112,7 +168,7 @@ public struct ActivitiesView: View {
                 )
                 .presentationDetents([.large, .fraction(0.86)])
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
+                .presentationCornerRadius(30)
             }
             .sheet(item: $activeAssessmentDetail) { item in
                 AssessmentDetailSheetView(
@@ -128,7 +184,7 @@ public struct ActivitiesView: View {
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
+                .presentationCornerRadius(30)
             }
             .confirmationDialog(
                 "Excluir avaliação?",
@@ -194,7 +250,7 @@ public struct ActivitiesView: View {
                 .accessibilityAddTraits(.isHeader)
 
             Text("\(pendingCount) pendentes · \(completedCount) concluídas")
-                .font(.system(size: 14, weight: .regular))
+                .font(CampusTheme.tabularFont(size: 14, weight: .regular))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
         }
     }
@@ -295,25 +351,26 @@ public struct ActivitiesView: View {
 
     @ViewBuilder
     private var activitiesListSection: some View {
-        if filteredActivities.isEmpty {
+        let hasAnyToShow = onlyCompleted ? !filteredActivities.isEmpty : (!filteredActivities.isEmpty || !completedMatchingActivities.isEmpty)
+        if !hasAnyToShow {
             VStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 28))
                     .foregroundStyle(accent)
 
                 Text("Tudo em dia")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(CampusTheme.font(size: 16, weight: .semibold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Text("Nenhuma atividade encontrada nos filtros selecionados.")
-                    .font(.system(size: 13))
+                    .font(CampusTheme.font(size: 13))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                 Button {
                     isAddAssessmentSheetPresented = true
                 } label: {
                     Label("Cadastrar Trabalho, Seminário ou Prova", systemImage: "plus.circle.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .semibold))
                         .foregroundStyle(accent)
                 }
                 .buttonStyle(.plain)
@@ -323,47 +380,147 @@ public struct ActivitiesView: View {
             .padding(.vertical, 34)
             .padding(.horizontal, 18)
             .liquidGlassCard(highContrast: hc)
-        } else if isRegular {
+        } else if onlyCompleted {
+            activitiesCollectionView(items: filteredActivities)
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(groupedPendingHorizons, id: \.horizon.rawValue) { group in
+                    VStack(alignment: .leading, spacing: 10) {
+                        horizonSectionHeader(horizon: group.horizon, count: group.items.count)
+                        activitiesCollectionView(items: group.items)
+                    }
+                }
+
+                if !completedMatchingActivities.isEmpty {
+                    Button {
+                        withAnimation(.snappy) {
+                            isCompletedExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(colorScheme == .dark ? Color(hex: 0x34D399) : Color(hex: 0x166534))
+
+                            Text("Concluídas")
+                                .font(CampusTheme.font(size: 14, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+                            Text("\(completedMatchingActivities.count)")
+                                .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(CampusTheme.surface1(for: appearance?.accentColor ?? .red, scheme: colorScheme)))
+
+                            Spacer()
+
+                            Image(systemName: isCompletedExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity)
+                        .liquidGlassCard(useSurface2: true, highContrast: hc)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+
+                    if isCompletedExpanded {
+                        activitiesCollectionView(items: completedMatchingActivities)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func activitiesCollectionView(items: [AcademicActivityItem]) -> some View {
+        if isRegular {
             LazyVGrid(columns: regularGridColumns, spacing: 14) {
-                ForEach(filteredActivities) { item in
+                ForEach(items) { item in
                     activityRow(item: item)
                 }
             }
         } else {
             VStack(spacing: 12) {
-                ForEach(filteredActivities) { item in
+                ForEach(items) { item in
                     activityRow(item: item)
                 }
             }
         }
     }
 
+    private func horizonSectionHeader(horizon: ActivityHorizon, count: Int) -> some View {
+        let isOverdue = horizon == .overdue
+        let overdueTint = colorScheme == .dark ? Color(hex: 0xFB7185) : Color(hex: 0xBE123C)
+        let dotColor: Color = {
+            switch horizon {
+            case .overdue: return overdueTint
+            case .thisWeek: return accent
+            case .upcoming: return CampusTheme.secondaryText(for: colorScheme, highContrast: hc)
+            }
+        }()
+
+        return HStack(spacing: 8) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 8, height: 8)
+
+            Text(horizon.rawValue)
+                .font(CampusTheme.font(size: 14, weight: .bold))
+                .foregroundStyle(isOverdue ? overdueTint : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+
+            Text("\(count)")
+                .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                .foregroundStyle(isOverdue ? overdueTint : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule().fill(
+                        isOverdue ? overdueTint.opacity(colorScheme == .dark ? 0.22 : 0.14) : (appearance?.accentColor ?? .red).surface2(for: colorScheme)
+                    )
+                )
+        }
+        .padding(.top, 4)
+    }
+
     private func activityRow(item: AcademicActivityItem) -> some View {
         let itemColor = CampusTheme.departmentColor(for: item.colorKey)
+        let overdueDaysCount = overdueDays(for: item)
+        let isOverdue = overdueDaysCount != nil
+        let overdueRed = colorScheme == .dark ? Color(hex: 0xFB7185) : Color(hex: 0xBE123C)
+        let badgeTint = isOverdue ? overdueRed : itemColor
+        let displayTitle = formatAcademicAssessmentTitle(item.title)
 
         return Button {
             activeAssessmentDetail = item
         } label: {
-            AccentBarCardContainer(accentColor: itemColor, highContrast: hc) {
+            AccentBarCardContainer(
+                accentColor: badgeTint,
+                highContrast: hc,
+                useSurface2: isOverdue
+            ) {
                 HStack(spacing: 12) {
                     VStack(spacing: 1) {
                         Text(item.dueDay)
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(itemColor)
+                            .font(CampusTheme.tabularFont(size: 16, weight: .bold))
+                            .foregroundStyle(badgeTint)
                         Text(item.dueMonth)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(itemColor)
+                            .font(CampusTheme.font(size: 10, weight: .bold))
+                            .foregroundStyle(badgeTint)
                     }
                     .frame(width: 46, height: 46)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(CampusTheme.departmentSoftTint(for: item.colorKey, scheme: colorScheme))
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(isOverdue ? overdueRed.opacity(0.14) : CampusTheme.departmentSoftTint(for: item.colorKey, scheme: colorScheme))
                     )
 
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(item.disciplineName)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(CampusTheme.font(size: 12, weight: .semibold))
                                 .foregroundStyle(CampusTheme.accessibleTextColor(itemColor, scheme: colorScheme))
                                 .lineLimit(1)
 
@@ -371,19 +528,29 @@ public struct ActivitiesView: View {
                                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                             Text(item.kind)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 11, weight: .bold))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+                            if let overdueDaysCount {
+                                Text("Há \(overdueDaysCount)d")
+                                    .font(CampusTheme.tabularFont(size: 10, weight: .bold))
+                                    .foregroundStyle(overdueRed)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(Capsule().fill(overdueRed.opacity(0.14)))
+                            }
                         }
 
-                        Text(item.title)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                        Text(displayTitle)
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .strikethrough(item.isCompleted)
+                            .lineLimit(2)
                             .multilineTextAlignment(.leading)
 
                         Text(item.categoryLabel)
-                            .font(.system(size: 12))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .font(CampusTheme.tabularFont(size: 12, weight: .regular))
+                            .foregroundStyle(isOverdue ? overdueRed : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
 
                     Spacer()
@@ -444,12 +611,13 @@ public struct AssessmentDetailSheetView: View {
 
     public var body: some View {
         let current = liveActivity
-        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        let accentObj = appearance?.accentColor ?? .red
+        let accent = accentObj.primary(for: colorScheme)
         let hc = appearance?.accessibility.highContrastMode ?? false
         let courseColor = CampusTheme.departmentColor(for: current.colorKey)
 
         ZStack {
-            LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+            LiquidGlassBackdrop(accent: accentObj, highContrast: hc)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -458,11 +626,11 @@ public struct AssessmentDetailSheetView: View {
                             HStack(spacing: 6) {
                                 Circle().fill(courseColor).frame(width: 8, height: 8)
                                 Text(current.disciplineName)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(CampusTheme.font(size: 13, weight: .semibold))
                                     .foregroundStyle(CampusTheme.accessibleTextColor(courseColor, scheme: colorScheme))
                             }
-                            Text(current.title)
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                            Text(formatAcademicAssessmentTitle(current.title))
+                                .font(CampusTheme.font(size: 22, weight: .bold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                         }
 
@@ -544,7 +712,7 @@ public struct AssessmentDetailSheetView: View {
 
                             LiquidGlassPrimaryButton(
                                 tint: accent,
-                                foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                                foreground: accentObj.onPrimary(for: colorScheme),
                                 minHeight: appearance?.accessibility.minTouchHeight ?? 48
                             ) {
                                 let df = DateFormatter()
@@ -563,23 +731,12 @@ public struct AssessmentDetailSheetView: View {
                                 isEditing = false
                             } label: {
                                 Text("Salvar alterações")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.font(size: 14, weight: .bold))
                             }
                         }
                         .padding(14)
                         .liquidGlassCard(cornerRadius: 16, highContrast: hc)
                     }
-
-                    Button(role: .destructive) {
-                        onRequestDelete(current)
-                    } label: {
-                        Label("Excluir avaliação", systemImage: "trash")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(hex: 0xEF4444))
-                            .frame(maxWidth: .infinity, minHeight: appearance?.accessibility.minTouchHeight ?? 48)
-                            .liquidGlassCapsule(selected: false, accent: Color(hex: 0xEF4444), highContrast: hc)
-                    }
-                    .buttonStyle(.plain)
 
                     HStack(spacing: 10) {
                         Button {
@@ -591,24 +748,35 @@ public struct AssessmentDetailSheetView: View {
                             isEditing.toggle()
                         } label: {
                             Label(isEditing ? "Cancelar edição" : "Editar", systemImage: "pencil")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 14, weight: .bold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                                 .frame(maxWidth: .infinity, minHeight: appearance?.accessibility.minTouchHeight ?? 48)
                                 .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                         }
                         .buttonStyle(.plain)
 
-                        LiquidGlassPrimaryButton(
-                            tint: accent,
-                            foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
-                            minHeight: appearance?.accessibility.minTouchHeight ?? 48
-                        ) {
-                            _ = store.toggleAssessmentCompleted(assessmentId: current.id)
-                            onClose()
+                        Button(role: .destructive) {
+                            onRequestDelete(current)
                         } label: {
-                            Text(current.isCompleted ? "Reabrir" : "Concluído")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                            Label("Excluir", systemImage: "trash")
+                                .font(CampusTheme.font(size: 14, weight: .semibold))
+                                .foregroundStyle(colorScheme == .dark ? Color(hex: 0xFB7185) : Color(hex: 0xBE123C))
+                                .frame(maxWidth: .infinity, minHeight: appearance?.accessibility.minTouchHeight ?? 48)
+                                .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                         }
+                        .buttonStyle(.plain)
+                    }
+
+                    LiquidGlassPrimaryButton(
+                        tint: accent,
+                        foreground: accentObj.onPrimary(for: colorScheme),
+                        minHeight: appearance?.accessibility.minTouchHeight ?? 48
+                    ) {
+                        _ = store.toggleAssessmentCompleted(assessmentId: current.id)
+                        onClose()
+                    } label: {
+                        Text(current.isCompleted ? "Reabrir atividade" : "Marcar como concluída")
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                     }
                 }
                 .padding(20)
@@ -659,11 +827,12 @@ public struct AddAssessmentSheetView: View {
     }
 
     public var body: some View {
-        let accent = (appearance?.accentColor ?? .green).primary(for: colorScheme)
+        let accentObj = appearance?.accentColor ?? .red
+        let accent = accentObj.primary(for: colorScheme)
         let hc = appearance?.accessibility.highContrastMode ?? false
 
         ZStack {
-            LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+            LiquidGlassBackdrop(accent: accentObj, highContrast: hc)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -724,7 +893,7 @@ public struct AddAssessmentSheetView: View {
 
                     LiquidGlassPrimaryButton(
                         tint: accent,
-                        foreground: (appearance?.accentColor ?? .green).onPrimary(for: colorScheme),
+                        foreground: accentObj.onPrimary(for: colorScheme),
                         minHeight: appearance?.accessibility.minTouchHeight ?? 48
                     ) {
                         let df = DateFormatter()

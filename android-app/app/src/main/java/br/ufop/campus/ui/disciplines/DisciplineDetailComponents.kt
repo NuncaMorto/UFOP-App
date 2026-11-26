@@ -61,10 +61,17 @@ import br.ufop.campus.core.ffi.AbsenceHistoryEntry
 import br.ufop.campus.core.ffi.AssessmentItem
 import br.ufop.campus.core.ffi.AttendanceStatus
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
+import br.ufop.campus.core.ffi.formatAcademicAssessmentTitle
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusGroupedRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
+import br.ufop.campus.ui.theme.tabularNums
 
 internal val EDIT_WORKLOAD_PRESETS = listOf(30, 45, 60, 72, 90, 120)
 internal enum class SyllabusFeedbackTone {
@@ -144,6 +151,24 @@ internal fun DisciplineInfoDetailRow(
     }
 }
 @Composable
+internal fun DisciplineGroupedSectionContainer(
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(CampusGroupedRadius),
+        color = MaterialTheme.colorScheme.surface,
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            content = content
+        )
+    }
+}
+
+@Composable
 internal fun DisciplineAccordionCard(
     title: String,
     summaryPillText: String,
@@ -152,6 +177,7 @@ internal fun DisciplineAccordionCard(
     expanded: Boolean,
     reduceMotion: Boolean = false,
     minTouchTarget: Dp = 48.dp,
+    grouped: Boolean = true,
     onToggle: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -160,79 +186,79 @@ internal fun DisciplineAccordionCard(
         animationSpec = if (reduceMotion) snap() else spring(),
         label = "DisciplineAccordionChevron"
     )
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (expanded) {
-                accentColor.copy(alpha = 0.38f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
+    val rowContent: @Composable ColumnScope.() -> Unit = {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = minTouchTarget)
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = minTouchTarget)
-                    .clickable(onClick = onToggle)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .weight(1f)
+                    .semantics { heading() },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                shape = RoundedCornerShape(CampusPillRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder(1.dp)
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { heading() },
+                    text = summaryPillText,
+                    style = MaterialTheme.typography.labelSmall.tabularNums(),
+                    fontWeight = FontWeight.SemiBold,
+                    color = accessibleAccent,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = accentColor.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f))
-                ) {
-                    Text(
-                        text = summaryPillText,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = accessibleAccent,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Recolher $title" else "Expandir $title",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .rotate(chevronRotation)
+                    softWrap = false
                 )
             }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Recolher $title" else "Expandir $title",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .size(22.dp)
+                    .rotate(chevronRotation)
+            )
+        }
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = if (reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
-                exit = if (reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    content = content
-                )
-            }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = if (reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
+            exit = if (reduceMotion) ExitTransition.None else shrinkVertically() + fadeOut()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                content = content
+            )
+        }
+    }
+
+    if (grouped) {
+        Column(modifier = Modifier.fillMaxWidth(), content = rowContent)
+    } else {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(CampusCardRadius),
+            color = MaterialTheme.colorScheme.surface,
+            border = campusCardBorder(),
+            shadowElevation = campusCardElevation()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth(), content = rowContent)
         }
     }
 }
@@ -476,7 +502,7 @@ internal fun AssessmentRowCard(
                     modifier = Modifier.size(width = 52.dp, height = 52.dp),
                     shape = RoundedCornerShape(14.dp),
                     color = baseBadgeColor.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, baseBadgeColor.copy(alpha = 0.28f))
+                    border = campusCardBorder(1.dp)
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -484,7 +510,7 @@ internal fun AssessmentRowCard(
                     ) {
                         Text(
                             text = item.dayNumber,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleMedium.tabularNums(),
                             fontWeight = FontWeight.Bold,
                             color = badgeColor
                         )
@@ -510,7 +536,7 @@ internal fun AssessmentRowCard(
                         Spacer(modifier = Modifier.height(2.dp))
                     }
                     Text(
-                        text = item.title,
+                        text = formatAcademicAssessmentTitle(item.title),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,

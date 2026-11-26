@@ -366,44 +366,14 @@ internal struct OnboardingStep3View: View {
                 .pickerStyle(.segmented)
 
                 Text("Cor principal")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(CampusTheme.font(size: 14, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     .padding(.top, 4)
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 10)], spacing: 10) {
-                    ForEach(CampusAccentColor.allCases) { option in
-                        let isSelected = appearance.accentColor == option
-                        let swatch = option.primary(for: colorScheme)
-                        Button {
-                            withAnimation(.snappy) { appearance.accentColor = option }
-                        } label: {
-                            VStack(spacing: 6) {
-                                Circle()
-                                    .fill(swatch)
-                                    .frame(width: 28, height: 28)
-                                    .overlay(
-                                        Image(systemName: isSelected ? "checkmark" : "")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .foregroundStyle(option.onPrimary(for: colorScheme))
-                                    )
-                                Text(option.displayName)
-                                    .font(.system(size: 12, weight: isSelected ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .liquidGlassCard(cornerRadius: 14, tint: isSelected ? swatch : nil, interactive: true, highContrast: highContrast)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(isSelected ? swatch : .clear, lineWidth: 2)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                CampusAccentPalettePreviewGrid(appearance: appearance)
             }
             .padding(16)
-            .liquidGlassCard(tint: accent, highContrast: highContrast)
+            .liquidGlassCard(cornerRadius: 24, tint: accent, highContrast: highContrast)
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {

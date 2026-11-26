@@ -1,6 +1,5 @@
 package br.ufop.campus.ui.disciplines
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,11 +47,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.StatusAbsentRed
+import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.parseHexColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLabel
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLevel
+import br.ufop.campus.ui.theme.tabularNums
+
+internal fun formatAbsenceSlackLabel(currentAbsences: Int, maxAbsences: Int): String {
+    val remaining = maxAbsences - currentAbsences
+    return when {
+        remaining > 1 -> "restam $remaining aulas"
+        remaining == 1 -> "resta 1 aula"
+        remaining == 0 -> "no limite"
+        else -> "limite excedido"
+    }
+}
 
 private data class DisciplineCardDisplayState(
     val accentColor: Color,
@@ -121,9 +137,10 @@ internal fun DisciplinesEmptyStateCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation()
     ) {
         Column(
             modifier = Modifier
@@ -235,9 +252,9 @@ private fun DisciplineCodeChip(
     textColor: Color
 ) {
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(CampusPillRadius),
         color = accentColor.copy(alpha = 0.14f),
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.30f))
+        border = campusCardBorder(1.dp)
     ) {
         Text(
             text = label,
@@ -259,6 +276,14 @@ internal fun DisciplineGridCard(
     onClick: () -> Unit
 ) {
     val state = rememberDisciplineCardDisplayState(card = card, slots = slots, isDark = isDark)
+    val slackLabel = remember(card.currentAbsences, card.maxAbsences) {
+        formatAbsenceSlackLabel(card.currentAbsences, card.maxAbsences)
+    }
+    val cardContainerColor = when (state.riskLevel) {
+        2 -> StatusAbsentRed.copy(alpha = if (isDark) 0.14f else 0.08f)
+        1 -> StatusCancelledAmber.copy(alpha = if (isDark) 0.14f else 0.08f)
+        else -> MaterialTheme.colorScheme.surface
+    }
 
     Surface(
         onClick = onClick,
@@ -269,9 +294,10 @@ internal fun DisciplineGridCard(
             .semantics(mergeDescendants = true) {
                 contentDescription = state.cardDescription
             },
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = cardContainerColor,
+        border = campusCardBorder(),
+        shadowElevation = if (state.riskLevel == 0) campusCardElevation() else 0.dp
     ) {
         Row(
             modifier = Modifier.fillMaxSize()
@@ -320,7 +346,7 @@ internal fun DisciplineGridCard(
                                     SpanStyle(
                                         fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = if (state.riskLevel > 0) state.riskColor else MaterialTheme.colorScheme.onSurface
                                     )
                                 ) {
                                     append("${card.currentAbsences}")
@@ -334,18 +360,8 @@ internal fun DisciplineGridCard(
                                 ) {
                                     append("/${card.maxAbsences}")
                                 }
-                                if (state.riskLevel == 0) {
-                                    withStyle(
-                                        SpanStyle(
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Normal,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    ) {
-                                        append(" faltas")
-                                    }
-                                }
                             },
+                            style = MaterialTheme.typography.titleMedium.tabularNums(),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
@@ -360,6 +376,15 @@ internal fun DisciplineGridCard(
                             )
                         }
                     }
+
+                    Text(
+                        text = slackLabel,
+                        style = MaterialTheme.typography.labelSmall.tabularNums(),
+                        color = if (state.riskLevel > 0) state.riskColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (state.riskLevel > 0) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -386,6 +411,14 @@ internal fun DisciplineListCard(
     onClick: () -> Unit
 ) {
     val state = rememberDisciplineCardDisplayState(card = card, slots = slots, isDark = isDark)
+    val slackLabel = remember(card.currentAbsences, card.maxAbsences) {
+        formatAbsenceSlackLabel(card.currentAbsences, card.maxAbsences)
+    }
+    val cardContainerColor = when (state.riskLevel) {
+        2 -> StatusAbsentRed.copy(alpha = if (isDark) 0.14f else 0.08f)
+        1 -> StatusCancelledAmber.copy(alpha = if (isDark) 0.14f else 0.08f)
+        else -> MaterialTheme.colorScheme.surface
+    }
 
     Surface(
         onClick = onClick,
@@ -394,9 +427,10 @@ internal fun DisciplineListCard(
             .semantics(mergeDescendants = true) {
                 contentDescription = state.cardDescription
             },
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = cardContainerColor,
+        border = campusCardBorder(),
+        shadowElevation = if (state.riskLevel == 0) campusCardElevation() else 0.dp
     ) {
         Row(
             modifier = Modifier
@@ -468,7 +502,7 @@ internal fun DisciplineListCard(
                                     SpanStyle(
                                         fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = if (state.riskLevel > 0) state.riskColor else MaterialTheme.colorScheme.onSurface
                                     )
                                 ) {
                                     append("${card.currentAbsences}")
@@ -482,12 +516,15 @@ internal fun DisciplineListCard(
                                 ) {
                                     append("/${card.maxAbsences}")
                                 }
-                            }
+                            },
+                            style = MaterialTheme.typography.titleMedium.tabularNums()
                         )
                         Text(
-                            text = "faltas",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = slackLabel,
+                            style = MaterialTheme.typography.labelSmall.tabularNums(),
+                            color = if (state.riskLevel > 0) state.riskColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (state.riskLevel > 0) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1
                         )
                         if (state.riskLevel >= 1) {
                             Spacer(modifier = Modifier.height(2.dp))
@@ -522,9 +559,9 @@ private fun AbsenceRiskBadge(
 ) {
     val riskIcon = if (riskLevel >= 2) Icons.Outlined.ErrorOutline else Icons.Outlined.WarningAmber
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(CampusPillRadius),
         color = riskColor.copy(alpha = 0.14f),
-        border = BorderStroke(1.dp, riskColor.copy(alpha = 0.32f))
+        border = campusCardBorder(1.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),

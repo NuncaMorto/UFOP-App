@@ -10,6 +10,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -120,6 +121,7 @@ fun AgendaScreen(
                             selectedIsoDate = uiState.selectedIsoDate,
                             isDark = themeController.isDark,
                             largeTouchTargets = a11y.largeTouchTargets,
+                            daysWithEvents = uiState.weekDaysWithEvents,
                             onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
                         )
                     }
@@ -224,37 +226,37 @@ fun AgendaScreen(
                     } else {
                         val nextClassOnSelectedDay = uiState.nextClassPreview
                             ?.takeIf { it.isoDate == uiState.selectedIsoDate }
-                        items(
+                        itemsIndexed(
                             items = dayOverview.items,
-                            key = { it.id }
-                        ) { item ->
-                            val inlineNextClassLabel = nextClassOnSelectedDay?.let { nextClass ->
-                                val isMatchingClass = item.kind == TimelineItemKind.CLASS_SESSION && (
-                                    (nextClass.slotId != null && item.slotId == nextClass.slotId) ||
-                                        (item.title == nextClass.courseName && item.startTime == nextClass.startTime)
-                                    )
-                                if (isMatchingClass) {
-                                    if (nextClass.isHappeningNow) "Agora" else "Próxima aula"
-                                } else {
-                                    null
-                                }
-                            }
-                            AgendaTimelineCard(
+                            key = { _, item -> item.id }
+                        ) { index, item ->
+                            val previousItem = dayOverview.items.getOrNull(index - 1)
+                            val freeWindowMinutes = computeFreeWindowMinutesBetween(previousItem, item)
+                            val inlineNextClassLabel = resolveTodayClassHighlightLabel(
                                 item = item,
-                                isDark = themeController.isDark,
-                                largeTouchTargets = a11y.largeTouchTargets,
-                                inlineNextClassLabel = inlineNextClassLabel,
-                                onClick = {
-                                    when (item.kind) {
-                                        TimelineItemKind.CLASS_SESSION -> {
-                                            item.slotId?.let { viewModel.openClassCheckIn(it) }
-                                        }
-                                        TimelineItemKind.COMMITMENT -> {
-                                            viewModel.openCommitmentDetail(item)
+                                nextClassOnSelectedDay = nextClassOnSelectedDay
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                if (freeWindowMinutes != null) {
+                                    FreeWindowDivider(gapMinutes = freeWindowMinutes)
+                                }
+                                AgendaTimelineCard(
+                                    item = item,
+                                    isDark = themeController.isDark,
+                                    largeTouchTargets = a11y.largeTouchTargets,
+                                    inlineNextClassLabel = inlineNextClassLabel,
+                                    onClick = {
+                                        when (item.kind) {
+                                            TimelineItemKind.CLASS_SESSION -> {
+                                                item.slotId?.let { viewModel.openClassCheckIn(it) }
+                                            }
+                                            TimelineItemKind.COMMITMENT -> {
+                                                viewModel.openCommitmentDetail(item)
+                                            }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                     item {
@@ -338,6 +340,7 @@ fun AgendaScreen(
                         selectedIsoDate = uiState.selectedIsoDate,
                         isDark = themeController.isDark,
                         largeTouchTargets = a11y.largeTouchTargets,
+                        daysWithEvents = uiState.weekDaysWithEvents,
                         onSelectDay = { isoDate -> viewModel.selectDay(isoDate) }
                     )
                 }
@@ -424,37 +427,37 @@ fun AgendaScreen(
                 } else {
                     val nextClassOnSelectedDay = uiState.nextClassPreview
                         ?.takeIf { it.isoDate == uiState.selectedIsoDate }
-                    items(
+                    itemsIndexed(
                         items = dayOverview.items,
-                        key = { it.id }
-                    ) { item ->
-                        val inlineNextClassLabel = nextClassOnSelectedDay?.let { nextClass ->
-                            val isMatchingClass = item.kind == TimelineItemKind.CLASS_SESSION && (
-                                (nextClass.slotId != null && item.slotId == nextClass.slotId) ||
-                                    (item.title == nextClass.courseName && item.startTime == nextClass.startTime)
-                                )
-                            if (isMatchingClass) {
-                                if (nextClass.isHappeningNow) "Agora" else "Próxima aula"
-                            } else {
-                                null
-                            }
-                        }
-                        AgendaTimelineCard(
+                        key = { _, item -> item.id }
+                    ) { index, item ->
+                        val previousItem = dayOverview.items.getOrNull(index - 1)
+                        val freeWindowMinutes = computeFreeWindowMinutesBetween(previousItem, item)
+                        val inlineNextClassLabel = resolveTodayClassHighlightLabel(
                             item = item,
-                            isDark = themeController.isDark,
-                            largeTouchTargets = a11y.largeTouchTargets,
-                            inlineNextClassLabel = inlineNextClassLabel,
-                            onClick = {
-                                when (item.kind) {
-                                    TimelineItemKind.CLASS_SESSION -> {
-                                        item.slotId?.let { viewModel.openClassCheckIn(it) }
-                                    }
-                                    TimelineItemKind.COMMITMENT -> {
-                                        viewModel.openCommitmentDetail(item)
+                            nextClassOnSelectedDay = nextClassOnSelectedDay
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (freeWindowMinutes != null) {
+                                FreeWindowDivider(gapMinutes = freeWindowMinutes)
+                            }
+                            AgendaTimelineCard(
+                                item = item,
+                                isDark = themeController.isDark,
+                                largeTouchTargets = a11y.largeTouchTargets,
+                                inlineNextClassLabel = inlineNextClassLabel,
+                                onClick = {
+                                    when (item.kind) {
+                                        TimelineItemKind.CLASS_SESSION -> {
+                                            item.slotId?.let { viewModel.openClassCheckIn(it) }
+                                        }
+                                        TimelineItemKind.COMMITMENT -> {
+                                            viewModel.openCommitmentDetail(item)
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
 

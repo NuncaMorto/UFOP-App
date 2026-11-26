@@ -1,6 +1,5 @@
 package br.ufop.campus.ui.agenda
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,14 +40,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.AgendaTimelineItem
 import br.ufop.campus.core.ffi.AttendanceStatus
 import br.ufop.campus.core.ffi.TimelineItemKind
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.parseHexColor
+import br.ufop.campus.ui.theme.tabularNums
+import java.time.LocalTime
+import java.util.Locale
 
 @Composable
 internal fun DaySummaryHeader(
@@ -58,6 +67,7 @@ internal fun DaySummaryHeader(
 ) {
     val classesLabel = if (classesCount == 1) "1 aula" else "$classesCount aulas"
     val commitmentsLabel = if (commitmentsCount == 1) "1 compromisso" else "$commitmentsCount compromissos"
+    val displayDate = remember(formattedDate) { formatDaySummaryDateNoOrphan(formattedDate) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -69,15 +79,20 @@ internal fun DaySummaryHeader(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
-                text = formattedDate,
-                style = MaterialTheme.typography.titleLarge,
+                text = displayDate,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 18.sp,
+                    lineHeight = 23.sp
+                ),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() }
             )
             Text(
                 text = "$classesLabel • $commitmentsLabel",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.tabularNums(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -88,15 +103,15 @@ internal fun DaySummaryHeader(
             modifier = Modifier
                 .minimumInteractiveComponentSize()
                 .defaultMinSize(minHeight = if (largeTouchTargets) 52.dp else 38.dp)
-                .clip(RoundedCornerShape(50))
+                .clip(RoundedCornerShape(CampusPillRadius))
                 .clickable(
                     role = Role.Button,
                     onClickLabel = "Adicionar compromisso",
                     onClick = onAddCommitmentClick
                 ),
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
+            shape = RoundedCornerShape(CampusPillRadius),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            border = campusCardBorder()
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
@@ -143,7 +158,7 @@ internal fun NextClassHeroCard(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (largeTouchTargets) 64.dp else 56.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(CampusCardRadius))
             .semantics(mergeDescendants = true) {
                 contentDescription = cardDescription
                 if (isNavigable) role = Role.Button
@@ -158,16 +173,10 @@ internal fun NextClassHeroCard(
                     Modifier
                 }
             ),
-        shape = RoundedCornerShape(20.dp),
-        color = if (preview.isHappeningNow) {
-            StatusAttendingGreen.copy(alpha = if (isDark) 0.16f else 0.10f)
-        } else {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.35f else 0.48f)
-        },
-        border = BorderStroke(
-            width = 1.dp,
-            color = accentBase.copy(alpha = 0.40f)
-        )
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = campusCardBorder(1.5.dp),
+        shadowElevation = campusCardElevation()
     ) {
         Row(
             modifier = Modifier
@@ -214,7 +223,7 @@ internal fun NextClassHeroCard(
                             append(" · $cleanLocation")
                         }
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.tabularNums(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -246,9 +255,10 @@ internal fun AgendaEmptyStateCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation()
     ) {
         Column(
             modifier = Modifier
@@ -288,9 +298,9 @@ internal fun AgendaEmptyStateCard(
                         role = Role.Button,
                         onClick = if (actionableNextClass != null) onJumpToNextClass else onAddCommitmentClick
                     ),
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(CampusPillRadius),
                 color = MaterialTheme.colorScheme.primaryContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                border = campusCardBorder()
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
@@ -376,7 +386,7 @@ internal fun AgendaTimelineCard(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = if (largeTouchTargets) 56.dp else 0.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(CampusCardRadius))
             .semantics(mergeDescendants = true) {
                 contentDescription = cardContentDescription
                 if (isClickable) role = Role.Button
@@ -395,13 +405,14 @@ internal fun AgendaTimelineCard(
                     Modifier
                 }
             ),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = if (inlineNextClassLabel != null) {
-            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = if (inlineNextClassLabel != null) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
         } else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        }
+            MaterialTheme.colorScheme.surface
+        },
+        border = campusCardBorder(if (inlineNextClassLabel != null) 1.5.dp else 1.dp),
+        shadowElevation = campusCardElevation()
     ) {
         Row(
             modifier = Modifier
@@ -415,7 +426,7 @@ internal fun AgendaTimelineCard(
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(CampusPillRadius))
                     .background(accentColor)
             )
 
@@ -425,32 +436,18 @@ internal fun AgendaTimelineCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Linha superior: Título + Badge de clima (☀ 22 °C) no canto superior direito
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
+                // Linha superior: Título com até 2 linhas para nomes longos
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                    item.weatherTempC?.let { tempC ->
-                        Spacer(modifier = Modifier.width(8.dp))
-                        WeatherPillBadge(
-                            tempC = tempC,
-                            isDark = isDark
-                        )
-                    }
-                }
-
-                // Horário + badge de status (aula) + destaque inline (Agora / Próxima aula) ou tag discreta (compromisso)
+                // Horário tabular + badge de status + pílula viva (AGORA / EM X MIN) ou compromisso
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -458,7 +455,7 @@ internal fun AgendaTimelineCard(
                 ) {
                     Text(
                         text = "${item.startTime}–${item.endTime}",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelLarge.tabularNums(),
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -470,14 +467,23 @@ internal fun AgendaTimelineCard(
                     }
 
                     if (inlineNextClassLabel != null) {
+                        val isNowBadge = inlineNextClassLabel.equals("AGORA", ignoreCase = true)
                         Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            shape = RoundedCornerShape(CampusPillRadius),
+                            color = if (isNowBadge) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer
+                            }
                         ) {
                             Text(
-                                text = "• $inlineNextClassLabel",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                text = inlineNextClassLabel.uppercase(Locale("pt", "BR")),
+                                style = MaterialTheme.typography.labelSmall.tabularNums(),
+                                color = if (isNowBadge) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                },
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 softWrap = false,
@@ -489,8 +495,8 @@ internal fun AgendaTimelineCard(
 
                     if (item.kind == TimelineItemKind.COMMITMENT) {
                         Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceVariant
+                            shape = RoundedCornerShape(CampusPillRadius),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
                             Text(
                                 text = "Compromisso",
@@ -562,4 +568,116 @@ private fun AttendanceStatusBadge(
             )
         }
     }
+}
+
+@Composable
+internal fun FreeWindowDivider(gapMinutes: Int) {
+    val label = remember(gapMinutes) { "Janela livre · ${formatFreeWindowDuration(gapMinutes)}" }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Schedule,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.tabularNums(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+        )
+    }
+}
+
+internal fun resolveTodayClassHighlightLabel(
+    item: AgendaTimelineItem,
+    nextClassOnSelectedDay: NextClassPreview?
+): String? {
+    val nextClass = nextClassOnSelectedDay ?: return null
+    if (item.kind != TimelineItemKind.CLASS_SESSION || item.status == AttendanceStatus.CANCELLED) {
+        return null
+    }
+    val matches = (nextClass.slotId != null && item.slotId == nextClass.slotId) ||
+        (item.title == nextClass.courseName && item.startTime == nextClass.startTime)
+    if (!matches) return null
+    if (nextClass.isHappeningNow) return "AGORA"
+
+    val now = LocalTime.now()
+    val nowMin = now.hour * 60 + now.minute
+    val startMin = parseAgendaMinutesOrNull(item.startTime) ?: return "PRÓXIMA"
+    val diff = startMin - nowMin
+    return when {
+        diff <= 0 -> "AGORA"
+        diff < 60 -> "EM $diff MIN"
+        diff < 360 -> {
+            val h = diff / 60
+            val m = diff % 60
+            if (m == 0) "EM ${h}H" else String.format(Locale.ROOT, "EM %dH%02d", h, m)
+        }
+        else -> "PRÓXIMA"
+    }
+}
+
+internal fun computeFreeWindowMinutesBetween(
+    previousItem: AgendaTimelineItem?,
+    currentItem: AgendaTimelineItem
+): Int? {
+    val prev = previousItem ?: return null
+    if (prev.kind != TimelineItemKind.CLASS_SESSION || currentItem.kind != TimelineItemKind.CLASS_SESSION) {
+        return null
+    }
+    if (prev.status == AttendanceStatus.CANCELLED || currentItem.status == AttendanceStatus.CANCELLED) {
+        return null
+    }
+    val prevEnd = parseAgendaMinutesOrNull(prev.endTime) ?: return null
+    val currStart = parseAgendaMinutesOrNull(currentItem.startTime) ?: return null
+    val gap = currStart - prevEnd
+    return if (gap >= 50) gap else null
+}
+
+internal fun formatFreeWindowDuration(gapMinutes: Int): String {
+    val hours = gapMinutes / 60
+    val mins = gapMinutes % 60
+    return when {
+        hours == 0 -> "${mins}min"
+        mins == 0 -> "${hours}h"
+        else -> String.format(Locale.ROOT, "%dh%02d", hours, mins)
+    }
+}
+
+private fun parseAgendaMinutesOrNull(hhmm: String): Int? {
+    val parts = hhmm.trim().split(":")
+    if (parts.size < 2) return null
+    val h = parts[0].toIntOrNull() ?: return null
+    val m = parts[1].toIntOrNull() ?: return null
+    return h * 60 + m
+}
+
+private fun formatDaySummaryDateNoOrphan(raw: String): String {
+    val idx = raw.lastIndexOf(" de ")
+    if (idx < 0) return raw
+    return raw.substring(0, idx) + " de\u00A0" + raw.substring(idx + 4)
 }

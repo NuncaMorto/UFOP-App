@@ -27,7 +27,7 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
         val raw = root.optNonNullString("accentColorPreference")
             .ifBlank { root.optNonNullString("accent_color_key") }
         normalizeAccentColorKey(raw)
-    }.getOrDefault("GREEN")
+    }.getOrDefault("RED")
 
     val loadedExportUri = runCatching {
         root.optNonNullString("exportFolderTreeUri").trim().takeIf { it.isNotEmpty() }

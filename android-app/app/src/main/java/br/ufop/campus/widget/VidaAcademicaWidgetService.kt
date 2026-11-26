@@ -56,41 +56,41 @@ internal object WidgetAccentThemeHelper {
         }.getOrNull()?.trim()?.uppercase()
 
         return when (rawKey) {
-            "RED" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#F2B8B5"),
-                itemTimeColor = Color.parseColor("#FFDAD6")
+            "GREEN" -> WidgetAccentPalette(
+                headerSubtitleColor = Color.parseColor("#A6DFC3"),
+                itemTimeColor = Color.parseColor("#E1EFE8")
             )
             "ORANGE" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#F6BD87"),
-                itemTimeColor = Color.parseColor("#FFDCBE")
+                headerSubtitleColor = Color.parseColor("#F7C4A8"),
+                itemTimeColor = Color.parseColor("#F4E6DD")
             )
             "PURPLE" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#D0BCFF"),
-                itemTimeColor = Color.parseColor("#E9DDFF")
+                headerSubtitleColor = Color.parseColor("#CFC0FA"),
+                itemTimeColor = Color.parseColor("#EAE4F7")
             )
             "YELLOW" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#FFE082"),
-                itemTimeColor = Color.parseColor("#FFF59D")
+                headerSubtitleColor = Color.parseColor("#F2D591"),
+                itemTimeColor = Color.parseColor("#F0E7D1")
             )
             "CYAN" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#80DEEA"),
-                itemTimeColor = Color.parseColor("#B2EBF2")
+                headerSubtitleColor = Color.parseColor("#9EE0E8"),
+                itemTimeColor = Color.parseColor("#DFEEF1")
             )
             "BROWN" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#D7CCC8"),
-                itemTimeColor = Color.parseColor("#EFEBE9")
+                headerSubtitleColor = Color.parseColor("#DFC2B2"),
+                itemTimeColor = Color.parseColor("#EFE6E0")
             )
             "PINK" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#F48FB1"),
-                itemTimeColor = Color.parseColor("#FFD8E4")
+                headerSubtitleColor = Color.parseColor("#F5B8D2"),
+                itemTimeColor = Color.parseColor("#F4E2EB")
             )
             "BLUE" -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#8AB4F8"),
-                itemTimeColor = Color.parseColor("#D8E6FF")
+                headerSubtitleColor = Color.parseColor("#B3CCF8"),
+                itemTimeColor = Color.parseColor("#E2EBF8")
             )
             else -> WidgetAccentPalette(
-                headerSubtitleColor = Color.parseColor("#A0B89C"),
-                itemTimeColor = Color.parseColor("#CBE6B1")
+                headerSubtitleColor = Color.parseColor("#F2B8C1"),
+                itemTimeColor = Color.parseColor("#F2E4E7")
             )
         }
     }

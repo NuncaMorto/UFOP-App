@@ -63,7 +63,8 @@ data class AgendaUiState(
     val activeCommitmentDetail: AgendaTimelineItem? = null,
     val editingCommitment: AgendaTimelineItem? = null,
     val isAddCommitmentSheetOpen: Boolean = false,
-    val statusBannerMessage: String? = null
+    val statusBannerMessage: String? = null,
+    val weekDaysWithEvents: Set<String> = emptySet()
 ) {
     /** `true` quando o dia selecionado é o dia de hoje (esconde o botão flutuante "Hoje"). */
     val isViewingToday: Boolean
@@ -86,11 +87,12 @@ class AgendaViewModel(
         )
         val initialYearMonth = YearMonth.from(LocalDate.parse(initialIsoDate))
         val initialSemesterMonths = computeSemesterMonths(initialStudentProfile)
+        val initialOverview = repository.getAgendaDay(initialIsoDate)
 
         _uiState = MutableStateFlow(
             AgendaUiState(
                 selectedIsoDate = initialIsoDate,
-                dayOverview = repository.getAgendaDay(initialIsoDate),
+                dayOverview = initialOverview,
                 activeCampus = initialAcademicSummary.activeCampus,
                 studentProfile = initialStudentProfile,
                 hasCoursesInSemester = repository.listDisciplines(activeSemester, null).isNotEmpty(),
@@ -104,7 +106,8 @@ class AgendaViewModel(
                     month = initialYearMonth.monthValue,
                     semester = activeSemester
                 ),
-                academicEvents = loadAcademicEvents(activeSemester)
+                academicEvents = loadAcademicEvents(activeSemester),
+                weekDaysWithEvents = computeWeekDaysWithEvents(initialOverview.weekDays)
             )
         )
 
@@ -146,7 +149,8 @@ class AgendaViewModel(
             activeCommitmentDetail = null,
             editingCommitment = null,
             isAddCommitmentSheetOpen = false,
-            statusBannerMessage = null
+            statusBannerMessage = null,
+            weekDaysWithEvents = computeWeekDaysWithEvents(overview.weekDays)
         )
     }
 
@@ -510,8 +514,17 @@ class AgendaViewModel(
             semesterMonths = semesterMonths,
             monthIndicators = repository.getMonthActivityIndicators(ym.year, ym.monthValue, activeSemester),
             academicEvents = loadAcademicEvents(activeSemester),
-            activeCheckIn = updatedCheckIn
+            activeCheckIn = updatedCheckIn,
+            weekDaysWithEvents = computeWeekDaysWithEvents(updatedOverview.weekDays)
         )
+    }
+
+    private fun computeWeekDaysWithEvents(weekDays: List<br.ufop.campus.core.ffi.DayPillItem>): Set<String> {
+        return weekDays
+            .filter { day ->
+                runCatching { repository.getAgendaDay(day.isoDate).items.isNotEmpty() }.getOrDefault(false)
+            }
+            .mapTo(linkedSetOf()) { it.isoDate }
     }
 
     private fun loadAcademicEvents(semester: String): List<AcademicCalendarEvent> =

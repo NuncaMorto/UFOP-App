@@ -89,20 +89,29 @@ object CampusMapMath {
         )
     }
 
-    /** Calcula o alvo de câmera que centraliza e enquadra `bounds` no viewport. */
+    /** Calcula o alvo de câmera que centraliza e enquadra `bounds` no viewport considerando margens do HUD. */
     fun computeCameraTarget(
         bounds: MapRect2D,
         viewportWidthPx: Float,
         viewportHeightPx: Float,
         density: Float,
-        paddingDp: Float = 36f
+        paddingDp: Float = 36f,
+        topInsetDp: Float = 0f,
+        bottomInsetDp: Float = 0f,
+        startInsetDp: Float = 0f,
+        endInsetDp: Float = 0f
     ): MapViewportTransform {
         val safeDensity = density.coerceAtLeast(0.5f)
         val safeW = max(1f, viewportWidthPx)
         val safeH = max(1f, viewportHeightPx)
         val padPx = paddingDp * safeDensity
-        val availW = max(24f, safeW - padPx * 2f)
-        val availH = max(24f, safeH - padPx * 2f)
+        val startPadPx = if (startInsetDp > 0f) max(padPx, startInsetDp * safeDensity + padPx * 0.5f) else padPx
+        val endPadPx = if (endInsetDp > 0f) max(padPx, endInsetDp * safeDensity + padPx * 0.5f) else padPx
+        val topPadPx = if (topInsetDp > 0f) max(padPx, topInsetDp * safeDensity + 12f * safeDensity) else padPx
+        val bottomPadPx = if (bottomInsetDp > 0f) max(padPx, bottomInsetDp * safeDensity + 12f * safeDensity) else padPx
+
+        val availW = max(24f, safeW - startPadPx - endPadPx)
+        val availH = max(24f, safeH - topPadPx - bottomPadPx)
 
         val spanX = max(8f, bounds.maxX - bounds.minX)
         val spanY = max(8f, bounds.maxY - bounds.minY)
@@ -112,10 +121,12 @@ object CampusMapMath {
 
         val centerMapX = (bounds.minX + bounds.maxX) * 0.5f
         val centerMapY = (bounds.minY + bounds.maxY) * 0.5f
+        val centerScreenX = startPadPx + availW * 0.5f
+        val centerScreenY = topPadPx + availH * 0.5f
 
         return MapViewportTransform(
-            offsetX = safeW * 0.5f - centerMapX * finalScale,
-            offsetY = safeH * 0.5f - centerMapY * finalScale,
+            offsetX = centerScreenX - centerMapX * finalScale,
+            offsetY = centerScreenY - centerMapY * finalScale,
             zoomDpPerMeter = targetZoom
         )
     }
@@ -204,7 +215,8 @@ class LabelCollisionBuffer(initialCapacity: Int = 64) {
         top: Float,
         right: Float,
         bottom: Float,
-        paddingPx: Float = 4f
+        paddingPx: Float = 4f,
+        ignoreLastPlaced: Boolean = false
     ): Boolean {
         if (!left.isFinite() || !top.isFinite() || !right.isFinite() || !bottom.isFinite()) {
             return false
@@ -218,7 +230,8 @@ class LabelCollisionBuffer(initialCapacity: Int = 64) {
         val pRight = right + pad
         val pBottom = bottom + pad
 
-        for (i in 0 until placedCount) {
+        val checkCount = if (ignoreLastPlaced && placedCount > 0) placedCount - 1 else placedCount
+        for (i in 0 until checkCount) {
             val base = i * 4
             if (pRight > bounds[base] &&
                 pLeft < bounds[base + 2] &&

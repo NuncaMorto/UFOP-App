@@ -1,6 +1,5 @@
 package br.ufop.campus.ui.activities
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +35,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.AssessmentWithCourse
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.parseHexColor
 
 internal fun formatActivityTypeFilterLabel(
@@ -159,20 +160,13 @@ private fun ActivityTypeFilterDropdown(
             } else {
                 Modifier.minimumInteractiveComponentSize()
             },
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(CampusPillRadius),
             color = if (hasActiveTypeFilter) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
                 MaterialTheme.colorScheme.surface
             },
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (hasActiveTypeFilter) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant
-                }
-            )
+            border = campusCardBorder(if (hasActiveTypeFilter) 1.5.dp else 1.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -355,20 +349,13 @@ private fun ActivityDisciplineFilterDropdown(
             } else {
                 Modifier.minimumInteractiveComponentSize()
             },
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(CampusPillRadius),
             color = if (selectedFilterCourseId != null) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+                MaterialTheme.colorScheme.primaryContainer
             } else {
                 MaterialTheme.colorScheme.surface
             },
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (selectedFilterCourseId != null) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant
-                }
-            )
+            border = campusCardBorder(if (selectedFilterCourseId != null) 1.5.dp else 1.dp)
         ) {
             Row(
                 modifier = Modifier

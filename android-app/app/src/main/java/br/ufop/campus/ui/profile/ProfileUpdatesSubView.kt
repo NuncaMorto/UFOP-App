@@ -33,13 +33,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.BuildConfig
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 @Composable
 internal fun ProfileUpdatesSubView(
     onOpenReleaseNotes: () -> Unit,
     onCheckForUpdates: () -> Unit
 ) {
+    val isDark = LocalCampusThemeController.current.isDark
     val minTouchTarget = campusMinTouchTarget()
+    val greenCheckTint = accessibleTextColor(StatusAttendingGreen, isDark, MaterialTheme.colorScheme.surface)
     val appUpdateState by br.ufop.campus.core.update.AppUpdateManager.state.collectAsState()
     val statusText = when (val st = appUpdateState) {
         is br.ufop.campus.core.update.AppUpdateUiState.Checking ->
@@ -81,9 +90,10 @@ internal fun ProfileUpdatesSubView(
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            shape = RoundedCornerShape(CampusCardRadius),
+            color = MaterialTheme.colorScheme.surface,
+            border = campusCardBorder(),
+            shadowElevation = campusCardElevation(1.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -104,7 +114,7 @@ internal fun ProfileUpdatesSubView(
                         modifier = Modifier.semantics { heading() }
                     )
                     Surface(
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(CampusPillRadius),
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Text(
@@ -127,7 +137,7 @@ internal fun ProfileUpdatesSubView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(22.dp)
+                    shape = RoundedCornerShape(CampusPillRadius)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.SystemUpdate,
@@ -147,7 +157,7 @@ internal fun ProfileUpdatesSubView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(22.dp)
+                    shape = RoundedCornerShape(CampusPillRadius)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Info,
@@ -177,20 +187,10 @@ internal fun ProfileUpdatesSubView(
         CampusReleaseNotes.versions.forEach { entry ->
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = if (entry.isLatest) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                } else {
-                    MaterialTheme.colorScheme.surface
-                },
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = if (entry.isLatest) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    }
-                )
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surface,
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation(1.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -212,11 +212,11 @@ internal fun ProfileUpdatesSubView(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            shape = RoundedCornerShape(50),
+                            shape = RoundedCornerShape(CampusPillRadius),
                             color = if (entry.isLatest) {
-                                MaterialTheme.colorScheme.primary
+                                MaterialTheme.colorScheme.primaryContainer
                             } else {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
+                                MaterialTheme.colorScheme.surfaceContainerHigh
                             }
                         ) {
                             Text(
@@ -224,7 +224,7 @@ internal fun ProfileUpdatesSubView(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = if (entry.isLatest) {
-                                    MaterialTheme.colorScheme.onPrimary
+                                    MaterialTheme.colorScheme.onPrimaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
@@ -242,7 +242,7 @@ internal fun ProfileUpdatesSubView(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = greenCheckTint,
                                 modifier = Modifier
                                     .padding(top = 2.dp)
                                     .size(15.dp)

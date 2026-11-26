@@ -34,7 +34,7 @@ public struct TimetableGridView: View {
     }
 
     private var isRegular: Bool { horizontalSizeClass == .regular }
-    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
+    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .red }
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
     private var isHorizontalOrientation: Bool { store.timetableOrientation == "horizontal" }
@@ -758,7 +758,7 @@ public struct TimetableGridView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: hc).opacity(0.5), lineWidth: 0.75)
+                        .strokeBorder(hc ? CampusTheme.cardBorder(for: colorScheme, highContrast: true) : .clear, lineWidth: hc ? 1 : 0)
                 )
         }
     }

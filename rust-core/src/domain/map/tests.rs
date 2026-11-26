@@ -960,3 +960,41 @@ fn simplify_reduces_external_redundancy_and_preserves_building_and_room_contours
         }
     }
 }
+
+#[test]
+fn search_matches_portuguese_category_aliases() {
+    let engine = CampusMapEngine::new_bundled().expect("bundled engine");
+
+    let lab_results = engine.search("laboratório".to_string(), None, 0);
+    assert!(
+        lab_results
+            .iter()
+            .any(|res| res.feature.category.as_deref() == Some("lab")),
+        "expected 'laboratório' to match features categorized as 'lab'"
+    );
+
+    let dining_results = engine.search("alimentação".to_string(), None, 0);
+    assert!(
+        dining_results
+            .iter()
+            .any(|res| res.feature.category.as_deref() == Some("dining")),
+        "expected 'alimentação' to match features categorized as 'dining'"
+    );
+
+    let classroom_results = engine.search("sala de aula".to_string(), None, 0);
+    assert!(
+        classroom_results
+            .iter()
+            .any(|res| res.feature.category.as_deref() == Some("classroom")),
+        "expected 'sala de aula' to match features categorized as 'classroom'"
+    );
+
+    let sports_results = engine.search("esportes".to_string(), None, 0);
+    assert!(
+        sports_results.iter().any(|res| matches!(
+            res.feature.category.as_deref(),
+            Some("sports" | "sports_building" | "soccer" | "beachvolleyball")
+        )),
+        "expected 'esportes' to match sports categories"
+    );
+}

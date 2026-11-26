@@ -35,10 +35,11 @@ internal struct ProfileSettingsSectionView: View {
 
     private var appearanceCustomizationCard: some View {
         let modes: [(key: String, label: String)] = [("system", "Sistema"), ("light", "Claro"), ("dark", "Escuro")]
+        let boldBoost = appearance.accessibility.boldTextBoost
 
         return VStack(alignment: .leading, spacing: 14) {
             Text("Personalização & Tema")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 16, weight: .bold, boldBoost: boldBoost))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             HStack(spacing: 8) {
@@ -50,7 +51,7 @@ internal struct ProfileSettingsSectionView: View {
                         }
                     } label: {
                         Text(mode.label)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 13, weight: .bold, boldBoost: boldBoost))
                             .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                             .frame(maxWidth: .infinity, minHeight: 38)
                             .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -60,40 +61,14 @@ internal struct ProfileSettingsSectionView: View {
                 }
             }
 
-            Text("Cor de destaque")
-                .font(.system(size: 13, weight: .semibold))
+            Text("Cor de destaque e pré-visualização")
+                .font(CampusTheme.font(size: 13, weight: .semibold, boldBoost: boldBoost))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(CampusAccentColor.allCases) { accentOption in
-                        let isSelected = appearance.accentColor == accentOption
-                        let swatch = accentOption.primary(for: colorScheme)
-                        Button {
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                appearance.accentColor = accentOption
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(swatch)
-                                    .frame(width: 18, height: 18)
-                                Text(accentOption.displayName)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 38)
-                            .liquidGlassCapsule(selected: isSelected, accent: swatch, interactive: true, highContrast: highContrast)
-                        }
-                        .buttonStyle(.plain)
-                        .minimumTouchTarget(minTouch)
-                    }
-                }
-            }
+            CampusAccentPalettePreviewGrid(appearance: appearance)
         }
         .padding(16)
-        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
     }
 
     private var securityAndLockCard: some View {

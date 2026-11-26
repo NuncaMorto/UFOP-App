@@ -40,21 +40,26 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 @Composable
 fun DisciplinesScreen(
@@ -139,119 +144,133 @@ fun DisciplinesScreen(
                             Surface(
                                 onClick = { viewModel.openAddCourseSheet() },
                                 modifier = Modifier
-                                    .let {
-                                        if (a11y.largeTouchTargets) {
-                                            it.defaultMinSize(minHeight = minTouchTarget)
-                                        } else {
-                                            it.minimumInteractiveComponentSize()
-                                        }
-                                    }
+                                    .minimumInteractiveComponentSize()
+                                    .size(if (a11y.largeTouchTargets) minTouchTarget else 44.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
                                     .semantics { role = Role.Button },
-                                shape = RoundedCornerShape(22.dp),
+                                shape = androidx.compose.foundation.shape.CircleShape,
                                 color = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                border = campusCardBorder()
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .heightIn(min = actionButtonVisualHeight)
-                                        .padding(horizontal = 14.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Rounded.Add,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Disciplina",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
+                                        contentDescription = "Adicionar disciplina",
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(if (a11y.largeTouchTargets) 12.dp else 8.dp))
+                        Spacer(modifier = Modifier.height(if (a11y.largeTouchTargets) 14.dp else 10.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
                                 onClick = { showCurriculumMatrix = true },
                                 modifier = Modifier
-                                    .let {
-                                        if (a11y.largeTouchTargets) {
-                                            it.defaultMinSize(minHeight = minTouchTarget)
-                                        } else {
-                                            it.minimumInteractiveComponentSize()
-                                        }
-                                    }
+                                    .weight(1f)
+                                    .defaultMinSize(minHeight = if (a11y.largeTouchTargets) minTouchTarget else 58.dp)
                                     .semantics { role = Role.Button },
-                                shape = RoundedCornerShape(22.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                shape = RoundedCornerShape(CampusCardRadius),
+                                color = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                border = campusCardBorder(),
+                                shadowElevation = campusCardElevation()
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .heightIn(min = actionButtonVisualHeight)
-                                        .padding(horizontal = 13.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.MenuBook,
-                                        contentDescription = "Abrir Matriz Curricular",
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Matriz",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
+                                    Surface(
+                                        modifier = Modifier.size(34.dp),
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                                                contentDescription = "Abrir Matriz Curricular",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Matriz",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Cursos & PPCs",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
 
                             Surface(
                                 onClick = onOpenTimetable,
                                 modifier = Modifier
-                                    .let {
-                                        if (a11y.largeTouchTargets) {
-                                            it.defaultMinSize(minHeight = minTouchTarget)
-                                        } else {
-                                            it.minimumInteractiveComponentSize()
-                                        }
-                                    }
+                                    .weight(1f)
+                                    .defaultMinSize(minHeight = if (a11y.largeTouchTargets) minTouchTarget else 58.dp)
                                     .semantics { role = Role.Button },
-                                shape = RoundedCornerShape(22.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                shape = RoundedCornerShape(CampusCardRadius),
+                                color = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                border = campusCardBorder(),
+                                shadowElevation = campusCardElevation()
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .heightIn(min = actionButtonVisualHeight)
-                                        .padding(horizontal = 13.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.CalendarViewMonth,
-                                        contentDescription = "Abrir Grade de horários",
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Grade",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
+                                    Surface(
+                                        modifier = Modifier.size(34.dp),
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        color = MaterialTheme.colorScheme.primaryContainer
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.CalendarViewMonth,
+                                                contentDescription = "Abrir Grade de horários",
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Grade",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Horários semanais",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }

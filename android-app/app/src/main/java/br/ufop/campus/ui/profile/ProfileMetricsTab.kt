@@ -31,6 +31,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -71,16 +72,24 @@ import br.ufop.campus.core.ffi.DisciplineSummaryCard
 import br.ufop.campus.core.ffi.SemesterCreSummary
 import br.ufop.campus.core.ffi.TranscriptCourseEntry
 import br.ufop.campus.core.ffi.normalizeUfopPortugueseText
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.DarkStatusCancelledAmber
 import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusAccentTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.parseHexColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskColor
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLabel
 import br.ufop.campus.ui.theme.semanticAbsenceRiskLevel
+import br.ufop.campus.ui.theme.tabularNums
 
 @Composable
 internal fun ProfileMetricsAndCreTab(
@@ -129,9 +138,10 @@ internal fun ProfileMetricsAndCreTab(
         if (creReport.semesters.isEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(CampusCardRadius),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation(1.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -185,20 +195,28 @@ private fun CurrentSemesterAbsencesCard(
     val normalizedDisciplineNames = remember(currentDisciplines) {
         currentDisciplines.associate { it.courseId to normalizeUfopPortugueseText(it.name) }
     }
+    val coursesInAttention = remember(currentDisciplines) {
+        currentDisciplines.count { semanticAbsenceRiskLevel(it.currentAbsences, it.maxAbsences) == 1 }
+    }
     val hasCourseAtRisk = profileSummary.coursesAtRisk > 0
     val overallBarColor = if (hasCourseAtRisk) {
         semanticAbsenceRiskColor(1, 1, isDark)
+    } else if (coursesInAttention > 0) {
+        if (isDark) DarkStatusCancelledAmber else StatusCancelledAmber
     } else {
         semanticAbsenceRiskColor(profileSummary.totalAbsences, profileSummary.totalMaxAbsences, isDark)
     }
     val riskRedText = accessibleTextColor(StatusAbsentRed, isDark, surfaceColor)
+    val amberWarningBase = if (isDark) DarkStatusCancelledAmber else StatusCancelledAmber
+    val amberWarningText = accessibleTextColor(amberWarningBase, isDark, surfaceColor)
     val safeGreenText = accessibleTextColor(StatusAttendingGreen, isDark, surfaceColor)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = surfaceColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Column(
             modifier = Modifier
@@ -220,7 +238,8 @@ private fun CurrentSemesterAbsencesCard(
                         SpanStyle(
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFeatureSettings = "tnum"
                         )
                     ) {
                         append("${profileSummary.totalAbsences}")
@@ -229,7 +248,8 @@ private fun CurrentSemesterAbsencesCard(
                         SpanStyle(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFeatureSettings = "tnum"
                         )
                     ) {
                         append(" / ${profileSummary.totalMaxAbsences}")
@@ -281,8 +301,8 @@ private fun CurrentSemesterAbsencesCard(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = StatusAbsentRed.copy(alpha = if (isDark) 0.18f else 0.12f),
-                    border = BorderStroke(1.dp, riskRedText.copy(alpha = 0.4f))
+                    color = StatusAbsentRed.copy(alpha = if (isDark) 0.18f else 0.10f),
+                    border = campusCardBorder()
                 ) {
                     Row(
                         modifier = Modifier
@@ -305,6 +325,34 @@ private fun CurrentSemesterAbsencesCard(
                         )
                     }
                 }
+            } else if (coursesInAttention > 0) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = amberWarningBase.copy(alpha = if (isDark) 0.18f else 0.12f),
+                    border = campusCardBorder()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.WarningAmber,
+                            contentDescription = null,
+                            tint = amberWarningText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Atenção: $coursesInAttention disciplina(s) atingiu(ram) >= 50% do limite máximo de faltas.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = amberWarningText
+                        )
+                    }
+                }
             } else {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -312,7 +360,7 @@ private fun CurrentSemesterAbsencesCard(
                     color = StatusAttendingGreen.copy(alpha = if (isDark) 0.16f else 0.10f)
                 ) {
                     Text(
-                        text = "Frequência controlada: nenhuma disciplina está na faixa crítica (>= 75% do limite).",
+                        text = "Frequência controlada: nenhuma disciplina está na faixa crítica (>= 50% do limite).",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                         color = safeGreenText,
@@ -414,7 +462,7 @@ private fun CurrentSemesterAbsencesCard(
                                     }
                                     Text(
                                         text = "${discipline.currentAbsences}/${discipline.maxAbsences}",
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.labelMedium.tabularNums(),
                                         fontWeight = FontWeight.Bold,
                                         color = if (riskLevel >= 1) riskColor else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -465,11 +513,17 @@ private fun CreHeroAndImportCard(
     }
     var showCreFormulaDialog by remember { mutableStateOf(false) }
 
+    val hasInProgressOnly = remember(creReport) {
+        creReport.overallCre == 0.0 &&
+            creReport.semesters.isNotEmpty() &&
+            creReport.semesters.all { it.approvedCount == 0 && it.failedCount == 0 && it.inProgressCount > 0 }
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = surfaceColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Column(
             modifier = Modifier
@@ -500,7 +554,7 @@ private fun CreHeroAndImportCard(
                         modifier = Modifier.size(34.dp),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = campusCardBorder()
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -522,7 +576,7 @@ private fun CreHeroAndImportCard(
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = campusCardBorder()
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
@@ -536,8 +590,12 @@ private fun CreHeroAndImportCard(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = formattedOverallCre,
-                            style = MaterialTheme.typography.headlineLarge,
+                            text = if (hasInProgressOnly) "Em curso" else formattedOverallCre,
+                            style = if (hasInProgressOnly) {
+                                MaterialTheme.typography.titleLarge
+                            } else {
+                                MaterialTheme.typography.headlineLarge.tabularNums()
+                            },
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -555,7 +613,7 @@ private fun CreHeroAndImportCard(
                     )
                     Text(
                         text = hoursSummaryText,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.tabularNums(),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -570,7 +628,7 @@ private fun CreHeroAndImportCard(
                     )
                     Text(
                         text = approvalCountsText,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.tabularNums(),
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -584,7 +642,7 @@ private fun CreHeroAndImportCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = minTouchTarget),
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(CampusPillRadius)
             ) {
                 if (isImportingTranscript) {
                     CircularProgressIndicator(
@@ -615,18 +673,16 @@ private fun CreHeroAndImportCard(
                 }
             }
 
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = onOpenCurriculumMatrix,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = minTouchTarget),
-                shape = RoundedCornerShape(22.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                shape = RoundedCornerShape(CampusPillRadius)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.MenuBook,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -634,7 +690,6 @@ private fun CreHeroAndImportCard(
                     text = "Abrir Matriz Curricular (2026/2)",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -758,12 +813,17 @@ private fun SemesterCreCard(
     val formattedSemesterCre = remember(summary.cre) {
         formatScore(summary.cre, 2)
     }
+    val isAllInProgressWithoutGrades = remember(summary.courses) {
+        summary.courses.isNotEmpty() &&
+            summary.courses.all { it.status.equals("CS", ignoreCase = true) && it.grade == null }
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = surfaceColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Column(
             modifier = Modifier
@@ -784,13 +844,13 @@ private fun SemesterCreCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Semestre ${summary.semester}",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.tabularNums(),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = semesterStatsLabel,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.tabularNums(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -799,20 +859,35 @@ private fun SemesterCreCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "COEFICIENTE SEMESTRAL",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formattedSemesterCre,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = accessibleBlue
-                        )
+                    if (isAllInProgressWithoutGrades) {
+                        Surface(
+                            shape = RoundedCornerShape(CampusPillRadius),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "Em curso",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "COEFICIENTE SEMESTRAL",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = formattedSemesterCre,
+                                style = MaterialTheme.typography.titleMedium.tabularNums(),
+                                fontWeight = FontWeight.ExtraBold,
+                                color = accessibleBlue
+                            )
+                        }
                     }
                     Icon(
                         imageVector = if (isExpanded) {
@@ -823,6 +898,32 @@ private fun SemesterCreCard(
                         contentDescription = if (isExpanded) "Recolher semestre" else "Expandir semestre",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            if (isAllInProgressWithoutGrades) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Sem notas lançadas ainda",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    androidx.compose.material3.FilledTonalButton(
+                        onClick = { summary.courses.firstOrNull()?.let(onSelectCourse) },
+                        modifier = Modifier.heightIn(min = minTouchTarget),
+                        shape = RoundedCornerShape(CampusPillRadius)
+                    ) {
+                        Text(
+                            text = "Simular notas",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -867,8 +968,8 @@ private fun TranscriptCourseRow(
             .fillMaxWidth()
             .heightIn(min = minTouchTarget),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = campusCardBorder()
     ) {
         Row(
             modifier = Modifier
@@ -943,7 +1044,7 @@ private fun TranscriptCourseRow(
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                border = campusCardBorder()
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -957,7 +1058,7 @@ private fun TranscriptCourseRow(
                     )
                     Text(
                         text = entry.grade?.let { formatScore(it, 1) } ?: "--",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.tabularNums(),
                         fontWeight = FontWeight.Bold,
                         color = if (entry.grade != null) {
                             accessibleTextColor(

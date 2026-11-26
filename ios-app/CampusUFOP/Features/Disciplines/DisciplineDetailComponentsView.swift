@@ -212,8 +212,12 @@ internal struct DisciplineAbsenceReportCard: View {
     let summary: DisciplineSummaryCard
     let deptColor: Color
     let highContrast: Bool
+    var onUpdateAbsences: ((Int) -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
+    @State private var showManualAlert: Bool = false
+    @State private var manualDraft: String = ""
 
     var body: some View {
         let riskLevel = CampusTheme.semanticAbsenceRiskLevel(currentAbsences: summary.currentAbsences, maxAbsences: summary.maxAbsences)
@@ -221,43 +225,90 @@ internal struct DisciplineAbsenceReportCard: View {
         let barColor = riskLevel > 0 ? riskColor : deptColor
         let progress = summary.maxAbsences > 0 ? min(1.0, max(0.0, Double(summary.currentAbsences) / Double(summary.maxAbsences))) : 0
         let remaining = max(0, summary.maxAbsences - summary.currentAbsences)
+        let accentObj = appearance?.accentColor ?? .red
 
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Controle de Faltas")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(CampusTheme.font(size: 13, weight: .semibold))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("\(summary.currentAbsences)")
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                        Text("/ \(summary.maxAbsences) faltas")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    Button {
+                        manualDraft = "\(summary.currentAbsences)"
+                        showManualAlert = true
+                    } label: {
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text("\(summary.currentAbsences)")
+                                .font(CampusTheme.tabularFont(size: 30, weight: .bold))
+                                .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                            Text("/ \(summary.maxAbsences) faltas")
+                                .font(CampusTheme.tabularFont(size: 15, weight: .semibold))
+                                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                            if onUpdateAbsences != nil {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(accentObj.primary(for: colorScheme))
+                                    .padding(.leading, 3)
+                            }
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .disabled(onUpdateAbsences == nil)
+                    .accessibilityLabel("Editar total de faltas manualmente: \(summary.currentAbsences) de \(summary.maxAbsences)")
                 }
 
                 Spacer()
 
-                HStack(spacing: 5) {
-                    Image(systemName: riskLevel > 0
-                        ? CampusTheme.semanticAbsenceRiskIcon(currentAbsences: summary.currentAbsences, maxAbsences: summary.maxAbsences)
-                        : "checkmark.shield.fill")
-                        .font(.system(size: 12, weight: .bold))
-                    Text(riskLevel > 0
-                        ? CampusTheme.semanticAbsenceRiskLabel(currentAbsences: summary.currentAbsences, maxAbsences: summary.maxAbsences)
-                        : "Em dia")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                if let onUpdateAbsences {
+                    HStack(spacing: 8) {
+                        Button {
+                            onUpdateAbsences(max(0, summary.currentAbsences - 1))
+                        } label: {
+                            Image(systemName: "minus")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                                .frame(width: 40, height: 40)
+                                .background(Circle().fill(accentObj.surface1(for: colorScheme)))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(summary.currentAbsences <= 0)
+                        .opacity(summary.currentAbsences <= 0 ? 0.45 : 1)
+                        .minimumTouchTarget(48)
+                        .accessibilityLabel("Diminuir falta")
+
+                        Button {
+                            onUpdateAbsences(summary.currentAbsences + 1)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(accentObj.textOnHighlightSurface(for: colorScheme))
+                                .frame(width: 40, height: 40)
+                                .background(Circle().fill(accentObj.surface2(for: colorScheme)))
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(48)
+                        .accessibilityLabel("Adicionar falta")
+                    }
+                } else {
+                    HStack(spacing: 5) {
+                        Image(systemName: riskLevel > 0
+                            ? CampusTheme.semanticAbsenceRiskIcon(currentAbsences: summary.currentAbsences, maxAbsences: summary.maxAbsences)
+                            : "checkmark.shield.fill")
+                            .font(.system(size: 12, weight: .bold))
+                        Text(riskLevel > 0
+                            ? CampusTheme.semanticAbsenceRiskLabel(currentAbsences: summary.currentAbsences, maxAbsences: summary.maxAbsences)
+                            : "Em dia")
+                            .font(CampusTheme.font(size: 12, weight: .bold))
+                    }
+                    .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill((riskLevel > 0 ? riskColor : deptColor).opacity(colorScheme == .dark ? 0.22 : 0.14))
+                    )
                 }
-                .foregroundStyle(riskLevel > 0 ? riskColor : CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill((riskLevel > 0 ? riskColor : deptColor).opacity(colorScheme == .dark ? 0.22 : 0.14))
-                )
             }
 
             GeometryReader { proxy in
@@ -277,18 +328,32 @@ internal struct DisciplineAbsenceReportCard: View {
 
             HStack {
                 Text("Margem restante: \(remaining) falta(s)")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
                 Spacer()
 
                 Text("Canceladas: \(summary.cancelledClasses)")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
             }
         }
         .padding(16)
-        .liquidGlassCard(cornerRadius: 20, tint: barColor, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: barColor, highContrast: highContrast, useSurface2: true)
+        .alert("Editar faltas", isPresented: $showManualAlert) {
+            TextField("Quantidade de faltas", text: $manualDraft)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                #endif
+            Button("Salvar") {
+                if let parsed = Int(manualDraft.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                    onUpdateAbsences?(max(0, parsed))
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Informe o total de faltas acumuladas em \(summary.name).")
+        }
     }
 }
 

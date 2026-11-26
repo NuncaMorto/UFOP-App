@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.map.FloorOccupancySummary
+import br.ufop.campus.core.map.localizeCampusMapCategory
 import br.ufop.campus.core.uniffi.FeatureInfo
 import br.ufop.campus.core.uniffi.FloorLabel
 import br.ufop.campus.core.uniffi.IndoorStatus
@@ -64,7 +65,7 @@ internal fun CampusMapDetailSheet(
     val floorText = feature.floor?.let { resolveFloorDisplayLabel(it, floorLabels) }
     val metaSubtitle = buildList {
         feature.code?.takeIf { it.isNotBlank() }?.let { add(it) }
-        feature.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+        localizeCampusMapCategory(feature.category)?.let { add(it) }
         floorText?.let { add("Andar: $it") }
     }.joinToString(" · ")
 

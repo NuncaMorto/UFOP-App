@@ -288,3 +288,71 @@ public struct ClassCheckInDetail: Identifiable, Equatable, Codable, Sendable {
         self.footnoteText = footnoteText
     }
 }
+
+/// Formata títulos de avaliações importados em CAIXA ALTA para Title Case amigável em PT-BR,
+/// preservando siglas acadêmicas (EDO, P1, P2, TP1, TCC, códigos de disciplina) e algarismos romanos.
+public func formatAcademicAssessmentTitle(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return "" }
+
+    let hasLower = trimmed.contains { $0.isLetter && $0.isLowercase }
+    let hasUpper = trimmed.contains { $0.isLetter && $0.isUppercase }
+    let preservedAcronyms: Set<String> = [
+        "UFOP", "ICEB", "ICEA", "ICHS", "ICSA", "EMED", "EFAR", "EDTM", "ENUT",
+        "TCC", "EDO", "EDP", "SUB", "IC", "PIBIC", "PET", "EAD", "PDF", "API", "SQL",
+        "ULA", "ALU", "CPU", "GPU", "RAM", "VHDL", "FPGA", "CLP", "PLC", "PID",
+        "POO", "UML", "IA", "BD", "SO", "TI", "SGA", "DECOM", "DECSI", "DECEA",
+        "DECAT", "DECBI", "DEMAT", "DEFIS", "DEQUI", "DECIV", "DEPRO", "DEELT"
+    ]
+    let romans: Set<String> = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
+    let particles: Set<String> = [
+        "de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos",
+        "para", "por", "com", "sem", "sob", "a", "o", "as", "os", "ao", "aos", "ou"
+    ]
+    let accentsMap: [String: String] = [
+        "avaliacao": "avaliação", "revisao": "revisão", "apresentacao": "apresentação",
+        "seminario": "seminário", "relatorio": "relatório", "pratica": "prática",
+        "teorica": "teórica", "equacoes": "equações", "algebra": "álgebra",
+        "calculo": "cálculo", "fisica": "física", "quimica": "química",
+        "mecanica": "mecânica", "eletrica": "elétrica", "eletronica": "eletrônica",
+        "logica": "lógica", "analise": "análise", "programacao": "programação",
+        "computacao": "computação", "estatistica": "estatística", "metodo": "método",
+        "metodos": "métodos", "numerico": "numérico", "numericos": "numéricos",
+        "exercicio": "exercício", "exercicios": "exercícios", "questao": "questão",
+        "questoes": "questões", "codigo": "código", "topicos": "tópicos",
+        "basico": "básico", "basica": "básica", "integracao": "integração",
+        "automacao": "automação", "otimizacao": "otimização", "producao": "produção",
+        "introducao": "introdução"
+    ]
+
+    func isExamOrCourseCode(_ upper: String) -> Bool {
+        upper.range(of: "^[A-Z]{1,5}\\d{1,4}[A-Z]?$", options: .regularExpression) != nil
+    }
+
+    let tokens = trimmed.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+
+    if hasLower && hasUpper {
+        return tokens.map { token in
+            let upper = token.uppercased()
+            if preservedAcronyms.contains(upper) || isExamOrCourseCode(upper) {
+                return upper
+            }
+            return token
+        }.joined(separator: " ")
+    }
+
+    return tokens.enumerated().map { index, token in
+        let upper = token.uppercased()
+        if romans.contains(upper) || preservedAcronyms.contains(upper) || isExamOrCourseCode(upper) {
+            return upper
+        }
+        let asciiLower = token
+            .folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR"))
+            .lowercased()
+        if index > 0 && particles.contains(asciiLower) {
+            return asciiLower
+        }
+        let base = accentsMap[asciiLower] ?? token.lowercased()
+        return base.prefix(1).uppercased() + base.dropFirst()
+    }.joined(separator: " ")
+}

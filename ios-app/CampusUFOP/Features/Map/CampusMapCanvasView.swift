@@ -5,19 +5,31 @@ import SwiftUI
 public struct CampusMapCanvasView: View {
     @Bindable public var bridge: CampusMapBridge
     public let showBuiltInHud: Bool
+    public let topHudInsetPt: CGFloat
+    public let bottomHudInsetPt: CGFloat
+    public let leadingHudInsetPt: CGFloat
 
     @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
 
-    public init(bridge: CampusMapBridge, showBuiltInHud: Bool = true) {
+    public init(
+        bridge: CampusMapBridge,
+        showBuiltInHud: Bool = true,
+        topHudInsetPt: CGFloat = 0,
+        bottomHudInsetPt: CGFloat = 0,
+        leadingHudInsetPt: CGFloat = 0
+    ) {
         self.bridge = bridge
         self.showBuiltInHud = showBuiltInHud
+        self.topHudInsetPt = topHudInsetPt
+        self.bottomHudInsetPt = bottomHudInsetPt
+        self.leadingHudInsetPt = leadingHudInsetPt
     }
 
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var reduceMotion: Bool { appearance?.accessibility.reduceMotion ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
-    private var accentColor: Color { (appearance?.accentColor ?? .green).primary(for: colorScheme) }
+    private var accentColor: Color { (appearance?.accentColor ?? .red).primary(for: colorScheme) }
 
     public var body: some View {
         let palette = MapCanvasPalette.resolve(for: colorScheme, highContrast: hc)
@@ -34,6 +46,9 @@ public struct CampusMapCanvasView: View {
                 accentColor: accentColor,
                 isDark: colorScheme == .dark,
                 reduceMotion: reduceMotion,
+                topHudInsetPt: topHudInsetPt,
+                bottomHudInsetPt: bottomHudInsetPt,
+                leadingHudInsetPt: leadingHudInsetPt,
                 onTapMap: { mapX, mapY, zoom in
                     bridge.onMapTap(mapX: mapX, mapY: mapY, zoom: zoom)
                 },
@@ -72,6 +87,9 @@ private struct CampusMapInteractiveCanvasView: View {
     let accentColor: Color
     let isDark: Bool
     let reduceMotion: Bool
+    let topHudInsetPt: CGFloat
+    let bottomHudInsetPt: CGFloat
+    let leadingHudInsetPt: CGFloat
     let onTapMap: (Float, Float, Float) -> Void
     let onConsumePendingFocus: () -> Void
 
@@ -202,7 +220,10 @@ private struct CampusMapInteractiveCanvasView: View {
         guard !hasAppliedInitialFit, let batch = renderBatch else { return }
         transform = CampusMapTransformMath.computeCameraTarget(
             bounds: batch.bounds,
-            viewportSize: viewportSize
+            viewportSize: viewportSize,
+            topInsetPt: topHudInsetPt,
+            bottomInsetPt: bottomHudInsetPt,
+            leadingInsetPt: leadingHudInsetPt
         )
         hasAppliedInitialFit = true
     }
@@ -553,7 +574,7 @@ private struct CampusMapInteractiveCanvasView: View {
               primaryRect.minY <= viewportSize.height else {
             return
         }
-        guard collisionChecker.tryPlace(primaryRect, padding: 4) else { return }
+        guard collisionChecker.tryPlace(primaryRect, padding: 8) else { return }
 
         let resolvedPrimary = context.resolve(entry.primaryText)
         context.draw(resolvedPrimary, at: pt, anchor: .center)
@@ -566,10 +587,11 @@ private struct CampusMapInteractiveCanvasView: View {
                zoomPtPerMeter: zoom,
                textWidthPt: entry.secondarySize.width
            ) {
-            let secCenter = CGPoint(x: pt.x, y: pt.y + entry.primarySize.height * 0.85)
+            let secTop = primaryRect.maxY + 2
+            let secCenter = CGPoint(x: pt.x, y: secTop + entry.secondarySize.height * 0.5)
             let secRect = CGRect(
                 x: secCenter.x - entry.secondarySize.width * 0.5,
-                y: secCenter.y - entry.secondarySize.height * 0.5,
+                y: secTop,
                 width: entry.secondarySize.width,
                 height: entry.secondarySize.height
             )
@@ -577,7 +599,7 @@ private struct CampusMapInteractiveCanvasView: View {
                secRect.minX <= viewportSize.width,
                secRect.maxY >= 0,
                secRect.minY <= viewportSize.height,
-               collisionChecker.tryPlace(secRect, padding: 4) {
+               collisionChecker.tryPlace(secRect, padding: 8, ignoreLastPlaced: true) {
                 let resolvedSec = context.resolve(secText)
                 context.draw(resolvedSec, at: secCenter, anchor: .center)
             }

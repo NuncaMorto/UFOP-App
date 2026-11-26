@@ -438,12 +438,21 @@ public enum CampusMapTransformMath {
     public static func computeCameraTarget(
         bounds: CampusMapRect2D,
         viewportSize: CGSize,
-        paddingPt: CGFloat = 36
+        paddingPt: CGFloat = 36,
+        topInsetPt: CGFloat = 0,
+        bottomInsetPt: CGFloat = 0,
+        leadingInsetPt: CGFloat = 0,
+        trailingInsetPt: CGFloat = 0
     ) -> CampusMapViewportTransform {
         let safeW = max(1, viewportSize.width)
         let safeH = max(1, viewportSize.height)
-        let availW = max(24, safeW - paddingPt * 2)
-        let availH = max(24, safeH - paddingPt * 2)
+        let startPad = leadingInsetPt > 0 ? max(paddingPt, leadingInsetPt + paddingPt * 0.5) : paddingPt
+        let endPad = trailingInsetPt > 0 ? max(paddingPt, trailingInsetPt + paddingPt * 0.5) : paddingPt
+        let topPad = topInsetPt > 0 ? max(paddingPt, topInsetPt + 12) : paddingPt
+        let bottomPad = bottomInsetPt > 0 ? max(paddingPt, bottomInsetPt + 12) : paddingPt
+
+        let availW = max(24, safeW - startPad - endPad)
+        let availH = max(24, safeH - topPad - bottomPad)
 
         let spanX = max(8, CGFloat(bounds.maxX - bounds.minX))
         let spanY = max(8, CGFloat(bounds.maxY - bounds.minY))
@@ -451,10 +460,12 @@ public enum CampusMapTransformMath {
 
         let centerMapX = CGFloat(bounds.minX + bounds.maxX) * 0.5
         let centerMapY = CGFloat(bounds.minY + bounds.maxY) * 0.5
+        let centerScreenX = startPad + availW * 0.5
+        let centerScreenY = topPad + availH * 0.5
 
         return CampusMapViewportTransform(
-            offsetX: safeW * 0.5 - centerMapX * targetZoom,
-            offsetY: safeH * 0.5 - centerMapY * targetZoom,
+            offsetX: centerScreenX - centerMapX * targetZoom,
+            offsetY: centerScreenY - centerMapY * targetZoom,
             zoomPtPerMeter: targetZoom
         )
     }
@@ -534,7 +545,7 @@ public struct CampusLabelCollisionChecker {
         placedRects.removeAll(keepingCapacity: true)
     }
 
-    public mutating func tryPlace(_ rect: CGRect, padding: CGFloat = 4) -> Bool {
+    public mutating func tryPlace(_ rect: CGRect, padding: CGFloat = 4, ignoreLastPlaced: Bool = false) -> Bool {
         guard rect.width > 0,
               rect.height > 0,
               rect.minX.isFinite,
@@ -545,10 +556,73 @@ public struct CampusLabelCollisionChecker {
         }
         let pad = max(0, padding)
         let padded = rect.insetBy(dx: -pad, dy: -pad)
-        for existing in placedRects where padded.intersects(existing) {
+        let existingSlice = ignoreLastPlaced && !placedRects.isEmpty
+            ? placedRects.dropLast()
+            : placedRects[...]
+        for existing in existingSlice where padded.intersects(existing) {
             return false
         }
         placedRects.append(rect)
         return true
+    }
+}
+
+public enum CampusMapPresentationHelpers {
+    public static func localizeCategory(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else {
+            return nil
+        }
+        switch trimmed.lowercased() {
+        case "classroom": return "Sala de aula"
+        case "lab", "laboratory": return "Laboratório"
+        case "library": return "Biblioteca"
+        case "dining": return "Alimentação"
+        case "toilet", "wc": return "Banheiro"
+        case "faculty_office": return "Secretaria / Docentes"
+        case "administrative": return "Administrativo"
+        case "auditorium": return "Auditório"
+        case "entrance": return "Acesso"
+        case "parking", "parking_aisle": return "Estacionamento"
+        case "academic": return "Bloco acadêmico"
+        case "academic_zone": return "Setor acadêmico"
+        case "campus": return "Campus"
+        case "health": return "Saúde"
+        case "housing": return "Moradia estudantil"
+        case "sports": return "Esportes"
+        case "sports_building": return "Ginásio / Esportes"
+        case "soccer": return "Campo de futebol"
+        case "beachvolleyball": return "Quadra de areia"
+        case "park", "grass": return "Área verde / Praça"
+        case "footpath": return "Passarela"
+        case "steps": return "Escadaria"
+        case "service_road": return "Via interna"
+        case "support": return "Apoio / Serviços"
+        default:
+            return trimmed.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    public static func sanitizeAttribution(_ raw: String?) -> String {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmed.isEmpty {
+            return "Dados cartográficos © colaboradores do OpenStreetMap (ODbL) e mapeamento acadêmico UFOP. Layouts internos de salas são representações esquemáticas para orientação estudantil."
+        }
+        let noParenMock = trimmed.replacingOccurrences(
+            of: #"\s*\(\s*is_mock\s*=\s*true\s*\)"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let noRawMock = noParenMock.replacingOccurrences(
+            of: #"is_mock\s*=\s*true"#,
+            with: "modo esquemático",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        let collapsed = noRawMock.replacingOccurrences(
+            of: #"\s{2,}"#,
+            with: " ",
+            options: .regularExpression
+        )
+        return collapsed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

@@ -16,6 +16,8 @@ private val UFOP_PRESERVED_ACRONYMS = setOf(
     "CEDUFOP", "CEAD", "MEC", "SISU", "ENADE", "DOU", "TCC", "CLP", "PLC",
     "CAD", "CAM", "CAE", "CNC", "IHM", "PID", "FPGA", "VHDL", "DSP", "IOT",
     "IA", "SO", "BD", "POO", "UML", "ERP", "SIG", "BIM", "TI",
+    "EDO", "EDP", "SUB", "IC", "PIBIC", "PET", "EAD", "PDF", "API", "SQL",
+    "ULA", "ALU", "CPU", "GPU", "RAM", "SGA",
     "DEABI", "DEACL", "DEALI", "DEAMB", "DEARQ", "DEART", "DEBIO", "DECAD",
     "DECAT", "DECBI", "DECEA", "DECGP", "DECIV", "DECOM", "DECPA", "DECSI",
     "DECSO", "DEDIR", "DEECO", "DEEDU", "DEEFD", "DEELT", "DEEMA", "DEENP",
@@ -392,6 +394,7 @@ private val UFOP_PORTUGUESE_WORD_MAP: Map<String, String> = mapOf(
 private val DIACRITICS_REGEX = Regex("\\p{M}+")
 private val WHITESPACE_SPLIT_REGEX = Regex("""\s+""")
 private val COURSE_CODE_TOKEN_REGEX = Regex("""^[A-Z]{2,4}\d{2,4}[A-Z]?$""")
+private val ASSESSMENT_CODE_TOKEN_REGEX = Regex("""^[A-Z]{1,5}\d{1,4}[A-Z]?$""")
 
 internal fun stripDiacriticsLower(value: String): String =
     java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
@@ -440,6 +443,7 @@ private fun normalizeUfopWordCore(
     if (upper in UFOP_ROMAN_NUMERALS) return upper
     if (upper in UFOP_PRESERVED_ACRONYMS) return upper
     if (COURSE_CODE_TOKEN_REGEX.matches(upper)) return upper
+    if (ASSESSMENT_CODE_TOKEN_REGEX.matches(upper)) return upper
 
     val asciiLower = stripDiacriticsLower(core)
     if (prevAsciiLower == "introducao" && asciiLower == "as") return "às"
@@ -553,4 +557,37 @@ internal fun deriveCourseCodeFallback(
     }
 
     return courseId.uppercase().filter { it.isLetterOrDigit() }.take(6).ifBlank { "UFOP" }
+}
+
+/**
+ * Formata títulos de avaliações (provas, trabalhos, listas) para exibição visual amigável.
+ * Converte CAIXA ALTA importada de PDFs (ex.: "TRABALHO CIRCUITOS DIGITAIS" ->
+ * "Trabalho Circuitos Digitais") mantendo siglas (EDO, P1, P2, TP1, TCC, BCC721),
+ * algarismos romanos (I..XII) e partículas em minúsculo (de, da, do, em).
+ */
+fun formatAcademicAssessmentTitle(raw: String): String {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return ""
+    val hasLower = trimmed.any { it.isLetter() && it.isLowerCase() }
+    val hasUpper = trimmed.any { it.isLetter() && it.isUpperCase() }
+    if (hasLower && hasUpper) {
+        // Texto digitado manualmente com maiúsculas/minúsculas mistas: preserva estilo do usuário,
+        // garantindo apenas siglas/códigos acadêmicos explícitos quando em minúsculo.
+        val tokens = trimmed.split(WHITESPACE_SPLIT_REGEX).filter { it.isNotEmpty() }
+        return tokens.joinToString(" ") { token ->
+            val firstAlnum = token.indexOfFirst { it.isLetterOrDigit() }
+            val lastAlnum = token.indexOfLast { it.isLetterOrDigit() }
+            if (firstAlnum < 0 || lastAlnum < firstAlnum) return@joinToString token
+            val prefix = token.substring(0, firstAlnum)
+            val core = token.substring(firstAlnum, lastAlnum + 1)
+            val suffix = token.substring(lastAlnum + 1)
+            val upper = core.uppercase()
+            val fixedCore = when {
+                upper in UFOP_PRESERVED_ACRONYMS || ASSESSMENT_CODE_TOKEN_REGEX.matches(upper) -> upper
+                else -> core
+            }
+            "$prefix$fixedCore$suffix"
+        }
+    }
+    return normalizeUfopPortugueseText(trimmed)
 }

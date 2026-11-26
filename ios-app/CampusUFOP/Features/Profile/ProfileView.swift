@@ -35,6 +35,7 @@ public struct ProfileView: View {
     @State private var selectedCalendarCategory: String = "Todos"
 
     // Sheets & Importers
+    @State private var isEditProfilePresented: Bool = false
     @State private var isMatrixPresented: Bool = false
     @State private var isSharePresented: Bool = false
     @State private var isReleaseNotesPresented: Bool = false
@@ -83,7 +84,11 @@ public struct ProfileView: View {
                                 summary: summary,
                                 primaryAccent: primaryAccent,
                                 onPrimaryAccent: onPrimaryAccent,
-                                highContrast: hc
+                                highContrast: hc,
+                                minTouch: minTouch,
+                                onEditProfile: {
+                                    isEditProfilePresented = true
+                                }
                             )
                             verticalSubtabPickerSection
                             ProfileCampusSelectorCard(
@@ -146,20 +151,32 @@ public struct ProfileView: View {
                 }
             }
         }
+        .sheet(isPresented: $isEditProfilePresented) {
+            ProfileEditSheetView(
+                store: store,
+                appearance: appearance
+            ) {
+                isEditProfilePresented = false
+            }
+            .presentationCornerRadius(30)
+        }
         .sheet(isPresented: $isMatrixPresented) {
             CurriculumMatrixView(store: store) {
                 isMatrixPresented = false
             }
+            .presentationCornerRadius(30)
         }
         .sheet(isPresented: $isSharePresented) {
             ScheduleShareImportSheetView(store: store) {
                 isSharePresented = false
             }
+            .presentationCornerRadius(30)
         }
         .sheet(isPresented: $isReleaseNotesPresented) {
             ReleaseNotesSheetView {
                 isReleaseNotesPresented = false
             }
+            .presentationCornerRadius(30)
         }
         .fileImporter(
             isPresented: $showTranscriptPicker,
@@ -299,6 +316,9 @@ public struct ProfileView: View {
                 },
                 onOpenShare: {
                     isSharePresented = true
+                },
+                onEditProfile: {
+                    isEditProfilePresented = true
                 }
             )
         case .dynamicGrid:

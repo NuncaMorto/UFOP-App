@@ -38,6 +38,10 @@ public struct DisciplineDetailSheetView: View {
     @State private var syllabusErrorMessage: String?
 
     @State private var isDeleteConfirmationPresented: Bool = false
+    @State private var historyExpanded: Bool = false
+    @State private var slotsExpanded: Bool = false
+    @State private var assessmentsExpanded: Bool = false
+    @State private var notesExpanded: Bool = false
 
     public init(
         detail: DisciplineDetail,
@@ -58,7 +62,7 @@ public struct DisciplineDetailSheetView: View {
     }
 
     private var activeStore: CampusStore? { store ?? environmentStore }
-    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .green }
+    private var resolvedAccent: CampusAccentColor { appearance?.accentColor ?? .red }
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
 
@@ -142,7 +146,15 @@ public struct DisciplineDetailSheetView: View {
                         DisciplineAbsenceReportCard(
                             summary: currentDetail.summary,
                             deptColor: deptColor,
-                            highContrast: hc
+                            highContrast: hc,
+                            onUpdateAbsences: activeStore.map { storeInstance in
+                                { updatedCount in
+                                    storeInstance.updateDisciplineAbsences(
+                                        disciplineId: currentDetail.summary.id,
+                                        totalAbsences: updatedCount
+                                    )
+                                }
+                            }
                         )
 
                         DisciplineEadAndSyllabusCard(
@@ -167,63 +179,7 @@ public struct DisciplineDetailSheetView: View {
                             }
                         )
 
-                        DisciplineAbsenceHistorySection(
-                            courseName: currentDetail.summary.name,
-                            history: resolvedAbsenceHistory,
-                            highContrast: hc
-                        )
-
-                        DisciplineWeeklySlotsSection(
-                            courseName: currentDetail.summary.name,
-                            colorKey: currentDetail.summary.colorKey,
-                            slots: resolvedSlots,
-                            isEadCourse: isEadCourse,
-                            deptColor: deptColor,
-                            highContrast: hc,
-                            minTouch: minTouch,
-                            isAddingSlot: $isAddingSlot,
-                            newSlotDayOfWeek: $newSlotDayOfWeek,
-                            newSlotStartTime: $newSlotStartTime,
-                            newSlotEndTime: $newSlotEndTime,
-                            newSlotBuilding: $newSlotBuilding,
-                            newSlotRoom: $newSlotRoom,
-                            newSlotShortLocation: $newSlotShortLocation,
-                            slotConflictError: $slotConflictError,
-                            onSubmitSlot: {
-                                submitNewSlot(courseId: currentDetail.summary.id)
-                            },
-                            onDeleteSlot: { slotId in
-                                deleteSlot(slotId)
-                            }
-                        )
-
-                        DisciplineAssessmentsSection(
-                            courseName: currentDetail.summary.name,
-                            colorKey: currentDetail.summary.colorKey,
-                            assessments: currentDetail.assessments,
-                            deptColor: deptColor,
-                            highContrast: hc,
-                            minTouch: minTouch,
-                            isAddingAssessment: $isAddingAssessment,
-                            newAssessmentTitle: $newAssessmentTitle,
-                            newAssessmentKind: $newAssessmentKind,
-                            newAssessmentDueDate: $newAssessmentDueDate,
-                            newAssessmentDueTime: $newAssessmentDueTime,
-                            onSubmitAssessment: {
-                                submitNewAssessment(courseId: currentDetail.summary.id)
-                            },
-                            onToggleAssessment: { assessmentId in
-                                toggleAssessment(assessmentId)
-                            },
-                            onDeleteAssessment: { assessmentId in
-                                deleteAssessment(assessmentId)
-                            }
-                        )
-
-                        DisciplineNotesSection(
-                            notesText: $notesText,
-                            highContrast: hc
-                        )
+                        groupedDetailSectionsContainer(currentDetail: currentDetail)
 
                         DisciplineDeleteCourseButton(
                             courseName: currentDetail.summary.name,
@@ -261,6 +217,156 @@ public struct DisciplineDetailSheetView: View {
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("Esta ação remove a disciplina, seus horários na grade, aulas na agenda e prazos vinculados em Atividades.")
+        }
+    }
+
+    // MARK: - Grouped 26pt Accordion Container
+
+    private func groupedDetailSectionsContainer(currentDetail: DisciplineDetail) -> some View {
+        let doneCount = currentDetail.assessments.filter(\.completed).count
+        let historyPill = resolvedAbsenceHistory.isEmpty ? "0 reg." : "\(resolvedAbsenceHistory.count)"
+        let slotsPill = "\(resolvedSlots.count)"
+        let assessPill = "\(doneCount)/\(currentDetail.assessments.count)"
+        let notesPill = notesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Sem notas" : "Salva"
+
+        return VStack(spacing: 0) {
+            groupedAccordionRow(
+                title: "Histórico de faltas",
+                counter: historyPill,
+                expanded: $historyExpanded
+            ) {
+                DisciplineAbsenceHistorySection(
+                    courseName: currentDetail.summary.name,
+                    history: resolvedAbsenceHistory,
+                    highContrast: hc
+                )
+            }
+
+            Divider()
+                .overlay(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
+
+            groupedAccordionRow(
+                title: "Horários semanais",
+                counter: slotsPill,
+                expanded: $slotsExpanded
+            ) {
+                DisciplineWeeklySlotsSection(
+                    courseName: currentDetail.summary.name,
+                    colorKey: currentDetail.summary.colorKey,
+                    slots: resolvedSlots,
+                    isEadCourse: isEadCourse,
+                    deptColor: deptColor,
+                    highContrast: hc,
+                    minTouch: minTouch,
+                    isAddingSlot: $isAddingSlot,
+                    newSlotDayOfWeek: $newSlotDayOfWeek,
+                    newSlotStartTime: $newSlotStartTime,
+                    newSlotEndTime: $newSlotEndTime,
+                    newSlotBuilding: $newSlotBuilding,
+                    newSlotRoom: $newSlotRoom,
+                    newSlotShortLocation: $newSlotShortLocation,
+                    slotConflictError: $slotConflictError,
+                    onSubmitSlot: {
+                        submitNewSlot(courseId: currentDetail.summary.id)
+                    },
+                    onDeleteSlot: { slotId in
+                        deleteSlot(slotId)
+                    }
+                )
+            }
+
+            Divider()
+                .overlay(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
+
+            groupedAccordionRow(
+                title: "Prazos e avaliações",
+                counter: assessPill,
+                expanded: $assessmentsExpanded
+            ) {
+                DisciplineAssessmentsSection(
+                    courseName: currentDetail.summary.name,
+                    colorKey: currentDetail.summary.colorKey,
+                    assessments: currentDetail.assessments,
+                    deptColor: deptColor,
+                    highContrast: hc,
+                    minTouch: minTouch,
+                    isAddingAssessment: $isAddingAssessment,
+                    newAssessmentTitle: $newAssessmentTitle,
+                    newAssessmentKind: $newAssessmentKind,
+                    newAssessmentDueDate: $newAssessmentDueDate,
+                    newAssessmentDueTime: $newAssessmentDueTime,
+                    onSubmitAssessment: {
+                        submitNewAssessment(courseId: currentDetail.summary.id)
+                    },
+                    onToggleAssessment: { assessmentId in
+                        toggleAssessment(assessmentId)
+                    },
+                    onDeleteAssessment: { assessmentId in
+                        deleteAssessment(assessmentId)
+                    }
+                )
+            }
+
+            Divider()
+                .overlay(CampusTheme.cardBorder(for: colorScheme, highContrast: hc))
+
+            groupedAccordionRow(
+                title: "Anotações",
+                counter: notesPill,
+                expanded: $notesExpanded
+            ) {
+                DisciplineNotesSection(
+                    notesText: $notesText,
+                    highContrast: hc
+                )
+            }
+        }
+        .liquidGlassCard(cornerRadius: CampusTheme.groupedCornerRadius, highContrast: hc)
+    }
+
+    private func groupedAccordionRow<Content: View>(
+        title: String,
+        counter: String,
+        expanded: Binding<Bool>,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    expanded.wrappedValue.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(CampusTheme.font(size: 15, weight: .bold))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Text(counter)
+                        .font(CampusTheme.tabularFont(size: 11, weight: .semibold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(resolvedAccent.surface2(for: colorScheme)))
+
+                    Image(systemName: expanded.wrappedValue ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+
+            if expanded.wrappedValue {
+                content()
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            }
         }
     }
 

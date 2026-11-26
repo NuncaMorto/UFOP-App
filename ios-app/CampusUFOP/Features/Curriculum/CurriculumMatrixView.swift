@@ -224,28 +224,38 @@ public struct CurriculumMatrixView: View {
     }
 
     private func topBar(accent: Color, highContrast: Bool) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("MATRIZ CURRICULAR · GRADUAÇÃO")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .tracking(1.3)
-                    .foregroundStyle(accent)
-                Text("Catálogo de Cursos & CRE")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-            }
-
-            Spacer()
-
+        HStack(spacing: 12) {
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
-                    .frame(width: 34, height: 34)
-                    .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
+                Image(systemName: "arrow.left")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: appearance.accentColor))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: highContrast, accent: appearance.accentColor))
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(highContrast ? CampusTheme.cardBorder(for: colorScheme, highContrast: true) : .clear, lineWidth: 1.5)
+                    )
             }
             .buttonStyle(.plain)
             .minimumTouchTarget(appearance.accessibility.minTouchHeight)
+            .accessibilityLabel("Voltar")
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("MATRIZ CURRICULAR · GRADUAÇÃO")
+                    .font(CampusTheme.font(size: 10.5, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance.accentColor))
+                    .lineLimit(1)
+                Text("Matriz & Simulador CRE")
+                    .font(CampusTheme.font(size: 20, weight: .bold))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: appearance.accentColor))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
         }
     }
 

@@ -28,6 +28,14 @@
 	<string>Usado para desbloquear o Vida Acadêmica com Face ID ou Touch ID.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Usado para ler o QR Code de grades horárias compartilhadas por colegas.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Onest-Regular.ttf</string>
+		<string>Onest-Medium.ttf</string>
+		<string>Onest-SemiBold.ttf</string>
+		<string>Onest-Bold.ttf</string>
+		<string>Onest-ExtraBold.ttf</string>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

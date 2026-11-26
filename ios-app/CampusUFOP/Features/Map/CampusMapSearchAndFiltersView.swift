@@ -341,17 +341,6 @@ internal struct CampusMapSearchAndFiltersView: View {
     }
 
     private func localizedCategory(_ raw: String) -> String {
-        switch raw.lowercased() {
-        case "classroom": return "Sala de aula"
-        case "lab": return "Laboratório"
-        case "library": return "Biblioteca"
-        case "dining": return "Alimentação"
-        case "toilet": return "Banheiro"
-        case "faculty_office": return "Secretaria/Docentes"
-        case "entrance": return "Acesso"
-        case "parking": return "Estacionamento"
-        case "academic", "academic_zone": return "Acadêmico"
-        default: return raw.capitalized
-        }
+        CampusMapPresentationHelpers.localizeCategory(raw) ?? raw.capitalized
     }
 }

@@ -78,9 +78,10 @@ public struct MainTabView: View {
     }
 
     public var body: some View {
-        let accentObj = appearance?.accentColor ?? .green
+        let accentObj = appearance?.accentColor ?? .red
         let accent = accentObj.primary(for: colorScheme)
         let onPrimary = accentObj.onPrimary(for: colorScheme)
+        let studentName = store.studentProfile.fullName
 
         Group {
             if horizontalSizeClass == .regular {
@@ -97,6 +98,7 @@ public struct MainTabView: View {
                         selectedTab: activeTabBinding,
                         accent: accent,
                         onPrimary: onPrimary,
+                        studentName: studentName,
                         highContrast: hc,
                         reduceMotion: reduceMotion,
                         minTouch: minTouch,
@@ -112,10 +114,26 @@ public struct MainTabView: View {
                     tabDetailContent(for: activeTabBinding.wrappedValue)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+                    if activeTabBinding.wrappedValue != .map {
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                CampusTheme.appBackground(for: colorScheme, highContrast: hc, accent: accentObj).opacity(0.88),
+                                CampusTheme.appBackground(for: colorScheme, highContrast: hc, accent: accentObj)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 112)
+                        .allowsHitTesting(false)
+                        .ignoresSafeArea(edges: .bottom)
+                    }
+
                     FloatingCampusTabBarView(
                         selectedTab: activeTabBinding,
                         accent: accent,
                         onPrimary: onPrimary,
+                        studentName: studentName,
                         highContrast: hc,
                         reduceMotion: reduceMotion,
                         minTouch: minTouch,
@@ -165,7 +183,7 @@ public struct MainTabView: View {
             if let mapBridge {
                 CampusMapScreenView(bridge: mapBridge)
             } else {
-                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .green, highContrast: hc)
+                LiquidGlassBackdrop(accent: appearance?.accentColor ?? .red, highContrast: hc)
             }
         }
     }

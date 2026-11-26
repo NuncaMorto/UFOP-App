@@ -93,6 +93,8 @@ import br.ufop.campus.ui.profile.ReleaseNotesDialog
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.campusAccentTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.rememberCampusAdaptiveLayout
 import br.ufop.campus.ui.update.AppUpdateDialog
 import br.ufop.campus.ui.update.InAppUpdateBanner
@@ -375,17 +377,18 @@ fun CampusNavigation(
                 }
 
                 if (selectedTab != CampusTab.MAP) {
-                    // IHC-03 Scrim Inferior sob a Barra Flutuante para transição suave de rolagem
+                    // Scrim Inferior contínuo na cor exata do Canvas para evitar vazamento de texto sob a barra flutuante
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(108.dp)
+                            .height(124.dp)
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
                                         Color.Transparent,
-                                        MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
+                                        MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
+                                        MaterialTheme.colorScheme.background,
                                         MaterialTheme.colorScheme.background
                                     )
                                 )
@@ -595,14 +598,9 @@ private fun FloatingVerticalCampusNavigationIsland(
         }
     }
 
-    val capsuleBg = MaterialTheme.colorScheme.surface.copy(
-        alpha = if (isDark) 0.78f else 0.88f
-    )
-    val capsuleBorder = if (isDark) {
-        Color.White.copy(alpha = 0.14f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
-    }
+    val capsuleBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+    val capsuleBorder = campusCardBorder(strokeWidth = 2.dp)
+    val activeAccentText = campusAccentTextColor()
 
     Column(
         modifier = modifier,
@@ -613,9 +611,9 @@ private fun FloatingVerticalCampusNavigationIsland(
             modifier = Modifier.width(74.dp),
             shape = RoundedCornerShape(999.dp),
             color = capsuleBg,
-            shadowElevation = 12.dp,
-            tonalElevation = 3.dp,
-            border = BorderStroke(1.dp, capsuleBorder)
+            shadowElevation = if (isDark) 14.dp else 8.dp,
+            tonalElevation = 0.dp,
+            border = capsuleBorder
         ) {
             Column(
                 modifier = Modifier
@@ -628,7 +626,7 @@ private fun FloatingVerticalCampusNavigationIsland(
                     val isSelected = selectedTab == tab
                     val pillColor by animateColorAsState(
                         targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+                            MaterialTheme.colorScheme.surfaceContainerHigh
                         } else {
                             Color.Transparent
                         },
@@ -637,7 +635,7 @@ private fun FloatingVerticalCampusNavigationIsland(
                     )
                     val itemColor by animateColorAsState(
                         targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
+                            if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
@@ -707,7 +705,7 @@ private fun FloatingVerticalCampusNavigationIsland(
         val isMapSelected = selectedTab == CampusTab.MAP
         val mapPillColor by animateColorAsState(
             targetValue = if (isMapSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+                MaterialTheme.colorScheme.surfaceContainerHigh
             } else {
                 Color.Transparent
             },
@@ -716,7 +714,7 @@ private fun FloatingVerticalCampusNavigationIsland(
         )
         val mapIconColor by animateColorAsState(
             targetValue = if (isMapSelected) {
-                MaterialTheme.colorScheme.onPrimaryContainer
+                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
@@ -728,9 +726,9 @@ private fun FloatingVerticalCampusNavigationIsland(
             modifier = Modifier.size(64.dp),
             shape = CircleShape,
             color = capsuleBg,
-            shadowElevation = 12.dp,
-            tonalElevation = 3.dp,
-            border = BorderStroke(1.dp, capsuleBorder)
+            shadowElevation = if (isDark) 14.dp else 8.dp,
+            tonalElevation = 0.dp,
+            border = capsuleBorder
         ) {
             Box(
                 modifier = Modifier
@@ -788,14 +786,9 @@ private fun FloatingCampusNavigationBar(
         }
     }
 
-    val capsuleBg = MaterialTheme.colorScheme.surface.copy(
-        alpha = if (isDark) 0.78f else 0.88f
-    )
-    val capsuleBorder = if (isDark) {
-        Color.White.copy(alpha = 0.14f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
-    }
+    val capsuleBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+    val capsuleBorder = campusCardBorder(strokeWidth = 2.dp)
+    val activeAccentText = campusAccentTextColor()
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -808,9 +801,9 @@ private fun FloatingCampusNavigationBar(
                 .height(64.dp),
             shape = RoundedCornerShape(999.dp),
             color = capsuleBg,
-            shadowElevation = 12.dp,
-            tonalElevation = 3.dp,
-            border = BorderStroke(1.dp, capsuleBorder)
+            shadowElevation = if (isDark) 14.dp else 8.dp,
+            tonalElevation = 0.dp,
+            border = capsuleBorder
         ) {
             Row(
                 modifier = Modifier
@@ -823,7 +816,7 @@ private fun FloatingCampusNavigationBar(
                     val isSelected = selectedTab == tab
                     val pillColor by animateColorAsState(
                         targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+                            MaterialTheme.colorScheme.surfaceContainerHigh
                         } else {
                             Color.Transparent
                         },
@@ -832,7 +825,7 @@ private fun FloatingCampusNavigationBar(
                     )
                     val itemColor by animateColorAsState(
                         targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
+                            if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
@@ -902,7 +895,7 @@ private fun FloatingCampusNavigationBar(
         val isMapSelected = selectedTab == CampusTab.MAP
         val mapPillColor by animateColorAsState(
             targetValue = if (isMapSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+                MaterialTheme.colorScheme.surfaceContainerHigh
             } else {
                 Color.Transparent
             },
@@ -911,7 +904,7 @@ private fun FloatingCampusNavigationBar(
         )
         val mapIconColor by animateColorAsState(
             targetValue = if (isMapSelected) {
-                MaterialTheme.colorScheme.onPrimaryContainer
+                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
@@ -923,9 +916,9 @@ private fun FloatingCampusNavigationBar(
             modifier = Modifier.size(64.dp),
             shape = CircleShape,
             color = capsuleBg,
-            shadowElevation = 12.dp,
-            tonalElevation = 3.dp,
-            border = BorderStroke(1.dp, capsuleBorder)
+            shadowElevation = if (isDark) 14.dp else 8.dp,
+            tonalElevation = 0.dp,
+            border = capsuleBorder
         ) {
             Box(
                 modifier = Modifier

@@ -44,6 +44,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.tabularNums
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -153,11 +157,13 @@ fun CampusDatePickerField(
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = minHeight)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(
                 enabled = enabled,
                 role = Role.Button,
@@ -165,9 +171,9 @@ fun CampusDatePickerField(
             ) {
                 showDialog = true
             },
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        color = MaterialTheme.colorScheme.surface
+        shape = RoundedCornerShape(14.dp),
+        border = if (highContrast) campusCardBorder(1.5.dp) else null,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
             modifier = Modifier
@@ -188,7 +194,7 @@ fun CampusDatePickerField(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (isoDate.isNotBlank()) formatIsoToBrDate(isoDate) else "Selecione a data",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.tabularNums(),
                     fontWeight = FontWeight.Medium,
                     color = if (isoDate.isNotBlank()) {
                         MaterialTheme.colorScheme.onSurface
@@ -211,7 +217,7 @@ fun CampusDatePickerField(
             Icon(
                 imageVector = Icons.Default.DateRange,
                 contentDescription = null,
-                tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -273,16 +279,18 @@ fun CampusTimePickerField(
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
-    val borderColor = when {
-        isError -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.outlineVariant
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
+    val fieldBorder = when {
+        isError -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.error)
+        highContrast -> campusCardBorder(1.5.dp)
+        else -> null
     }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = minHeight)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(
                 enabled = enabled,
                 role = Role.Button,
@@ -290,9 +298,9 @@ fun CampusTimePickerField(
             ) {
                 showDialog = true
             },
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, borderColor),
-        color = MaterialTheme.colorScheme.surface
+        shape = RoundedCornerShape(14.dp),
+        border = fieldBorder,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
             modifier = Modifier
@@ -313,7 +321,7 @@ fun CampusTimePickerField(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (time24h.isNotBlank()) time24h else "Selecione o horário",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.tabularNums(),
                     fontWeight = FontWeight.Medium,
                     color = when {
                         isError -> MaterialTheme.colorScheme.error
@@ -330,7 +338,7 @@ fun CampusTimePickerField(
                 contentDescription = null,
                 tint = when {
                     isError -> MaterialTheme.colorScheme.error
-                    enabled -> MaterialTheme.colorScheme.primary
+                    enabled -> MaterialTheme.colorScheme.onSurfaceVariant
                     else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 },
                 modifier = Modifier.size(24.dp)

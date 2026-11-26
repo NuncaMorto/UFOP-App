@@ -7,18 +7,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -61,12 +67,22 @@ import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.curriculum.CurriculumMatrixModal
 import br.ufop.campus.ui.disciplines.DisciplinesViewModel
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.CampusFoldPosture
 import br.ufop.campus.ui.theme.CampusWindowWidthClass
+import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
+import br.ufop.campus.ui.theme.DarkStatusCancelledAmber
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
+import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.StatusCancelledAmber
+import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
+import br.ufop.campus.ui.theme.semanticAbsenceRiskLevel
+import br.ufop.campus.ui.theme.tabularNums
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -464,7 +480,7 @@ fun ProfilePlaceholderScreen(
             )
         }
 
-        // Card Hero Centralizado: Identidade Acadêmica
+        // Card Hero Horizontal: Identidade Acadêmica
         AcademicIdentityCard(
             studentProfile = studentProfile,
             activeSemester = activeSemester,
@@ -472,6 +488,201 @@ fun ProfilePlaceholderScreen(
             avatarBitmap = avatarBitmap,
             onEditProfile = { showEditProfileSheet = true }
         )
+
+        // Blocos Bento Clicáveis: CRE Geral, % Integralizado, Frequência / Alertas
+        val bentoIsDark = themeController.isDark
+        val surfaceColor = MaterialTheme.colorScheme.surface
+        val creAllInProgressNoGrades = remember(creReport) {
+            creReport.overallCre == 0.0 &&
+                creReport.semesters.isNotEmpty() &&
+                creReport.semesters.all { it.approvedCount == 0 && it.failedCount == 0 && it.inProgressCount > 0 }
+        }
+        val creDisplayValue = if (creAllInProgressNoGrades) {
+            "Em curso"
+        } else {
+            formatScore(creReport.overallCre, 2)
+        }
+        val integralPercent = remember(creReport.completedHours, creReport.totalRequiredHours, dynamicGridSummary.completionPercent) {
+            if (creReport.completedHours > 0) {
+                ((creReport.completedHours.toDouble() / creReport.totalRequiredHours.coerceAtLeast(1)) * 100.0)
+                    .toInt()
+                    .coerceIn(0, 100)
+            } else {
+                dynamicGridSummary.completionPercent
+            }
+        }
+        val integralHoursLabel = if (creReport.completedHours > 0) {
+            "${creReport.completedHours}/${creReport.totalRequiredHours}h"
+        } else {
+            "${dynamicGridSummary.completedHours}/${dynamicGridSummary.totalGridHours}h"
+        }
+        val attentionCount = remember(currentDisciplines) {
+            currentDisciplines.count { semanticAbsenceRiskLevel(it.currentAbsences, it.maxAbsences) == 1 }
+        }
+        val freqValueColor = when {
+            profileSummary.coursesAtRisk > 0 -> accessibleTextColor(StatusAbsentRed, bentoIsDark, surfaceColor)
+            attentionCount > 0 -> accessibleTextColor(
+                if (bentoIsDark) DarkStatusCancelledAmber else StatusCancelledAmber,
+                bentoIsDark,
+                surfaceColor
+            )
+            else -> accessibleTextColor(
+                if (bentoIsDark) DarkStatusAttendingGreen else StatusAttendingGreen,
+                bentoIsDark,
+                surfaceColor
+            )
+        }
+        val freqStatusLabel = when {
+            profileSummary.coursesAtRisk > 0 -> "${profileSummary.coursesAtRisk} em risco"
+            attentionCount > 0 -> "$attentionCount em atenção"
+            else -> "Controlada"
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                onClick = { activeDestination = ProfileDestination.METRICS_CRE },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .heightIn(min = 84.dp),
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surface,
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation(1.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "CRE Geral",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = creDisplayValue,
+                        style = if (creAllInProgressNoGrades) {
+                            MaterialTheme.typography.titleMedium
+                        } else {
+                            MaterialTheme.typography.titleLarge.tabularNums()
+                        },
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${creReport.totalApproved} aprov.",
+                        style = MaterialTheme.typography.labelSmall.tabularNums(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Surface(
+                onClick = onOpenDynamicGrid,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .heightIn(min = 84.dp),
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surface,
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation(1.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Integralizado",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "$integralPercent%",
+                        style = MaterialTheme.typography.titleLarge.tabularNums(),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = integralHoursLabel,
+                        style = MaterialTheme.typography.labelSmall.tabularNums(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Surface(
+                onClick = { activeDestination = ProfileDestination.METRICS_CRE },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .heightIn(min = 84.dp),
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = when {
+                    profileSummary.coursesAtRisk > 0 ->
+                        StatusAbsentRed.copy(alpha = if (bentoIsDark) 0.16f else 0.08f)
+                    attentionCount > 0 ->
+                        (if (bentoIsDark) DarkStatusCancelledAmber else StatusCancelledAmber)
+                            .copy(alpha = if (bentoIsDark) 0.16f else 0.08f)
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation(1.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Frequência",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${profileSummary.totalAbsences}/${profileSummary.totalMaxAbsences}",
+                        style = MaterialTheme.typography.titleLarge.tabularNums(),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = freqStatusLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = freqValueColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
 
         // Menu agrupado da Central do Perfil (ordem exata: Métricas & CRE, Grade Dinâmica, Configurações, Atualizações, FAQ & Ajuda, Sair da conta)
         val rightDestination = activeDestination ?: ProfileDestination.METRICS_CRE

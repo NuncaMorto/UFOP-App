@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.FriendScheduleInfo
 import br.ufop.campus.core.ffi.StudentProfile
+import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -149,13 +151,12 @@ internal fun TimetableTopBar(
             }
         }
 
-        // Linha de controles compactos: Seletor de grade (com avatar), Semestre, Compartilhar, Horizontal/Vertical, Compacto/Normal, Só meus horários/Grade completa
-        FlowRow(
+        // Barra de controles em no máximo 2 linhas limpas: Linha 1 (Seletores & Compartilhamento), Linha 2 (Visualização)
+        Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(if (largeTouchTargets) 6.dp else 2.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Seletor 1: Minha grade ▾ (preserva foto/avatar do usuário e dos amigos)
             GradeSelectorDropdown(
                 selectedGradeLabel = selectedGradeLabel,
                 activeFriend = activeFriend,
@@ -171,7 +172,6 @@ internal fun TimetableTopBar(
                 onOpenQrScanner = onOpenQrScanner
             )
 
-            // Seletor 2: Semestre (ex.: 2026.2 ▾)
             SemesterSelectorDropdown(
                 effectiveSemester = effectiveSemester,
                 availableSemesters = availableSemesters,
@@ -179,15 +179,17 @@ internal fun TimetableTopBar(
                 onSelectSemester = onSelectSemester
             )
 
+            Spacer(modifier = Modifier.weight(1f))
+
             // Botão Compartilhar (.ufopgrade)
             Surface(
                 onClick = onShareGrade,
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
                     .defaultMinSize(minHeight = toolbarVisualHeight),
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(CampusPillRadius),
                 color = MaterialTheme.colorScheme.primaryContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.40f))
+                border = campusCardBorder()
             ) {
                 Row(
                     modifier = Modifier.padding(
@@ -213,8 +215,13 @@ internal fun TimetableTopBar(
                     )
                 }
             }
+        }
 
-            // Alternância persistida de orientação: Horizontal / Vertical
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             TimetableToolbarChip(
                 label = if (isLandscape) "Horizontal" else "Vertical",
                 icon = Icons.Outlined.ScreenRotation,
@@ -233,7 +240,6 @@ internal fun TimetableTopBar(
                 onClick = onToggleLandscape
             )
 
-            // Alternância de densidade: Normal / Compacto
             TimetableToolbarChip(
                 label = if (isReducedMode) "Compacto" else "Normal",
                 icon = if (isReducedMode) Icons.Outlined.UnfoldMore else Icons.Outlined.UnfoldLess,
@@ -243,9 +249,8 @@ internal fun TimetableTopBar(
                 onClick = onToggleReducedMode
             )
 
-            // Alternância de faixa de horários: Só meus horários / Grade completa (07:30–22:40)
             TimetableToolbarChip(
-                label = if (showFullDayGrid) "Grade completa (07:30–22:40)" else "Só meus horários",
+                label = if (showFullDayGrid) "07:30–22:40" else "Meus horários",
                 icon = Icons.Outlined.Schedule,
                 isActive = showFullDayGrid,
                 visualHeight = toolbarVisualHeight,
@@ -339,20 +344,13 @@ private fun TimetableToolbarChip(
                 }
             }
             .clickable(onClickLabel = onClickLabel, onClick = onClick),
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(CampusPillRadius),
         color = if (isActive) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isActive) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        border = campusCardBorder()
     ) {
         Row(
             modifier = Modifier.padding(
@@ -403,20 +401,13 @@ internal fun ExpressiveSelectorPill(
         modifier = Modifier
             .minimumInteractiveComponentSize()
             .defaultMinSize(minHeight = visualHeight),
-        shape = RoundedCornerShape(50),
+        shape = RoundedCornerShape(CampusPillRadius),
         color = if (isHighlighted) {
             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.70f)
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isHighlighted) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.40f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        border = campusCardBorder()
     ) {
         Row(
             modifier = Modifier.padding(

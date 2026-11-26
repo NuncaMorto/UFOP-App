@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DarkMode
@@ -78,9 +76,7 @@ import br.ufop.campus.ui.theme.DepartmentMathBlue
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAttendingGreen
-import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.accessibleTextColor
-import br.ufop.campus.ui.theme.parseHexColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,7 +89,6 @@ private fun ProfilePersonalizationSubView(
     onSelectAccent: (CampusAccentColor) -> Unit
 ) {
     val minTouchTarget = campusMinTouchTarget()
-    val swatchMinHeight = if (LocalCampusAccessibility.current.settings.largeTouchTargets) 64.dp else 56.dp
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -105,9 +100,9 @@ private fun ProfilePersonalizationSubView(
                 iconTint = MaterialTheme.colorScheme.primary,
                 title = "Modo escuro",
                 subtitle = if (isDarkTheme) {
-                    "Ativado · Carbon Deep"
+                    "Ativado · Escada tonal escura (${selectedAccent.displayName})"
                 } else {
-                    "Desativado · Modo claro (Warm Cream)"
+                    "Desativado · Escada tonal clara (${selectedAccent.displayName})"
                 },
                 onClick = onToggleTheme,
                 trailing = {
@@ -126,7 +121,7 @@ private fun ProfilePersonalizationSubView(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "COR DE DESTAQUE DO APP",
+                text = "COR DE DESTAQUE E PRÉ-VISUALIZAÇÃO",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -134,121 +129,11 @@ private fun ProfilePersonalizationSubView(
                     .padding(horizontal = 6.dp)
                     .semantics { heading() }
             )
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        text = "Personalize a cor principal dos botões, destaques da Agenda e do widget. Sua preferência fica salva automaticamente mesmo após fechar o app ou reiniciar o celular.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    val accentRows = remember { CampusAccentColor.entries.chunked(2) }
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        accentRows.forEach { rowAccents ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                rowAccents.forEach { accent ->
-                                    val isSelected = selectedAccent == accent
-                                    val swatchColor = parseHexColor(accent.previewHex)
-                                    Surface(
-                                        onClick = { onSelectAccent(accent) },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .heightIn(min = swatchMinHeight),
-                                        shape = RoundedCornerShape(18.dp),
-                                        color = if (isSelected) {
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                                        },
-                                        border = BorderStroke(
-                                            width = if (isSelected) 2.dp else 1.dp,
-                                            color = if (isSelected) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.outlineVariant
-                                            }
-                                        )
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 12.dp, vertical = 12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            Surface(
-                                                modifier = Modifier.size(34.dp),
-                                                shape = CircleShape,
-                                                color = swatchColor,
-                                                border = BorderStroke(
-                                                    width = if (isSelected) 2.dp else 1.dp,
-                                                    color = if (isSelected) {
-                                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
-                                                    } else {
-                                                        Color.Black.copy(alpha = 0.12f)
-                                                    }
-                                                )
-                                            ) {
-                                                if (isSelected) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Check,
-                                                            contentDescription = "Selecionada",
-                                                            tint = accessibleContentColorOn(swatchColor),
-                                                            modifier = Modifier.size(18.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = accent.displayName,
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                    color = if (isSelected) {
-                                                        MaterialTheme.colorScheme.onPrimaryContainer
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurface
-                                                    },
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = if (isSelected) "Ativa" else "Toque para aplicar",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = if (isSelected) {
-                                                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                                    },
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                if (rowAccents.size == 1) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            CampusAccentPalettePreviewAndGrid(
+                isDark = isDarkTheme,
+                selectedAccent = selectedAccent,
+                onSelectAccent = onSelectAccent
+            )
         }
     }
 }

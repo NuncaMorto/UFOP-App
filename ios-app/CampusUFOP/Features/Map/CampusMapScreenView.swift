@@ -10,6 +10,7 @@ public struct CampusMapScreenView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var isSearchResultsExpanded: Bool = false
+    @State private var isCreditsAlertPresented: Bool = false
 
     public init(bridge: CampusMapBridge) {
         self.bridge = bridge
@@ -18,7 +19,7 @@ public struct CampusMapScreenView: View {
     private var isRegular: Bool { horizontalSizeClass == .regular }
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
-    private var accentColor: Color { (appearance?.accentColor ?? .green).primary(for: colorScheme) }
+    private var accentColor: Color { (appearance?.accentColor ?? .red).primary(for: colorScheme) }
     private var bottomBarInset: CGFloat { isRegular ? 16 : 88 }
     private var leadingBarInset: CGFloat { isRegular ? 96 : 12 }
 
@@ -32,8 +33,14 @@ public struct CampusMapScreenView: View {
 
     public var body: some View {
         ZStack {
-            CampusMapCanvasView(bridge: bridge, showBuiltInHud: false)
-                .ignoresSafeArea()
+            CampusMapCanvasView(
+                bridge: bridge,
+                showBuiltInHud: false,
+                topHudInsetPt: 148,
+                bottomHudInsetPt: bottomBarInset + 48,
+                leadingHudInsetPt: isRegular ? leadingBarInset : 0
+            )
+            .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
                 topHud
@@ -157,16 +164,37 @@ public struct CampusMapScreenView: View {
             }
 
             if let attribution = bridge.renderBatch?.attribution, !attribution.isEmpty {
-                Text(attribution)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(CampusTheme.cardBackground(for: colorScheme, highContrast: hc).opacity(0.72))
-                    )
+                HStack {
+                    Spacer()
+                    Button {
+                        isCreditsAlertPresented = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("© OSM · UFOP")
+                                .font(CampusTheme.font(size: 10, weight: .semibold))
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(CampusTheme.cardBackground(for: colorScheme, highContrast: hc).opacity(0.88))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget(minTouch)
+                    .accessibilityLabel("Créditos cartográficos")
+                }
             }
+        }
+        .alert("Créditos Cartográficos", isPresented: $isCreditsAlertPresented) {
+            Button("Fechar", role: .cancel) {}
+        } message: {
+            Text(
+                "\(CampusMapPresentationHelpers.sanitizeAttribution(bridge.renderBatch?.attribution))\n\nMapa vetorial 100% offline. Layouts de salas são representações esquemáticas para orientação estudantil."
+            )
         }
     }
 }

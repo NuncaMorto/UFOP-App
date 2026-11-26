@@ -30,21 +30,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.EventBusy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,6 +59,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.AttendanceStatus
@@ -67,15 +69,18 @@ import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.map.isEadMapLocation
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.components.isEndTimeAfterStart
-import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
-import br.ufop.campus.ui.theme.DarkWeatherBadgeText
-import br.ufop.campus.ui.theme.LightWeatherBadgeBg
-import br.ufop.campus.ui.theme.LightWeatherBadgeText
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
+import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.parseHexColor
+import br.ufop.campus.ui.theme.tabularNums
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -160,7 +165,7 @@ fun ClassCheckInBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -170,7 +175,7 @@ fun ClassCheckInBottomSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 24.dp)
         ) {
-            // Header: Departamento + Título da disciplina + Botão fechar (>= 48.dp unclipped)
+            // Header: Departamento + Título da disciplina + Pílula discreta Editar + Botão fechar (>= 48.dp)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
@@ -201,21 +206,63 @@ fun ClassCheckInBottomSheet(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
-                Surface(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(minTouchTarget),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "Fechar",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
+                    if (!isEditing && detail.courseId.isNotBlank()) {
+                        Surface(
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .clip(RoundedCornerShape(CampusPillRadius))
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = "Editar dados da aula"
+                                ) {
+                                    onClearEditError()
+                                    isEditing = true
+                                },
+                            shape = RoundedCornerShape(CampusPillRadius),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = campusCardBorder()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = "Editar",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(minTouchTarget),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Fechar",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -418,12 +465,12 @@ fun ClassCheckInBottomSheet(
                     }
                 } else {
                     Column {
-                        // Metadados da aula: Data, Horário + Clima, Localização e Docente
+                        // Metadados da aula: Data, Horário tabular, Localização e Docente
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.55f else 0.7f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                            shape = RoundedCornerShape(CampusCardRadius),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = campusCardBorder()
                         ) {
                             Column(
                                 modifier = Modifier
@@ -438,30 +485,12 @@ fun ClassCheckInBottomSheet(
                                     fontWeight = FontWeight.SemiBold
                                 )
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${detail.startTime}–${detail.endTime}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = if (isDark) DarkWeatherBadgeBg else LightWeatherBadgeBg
-                                    ) {
-                                        Text(
-                                            text = "☀ ${detail.weatherTempC} °C · ${detail.weatherCondition}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = if (isDark) DarkWeatherBadgeText else LightWeatherBadgeText,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = "${detail.startTime}–${detail.endTime}",
+                                    style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Medium
+                                )
 
                                 HorizontalDivider(
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
@@ -567,59 +596,61 @@ fun ClassCheckInBottomSheet(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         val attendanceOptions = listOf(
-                            AttendanceStatus.ATTENDING to "Vou à aula",
-                            AttendanceStatus.ABSENT to "Vou faltar",
-                            AttendanceStatus.CANCELLED to "Aula cancelada"
+                            Triple(AttendanceStatus.ATTENDING, "Vou à aula", Icons.Rounded.CheckCircle to StatusAttendingGreen),
+                            Triple(AttendanceStatus.ABSENT, "Vou faltar", Icons.Rounded.Cancel to StatusAbsentRed),
+                            Triple(AttendanceStatus.CANCELLED, "Aula cancelada", Icons.Rounded.EventBusy to StatusCancelledAmber)
                         )
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            attendanceOptions.forEach { (statusOption, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            attendanceOptions.forEach { (statusOption, label, stylePair) ->
+                                val (statusIcon, semanticColor) = stylePair
                                 val selected = selectedStatus == statusOption
+                                val readableSemantic = accessibleTextColor(semanticColor, isDark)
                                 Surface(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .defaultMinSize(minHeight = minTouchTarget)
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .weight(1f)
+                                        .defaultMinSize(minHeight = if (a11y.largeTouchTargets) 88.dp else 78.dp)
+                                        .clip(RoundedCornerShape(20.dp))
                                         .selectable(
                                             selected = selected,
                                             onClick = { selectedStatus = statusOption },
                                             role = Role.RadioButton
                                         ),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(20.dp),
                                     color = if (selected) {
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.45f else 0.55f)
+                                        semanticColor.copy(alpha = if (isDark) 0.24f else 0.14f)
                                     } else {
-                                        MaterialTheme.colorScheme.surface
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
                                     },
-                                    border = BorderStroke(
-                                        width = if (selected) 1.5.dp else 1.dp,
-                                        color = if (selected) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.outline
-                                        }
-                                    )
+                                    border = if (selected) {
+                                        BorderStroke(1.5.dp, readableSemantic)
+                                    } else {
+                                        campusCardBorder()
+                                    }
                                 ) {
-                                    Row(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        RadioButton(
-                                            selected = selected,
-                                            onClick = null,
-                                            colors = RadioButtonDefaults.colors(
-                                                selectedColor = MaterialTheme.colorScheme.primary,
-                                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
+                                        Icon(
+                                            imageVector = statusIcon,
+                                            contentDescription = null,
+                                            tint = if (selected) readableSemantic else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(22.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(12.dp))
                                         Text(
                                             text = label,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (selected) readableSemantic else MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 2
                                         )
                                     }
                                 }
@@ -637,54 +668,24 @@ fun ClassCheckInBottomSheet(
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Dois botões Expressivos lado a lado: Editar (esquerda) e Concluído (direita)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Button(
+                            onClick = {
+                                onSave(detail.slotId, selectedStatus)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(minFieldHeight),
+                            shape = RoundedCornerShape(CampusPillRadius),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
-                            FilledTonalButton(
-                                onClick = {
-                                    onClearEditError()
-                                    isEditing = true
-                                },
-                                enabled = detail.courseId.isNotBlank(),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(50)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Edit,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Editar",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    onSave(detail.slotId, selectedStatus)
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(50),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                )
-                            ) {
-                                Text(
-                                    text = "Concluído",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                            Text(
+                                text = "Concluído",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }

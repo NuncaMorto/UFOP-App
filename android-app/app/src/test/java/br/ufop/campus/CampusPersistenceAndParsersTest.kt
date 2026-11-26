@@ -989,24 +989,24 @@ class CampusPersistenceAndParsersTest {
             CampusAccentColor.entries.map { it.storageKey }
         )
 
-        assertEquals("Verde", CampusAccentColor.GREEN.displayName)
-        assertEquals("#3B6939", CampusAccentColor.GREEN.previewHex)
-        assertEquals("Vermelho", CampusAccentColor.RED.displayName)
-        assertEquals("#B3261E", CampusAccentColor.RED.previewHex)
-        assertEquals("Laranja", CampusAccentColor.ORANGE.displayName)
-        assertEquals("#C75B00", CampusAccentColor.ORANGE.previewHex)
-        assertEquals("Roxo", CampusAccentColor.PURPLE.displayName)
-        assertEquals("#6B3FA0", CampusAccentColor.PURPLE.previewHex)
-        assertEquals("Amarelo", CampusAccentColor.YELLOW.displayName)
-        assertEquals("#B58500", CampusAccentColor.YELLOW.previewHex)
-        assertEquals("Ciano", CampusAccentColor.CYAN.displayName)
-        assertEquals("#00838F", CampusAccentColor.CYAN.previewHex)
-        assertEquals("Marrom", CampusAccentColor.BROWN.displayName)
-        assertEquals("#6D4C41", CampusAccentColor.BROWN.previewHex)
-        assertEquals("Rosa", CampusAccentColor.PINK.displayName)
-        assertEquals("#C2185B", CampusAccentColor.PINK.previewHex)
-        assertEquals("Azul", CampusAccentColor.BLUE.displayName)
-        assertEquals("#1D5BD6", CampusAccentColor.BLUE.previewHex)
+        assertEquals("Mata", CampusAccentColor.GREEN.displayName)
+        assertEquals("#216B4A", CampusAccentColor.GREEN.previewHex)
+        assertEquals("Vinho", CampusAccentColor.RED.displayName)
+        assertEquals("#8C1D35", CampusAccentColor.RED.previewHex)
+        assertEquals("Terracota", CampusAccentColor.ORANGE.displayName)
+        assertEquals("#B54717", CampusAccentColor.ORANGE.previewHex)
+        assertEquals("Ametista", CampusAccentColor.PURPLE.displayName)
+        assertEquals("#5F3DC4", CampusAccentColor.PURPLE.previewHex)
+        assertEquals("Ouro Velho", CampusAccentColor.YELLOW.displayName)
+        assertEquals("#9A680E", CampusAccentColor.YELLOW.previewHex)
+        assertEquals("Mineral", CampusAccentColor.CYAN.displayName)
+        assertEquals("#126E7B", CampusAccentColor.CYAN.previewHex)
+        assertEquals("Cacau", CampusAccentColor.BROWN.displayName)
+        assertEquals("#734A34", CampusAccentColor.BROWN.previewHex)
+        assertEquals("Rubi", CampusAccentColor.PINK.displayName)
+        assertEquals("#A62660", CampusAccentColor.PINK.previewHex)
+        assertEquals("Cobalto", CampusAccentColor.BLUE.displayName)
+        assertEquals("#2557B8", CampusAccentColor.BLUE.previewHex)
 
         assertEquals(CampusAccentColor.GREEN, CampusAccentColor.fromKey("GREEN"))
         assertEquals(CampusAccentColor.RED, CampusAccentColor.fromKey("red"))
@@ -1018,48 +1018,54 @@ class CampusPersistenceAndParsersTest {
         assertEquals(CampusAccentColor.PINK, CampusAccentColor.fromKey("  pInK "))
         assertEquals(CampusAccentColor.BLUE, CampusAccentColor.fromKey("blue"))
 
-        // Fallback to GREEN for null, blank, or invalid color keys
-        assertEquals(CampusAccentColor.GREEN, CampusAccentColor.fromKey(null))
-        assertEquals(CampusAccentColor.GREEN, CampusAccentColor.fromKey(""))
-        assertEquals(CampusAccentColor.GREEN, CampusAccentColor.fromKey("   "))
-        assertEquals(CampusAccentColor.GREEN, CampusAccentColor.fromKey("INVALID_COLOR"))
-        assertEquals(CampusAccentColor.GREEN, CampusAccentColor.fromKey("UNKNOWN_COLOR"))
+        // Fallback to RED (Vinho) for null, blank, or invalid color keys
+        assertEquals(CampusAccentColor.RED, CampusAccentColor.fromKey(null))
+        assertEquals(CampusAccentColor.RED, CampusAccentColor.fromKey(""))
+        assertEquals(CampusAccentColor.RED, CampusAccentColor.fromKey("   "))
+        assertEquals(CampusAccentColor.RED, CampusAccentColor.fromKey("INVALID_COLOR"))
+        assertEquals(CampusAccentColor.RED, CampusAccentColor.fromKey("UNKNOWN_COLOR"))
     }
 
     @Test
     fun pinkAndBluePalettes_satisfyWcagAaContrastAndAccessibleContentColorOn() {
         // PINK Light palette
+        val pinkLight = CampusAccentColor.PINK.palette(isDark = false)
         assertTrue(contrastRatio(LightOnPrimaryPink, LightPrimaryPink) >= 4.5)
-        assertTrue(contrastRatio(LightPrimaryPink, LightBackground) >= 4.5)
-        assertTrue(contrastRatio(LightPrimaryPink, LightSurface) >= 4.5)
+        assertTrue(contrastRatio(LightPrimaryPink, pinkLight.canvas) >= 4.5)
+        assertTrue(contrastRatio(LightPrimaryPink, pinkLight.surface1) >= 4.5)
         assertTrue(contrastRatio(LightOnPrimaryContainerPink, LightPrimaryContainerPink) >= 4.5)
 
         // PINK Dark palette
+        val pinkDark = CampusAccentColor.PINK.palette(isDark = true)
         assertTrue(contrastRatio(DarkOnPrimaryPink, DarkPrimaryPink) >= 4.5)
-        assertTrue(contrastRatio(DarkPrimaryPink, DarkBackground) >= 4.5)
-        assertTrue(contrastRatio(DarkPrimaryPink, DarkSurface) >= 4.5)
+        assertTrue(contrastRatio(DarkOnPrimaryContainerPink, pinkDark.canvas) >= 4.5)
+        assertTrue(contrastRatio(DarkOnPrimaryContainerPink, pinkDark.surface1) >= 4.5)
         assertTrue(contrastRatio(DarkOnPrimaryContainerPink, DarkPrimaryContainerPink) >= 4.5)
 
         // BLUE Light palette
+        val blueLight = CampusAccentColor.BLUE.palette(isDark = false)
         assertTrue(contrastRatio(LightOnPrimaryBlue, LightPrimaryBlue) >= 4.5)
-        assertTrue(contrastRatio(LightPrimaryBlue, LightBackground) >= 4.5)
-        assertTrue(contrastRatio(LightPrimaryBlue, LightSurface) >= 4.5)
+        assertTrue(contrastRatio(LightPrimaryBlue, blueLight.canvas) >= 4.5)
+        assertTrue(contrastRatio(LightPrimaryBlue, blueLight.surface1) >= 4.5)
         assertTrue(contrastRatio(LightOnPrimaryContainerBlue, LightPrimaryContainerBlue) >= 4.5)
 
         // BLUE Dark palette
+        val blueDark = CampusAccentColor.BLUE.palette(isDark = true)
         assertTrue(contrastRatio(DarkOnPrimaryBlue, DarkPrimaryBlue) >= 4.5)
-        assertTrue(contrastRatio(DarkPrimaryBlue, DarkBackground) >= 4.5)
-        assertTrue(contrastRatio(DarkPrimaryBlue, DarkSurface) >= 4.5)
+        assertTrue(contrastRatio(DarkOnPrimaryContainerBlue, blueDark.canvas) >= 4.5)
+        assertTrue(contrastRatio(DarkOnPrimaryContainerBlue, blueDark.surface1) >= 4.5)
         assertTrue(contrastRatio(DarkOnPrimaryContainerBlue, DarkPrimaryContainerBlue) >= 4.5)
 
-        // accessibleContentColorOn picks white on dark/vibrant backgrounds and dark charcoal on light backgrounds
+        // accessibleContentColorOn picks white on saturated primary surfaces and dark charcoal on soft highlights
         assertEquals(Color.White, accessibleContentColorOn(LightPrimaryPink))
         assertEquals(Color.White, accessibleContentColorOn(LightPrimaryBlue))
         assertEquals(Color.White, accessibleContentColorOn(StatusAbsentRed))
-        assertEquals(Color(0xFF111315), accessibleContentColorOn(LightPrimaryYellow))
+        assertEquals(Color.White, accessibleContentColorOn(LightPrimaryYellow))
+        assertEquals(Color.White, accessibleContentColorOn(DarkPrimaryPink))
+        assertEquals(Color.White, accessibleContentColorOn(DarkPrimaryBlue))
         assertEquals(Color(0xFF111315), accessibleContentColorOn(DarkPrimaryYellow))
-        assertEquals(Color(0xFF111315), accessibleContentColorOn(DarkPrimaryPink))
-        assertEquals(Color(0xFF111315), accessibleContentColorOn(DarkPrimaryBlue))
+        assertEquals(Color(0xFF111315), accessibleContentColorOn(DarkOnPrimaryContainerPink))
+        assertEquals(Color(0xFF111315), accessibleContentColorOn(DarkOnPrimaryContainerBlue))
     }
 
     // ── 12. Sprint 11/12: Accent color & theme persistence (encrypted disk + holder + bridge) ────
@@ -1071,7 +1077,7 @@ class CampusPersistenceAndParsersTest {
 
         val stateFile = File(tempFolder.root, "accent_color_state.json")
         val repo1 = InMemoryCampusRepository(stateFile = stateFile)
-        assertEquals("GREEN", repo1.getAccentColorPreference())
+        assertEquals("RED", repo1.getAccentColorPreference())
 
         val prefs = InMemorySharedPreferences()
         var widgetUpdates = 0
@@ -1161,9 +1167,9 @@ class CampusPersistenceAndParsersTest {
             CampusRepositoryHolder.loadSavedAccentColorFromPrefs(prefs, InMemoryCampusRepository(stateFile = stateFile))
         )
 
-        // Invalid value set via repository falls back to GREEN
+        // Invalid value set via repository falls back to RED
         bridge.setAccentColorPreference("INVALID_COLOR")
-        assertEquals("GREEN", InMemoryCampusRepository(stateFile = stateFile).getAccentColorPreference())
+        assertEquals("RED", InMemoryCampusRepository(stateFile = stateFile).getAccentColorPreference())
 
         // Dark theme save also uses synchronous commit() and notifies widget
         val darkPrefs = InMemorySharedPreferences()
@@ -1658,7 +1664,7 @@ class CampusPersistenceAndParsersTest {
         assertFalse(targetBridge.getStudentProfile().onboardingCompleted)
         assertEquals("", targetBridge.getStudentProfile().fullName)
         assertTrue(targetBridge.listDisciplines("2026.2", null).isEmpty())
-        assertEquals("GREEN", targetBridge.getAccentColorPreference())
+        assertEquals("RED", targetBridge.getAccentColorPreference())
         assertEquals(CampusAccessibilitySettings(), targetBridge.getAccessibilitySettings())
         assertFalse(targetBridge.isGuidedTourCompleted())
         assertEquals("", targetBridge.getLastSeenReleaseVersion())

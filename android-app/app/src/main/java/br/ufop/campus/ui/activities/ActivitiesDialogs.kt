@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,9 +53,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.CampusCoreRepository
@@ -65,11 +68,15 @@ import br.ufop.campus.ui.components.CampusDatePickerField
 import br.ufop.campus.ui.components.CampusTimePickerField
 import br.ufop.campus.ui.components.defaultTodayIsoDate
 import br.ufop.campus.ui.disciplines.normalizeAssessmentDateInput
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.parseHexColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -176,7 +183,7 @@ internal fun CreateAssessmentBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -239,28 +246,50 @@ internal fun CreateAssessmentBottomSheet(
                     val isSelected = course.courseId == selectedCourseId
                     val courseColor = parseHexColor(course.colorHex)
                     val accessibleCourseColor = accessibleTextColor(courseColor, isDark)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            selectedCourseId = course.courseId
-                            syllabusFeedbackMessage = null
+                    Surface(
+                        modifier = Modifier
+                            .defaultMinSize(minHeight = if (a11y.largeTouchTargets) minTouchTarget else 40.dp)
+                            .clip(RoundedCornerShape(CampusPillRadius))
+                            .clickable(role = Role.RadioButton) {
+                                selectedCourseId = course.courseId
+                                syllabusFeedbackMessage = null
+                            },
+                        shape = RoundedCornerShape(CampusPillRadius),
+                        color = if (isSelected) {
+                            courseColor.copy(alpha = if (isDark) 0.24f else 0.16f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
                         },
-                        modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
-                        leadingIcon = {
+                        border = if (isSelected || a11y.highContrastMode) {
+                            BorderStroke(
+                                width = if (a11y.highContrastMode) 1.5.dp else 1.dp,
+                                color = if (isSelected) accessibleCourseColor else MaterialTheme.colorScheme.outline
+                            )
+                        } else {
+                            null
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(8.dp)
                                     .clip(CircleShape)
                                     .background(courseColor)
                             )
-                        },
-                        label = { Text(course.name) },
-                        shape = RoundedCornerShape(22.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = courseColor.copy(alpha = 0.16f),
-                            selectedLabelColor = accessibleCourseColor
-                        )
-                    )
+                            Text(
+                                text = course.name,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) accessibleCourseColor else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
                 }
             }
 
@@ -412,62 +441,66 @@ private fun SyllabusPdfImportCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = campusCardBorder()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "Extração automática · $selectedCourseName",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Envie o Plano de Ensino em PDF do professor para importar automaticamente todas as datas de Provas, Trabalhos e Seminários.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            FilledTonalButton(
-                onClick = onPickPdfClick,
-                enabled = !isImportingSyllabus,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = minTouchTarget),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (isImportingSyllabus) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Outlined.PictureAsPdf,
+                    contentDescription = null,
+                    tint = accessibleTextColor(MaterialTheme.colorScheme.primary, isDark),
+                    modifier = Modifier.size(20.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Lendo Plano de Ensino...",
+                        text = "Plano de Ensino (PDF)",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.PictureAsPdf,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Importar datas do Plano de Ensino (PDF)",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
+                        text = "Importar datas de $selectedCourseName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                }
+                FilledTonalButton(
+                    onClick = onPickPdfClick,
+                    enabled = !isImportingSyllabus,
+                    modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
+                    shape = RoundedCornerShape(CampusPillRadius),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    if (isImportingSyllabus) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "Importar PDF",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
 

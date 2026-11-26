@@ -1,5 +1,6 @@
 package br.ufop.campus.ui.theme
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -11,25 +12,251 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+val CampusCardRadius = 24.dp
+val CampusGroupedRadius = 26.dp
+val CampusSheetRadius = 30.dp
+val CampusPillRadius = 999.dp
 
 enum class CampusAccentColor(
     val storageKey: String,
     val displayName: String,
     val previewHex: String
 ) {
-    GREEN("GREEN", "Verde", "#3B6939"),
-    RED("RED", "Vermelho", "#B3261E"),
-    ORANGE("ORANGE", "Laranja", "#C75B00"),
-    PURPLE("PURPLE", "Roxo", "#6B3FA0"),
-    YELLOW("YELLOW", "Amarelo", "#B58500"),
-    CYAN("CYAN", "Ciano", "#00838F"),
-    BROWN("BROWN", "Marrom", "#6D4C41"),
-    PINK("PINK", "Rosa", "#C2185B"),
-    BLUE("BLUE", "Azul", "#1D5BD6");
+    GREEN("GREEN", "Mata", "#216B4A"),
+    RED("RED", "Vinho", "#8C1D35"),
+    ORANGE("ORANGE", "Terracota", "#B54717"),
+    PURPLE("PURPLE", "Ametista", "#5F3DC4"),
+    YELLOW("YELLOW", "Ouro Velho", "#9A680E"),
+    CYAN("CYAN", "Mineral", "#126E7B"),
+    BROWN("BROWN", "Cacau", "#734A34"),
+    PINK("PINK", "Rubi", "#A62660"),
+    BLUE("BLUE", "Cobalto", "#2557B8");
+
+    fun palette(isDark: Boolean): CampusTonalPalette = when (this to isDark) {
+        GREEN to true -> CampusTonalPalette(
+            canvas = Color(0xFF101513),
+            surface1 = Color(0xFF1A2520),
+            surface2 = DarkSelectedPillBg,
+            primary = DarkPrimaryGreen,
+            onPrimary = Color.White,
+            highlight = DarkSelectedPillText,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF43594F),
+            outlineVariant = Color(0xFF2D3F36)
+        )
+        GREEN to false -> CampusTonalPalette(
+            canvas = Color(0xFFF3F9F6),
+            surface1 = Color.White,
+            surface2 = LightSelectedPillBg,
+            primary = LightPrimaryGreen,
+            onPrimary = Color.White,
+            highlight = LightSelectedPillText,
+            ink = LightSelectedPillText,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFA7C1B4),
+            outlineVariant = Color(0xFFD0E2D8)
+        )
+        RED to true -> CampusTonalPalette(
+            canvas = DarkBackground,
+            surface1 = DarkSurface,
+            surface2 = DarkPrimaryContainerRed,
+            primary = DarkPrimaryRed,
+            onPrimary = Color.White,
+            highlight = DarkOnPrimaryContainerRed,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = DarkOutline,
+            outlineVariant = DarkCardBorder
+        )
+        RED to false -> CampusTonalPalette(
+            canvas = LightBackground,
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerRed,
+            primary = LightPrimaryRed,
+            onPrimary = Color.White,
+            highlight = LightOnPrimaryContainerRed,
+            ink = LightOnPrimaryContainerRed,
+            onSurfaceVariant = LightTextSecondary,
+            outline = LightOutline,
+            outlineVariant = LightCardBorder
+        )
+        ORANGE to true -> CampusTonalPalette(
+            canvas = Color(0xFF161210),
+            surface1 = Color(0xFF261E19),
+            surface2 = DarkPrimaryContainerOrange,
+            primary = DarkPrimaryOrange,
+            onPrimary = Color.White,
+            highlight = DarkOnPrimaryContainerOrange,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF614D41),
+            outlineVariant = Color(0xFF45362D)
+        )
+        ORANGE to false -> CampusTonalPalette(
+            canvas = Color(0xFFFBF6F3),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerOrange,
+            primary = LightPrimaryOrange,
+            onPrimary = Color.White,
+            highlight = LightOnPrimaryContainerOrange,
+            ink = LightOnPrimaryContainerOrange,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFD4BAAB),
+            outlineVariant = Color(0xFFEBD9CE)
+        )
+        PURPLE to true -> CampusTonalPalette(
+            canvas = Color(0xFF131117),
+            surface1 = Color(0xFF201C29),
+            surface2 = DarkPrimaryContainerPurple,
+            primary = DarkPrimaryPurple,
+            onPrimary = Color.White,
+            highlight = DarkOnPrimaryContainerPurple,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF53486B),
+            outlineVariant = Color(0xFF3A324D)
+        )
+        PURPLE to false -> CampusTonalPalette(
+            canvas = Color(0xFFF7F5FC),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerPurple,
+            primary = LightPrimaryPurple,
+            onPrimary = Color.White,
+            highlight = LightOnPrimaryContainerPurple,
+            ink = LightOnPrimaryContainerPurple,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFC1B6DD),
+            outlineVariant = Color(0xFFDED6F0)
+        )
+        YELLOW to true -> CampusTonalPalette(
+            canvas = Color(0xFF15130F),
+            surface1 = Color(0xFF242017),
+            surface2 = DarkPrimaryContainerYellow,
+            primary = DarkPrimaryYellow,
+            onPrimary = DarkOnPrimaryYellow,
+            highlight = DarkOnPrimaryContainerYellow,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF5D533C),
+            outlineVariant = Color(0xFF423A2A)
+        )
+        YELLOW to false -> CampusTonalPalette(
+            canvas = Color(0xFFFAF7F0),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerYellow,
+            primary = LightPrimaryYellow,
+            onPrimary = LightOnPrimaryYellow,
+            highlight = LightOnPrimaryContainerYellow,
+            ink = LightOnPrimaryContainerYellow,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFCFC0A0),
+            outlineVariant = Color(0xFFE7DEC6)
+        )
+        CYAN to true -> CampusTonalPalette(
+            canvas = Color(0xFF101517),
+            surface1 = Color(0xFF192428),
+            surface2 = DarkPrimaryContainerCyan,
+            primary = DarkPrimaryCyan,
+            onPrimary = DarkOnPrimaryCyan,
+            highlight = DarkOnPrimaryContainerCyan,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF3F5963),
+            outlineVariant = Color(0xFF2C4047)
+        )
+        CYAN to false -> CampusTonalPalette(
+            canvas = Color(0xFFF2F9FA),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerCyan,
+            primary = LightPrimaryCyan,
+            onPrimary = LightOnPrimaryCyan,
+            highlight = LightOnPrimaryContainerCyan,
+            ink = LightOnPrimaryContainerCyan,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFA7C7CD),
+            outlineVariant = Color(0xFFCDE2E6)
+        )
+        BROWN to true -> CampusTonalPalette(
+            canvas = Color(0xFF151210),
+            surface1 = Color(0xFF241E1B),
+            surface2 = DarkPrimaryContainerBrown,
+            primary = DarkPrimaryBrown,
+            onPrimary = DarkOnPrimaryBrown,
+            highlight = DarkOnPrimaryContainerBrown,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF5C4E46),
+            outlineVariant = Color(0xFF423832)
+        )
+        BROWN to false -> CampusTonalPalette(
+            canvas = Color(0xFFFAF6F3),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerBrown,
+            primary = LightPrimaryBrown,
+            onPrimary = LightOnPrimaryBrown,
+            highlight = LightOnPrimaryContainerBrown,
+            ink = LightOnPrimaryContainerBrown,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFCBBBAE),
+            outlineVariant = Color(0xFFE5DAD2)
+        )
+        PINK to true -> CampusTonalPalette(
+            canvas = Color(0xFF161114),
+            surface1 = Color(0xFF261B21),
+            surface2 = DarkPrimaryContainerPink,
+            primary = DarkPrimaryPink,
+            onPrimary = DarkOnPrimaryPink,
+            highlight = DarkOnPrimaryContainerPink,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF614353),
+            outlineVariant = Color(0xFF452F3B)
+        )
+        PINK to false -> CampusTonalPalette(
+            canvas = Color(0xFFFCF4F8),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerPink,
+            primary = LightPrimaryPink,
+            onPrimary = LightOnPrimaryPink,
+            highlight = LightOnPrimaryContainerPink,
+            ink = LightOnPrimaryContainerPink,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFD6B4C4),
+            outlineVariant = Color(0xFFECD5E0)
+        )
+        BLUE to true -> CampusTonalPalette(
+            canvas = Color(0xFF101318),
+            surface1 = Color(0xFF1A212D),
+            surface2 = DarkPrimaryContainerBlue,
+            primary = DarkPrimaryBlue,
+            onPrimary = DarkOnPrimaryBlue,
+            highlight = DarkOnPrimaryContainerBlue,
+            ink = DarkTextPrimary,
+            onSurfaceVariant = DarkTextSecondary,
+            outline = Color(0xFF435370),
+            outlineVariant = Color(0xFF2E3A4F)
+        )
+        else -> CampusTonalPalette(
+            canvas = Color(0xFFF3F7FC),
+            surface1 = Color.White,
+            surface2 = LightPrimaryContainerBlue,
+            primary = LightPrimaryBlue,
+            onPrimary = LightOnPrimaryBlue,
+            highlight = LightOnPrimaryContainerBlue,
+            ink = LightOnPrimaryContainerBlue,
+            onSurfaceVariant = LightTextSecondary,
+            outline = Color(0xFFAEBEE0),
+            outlineVariant = Color(0xFFD2DFF2)
+        )
+    }
 
     companion object {
         fun fromKey(raw: String?): CampusAccentColor =
-            entries.firstOrNull { it.storageKey.equals(raw?.trim(), ignoreCase = true) } ?: GREEN
+            entries.firstOrNull { it.storageKey.equals(raw?.trim(), ignoreCase = true) } ?: RED
     }
 }
 
@@ -55,244 +282,113 @@ val LocalCampusAccessibility = staticCompositionLocalOf { CampusAccessibilityCon
 data class CampusThemeController(
     val isDark: Boolean = false,
     val toggleTheme: () -> Unit = {},
-    val accentColor: CampusAccentColor = CampusAccentColor.GREEN,
+    val accentColor: CampusAccentColor = CampusAccentColor.RED,
     val selectAccentColor: (CampusAccentColor) -> Unit = {}
 )
 
 val LocalCampusThemeController = staticCompositionLocalOf { CampusThemeController() }
 
-private fun buildLightColorScheme(
-    primary: Color,
-    onPrimary: Color = LightOnPrimary,
-    primaryContainer: Color,
-    onPrimaryContainer: Color,
-    inversePrimary: Color,
-    highContrast: Boolean = false
-): ColorScheme = lightColorScheme(
-    primary = primary,
-    onPrimary = onPrimary,
-    primaryContainer = primaryContainer,
-    onPrimaryContainer = onPrimaryContainer,
-    inversePrimary = inversePrimary,
-    secondary = primary,
-    onSecondary = onPrimary,
-    secondaryContainer = primaryContainer,
-    onSecondaryContainer = onPrimaryContainer,
-    tertiary = DepartmentCompPurple,
-    onTertiary = LightOnPrimary,
-    background = if (highContrast) HighContrastLightBackground else LightBackground,
-    onBackground = if (highContrast) HighContrastLightTextPrimary else LightTextPrimary,
-    surface = if (highContrast) HighContrastLightSurface else LightSurface,
-    onSurface = if (highContrast) HighContrastLightTextPrimary else LightTextPrimary,
-    surfaceVariant = if (highContrast) HighContrastLightSurfaceVariant else LightSurfaceVariant,
-    onSurfaceVariant = if (highContrast) HighContrastLightTextSecondary else LightTextSecondary,
-    surfaceTint = primary,
-    surfaceContainerLowest = if (highContrast) HighContrastLightSurface else LightSurfaceContainerLowest,
-    surfaceContainerLow = if (highContrast) HighContrastLightSurface else LightSurfaceContainerLow,
-    surfaceContainer = if (highContrast) HighContrastLightSurface else LightSurfaceContainer,
-    surfaceContainerHigh = if (highContrast) HighContrastLightSurfaceVariant else LightSurfaceContainerHigh,
-    surfaceContainerHighest = if (highContrast) HighContrastLightSurfaceVariant else LightSurfaceContainerHighest,
-    outline = if (highContrast) HighContrastLightOutline else LightOutline,
-    outlineVariant = if (highContrast) HighContrastLightOutlineVariant else LightCardBorder
-)
+/**
+ * Retorna borda apenas quando `highContrastMode == true` (WCAG AAA);
+ * no modo padrão privilegia degraus tonais (`Canvas -> Surface 1 -> Surface 2`).
+ */
+@Composable
+fun campusCardBorder(strokeWidth: Dp = 1.5.dp): BorderStroke? {
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
+    return if (highContrast) BorderStroke(strokeWidth, MaterialTheme.colorScheme.outline) else null
+}
 
-private fun buildDarkColorScheme(
-    primary: Color,
-    onPrimary: Color = DarkOnPrimary,
-    primaryContainer: Color,
-    onPrimaryContainer: Color,
-    inversePrimary: Color,
-    highContrast: Boolean = false
-): ColorScheme = darkColorScheme(
-    primary = primary,
-    onPrimary = onPrimary,
-    primaryContainer = primaryContainer,
-    onPrimaryContainer = onPrimaryContainer,
-    inversePrimary = inversePrimary,
-    secondary = primary,
-    onSecondary = onPrimary,
-    secondaryContainer = primaryContainer,
-    onSecondaryContainer = onPrimaryContainer,
-    tertiary = DepartmentCompPurple,
-    onTertiary = DarkOnPrimary,
-    background = if (highContrast) HighContrastDarkBackground else DarkBackground,
-    onBackground = if (highContrast) HighContrastDarkTextPrimary else DarkTextPrimary,
-    surface = if (highContrast) HighContrastDarkSurface else DarkSurface,
-    onSurface = if (highContrast) HighContrastDarkTextPrimary else DarkTextPrimary,
-    surfaceVariant = if (highContrast) HighContrastDarkSurfaceVariant else DarkSurfaceVariant,
-    onSurfaceVariant = if (highContrast) HighContrastDarkTextSecondary else DarkTextSecondary,
-    surfaceTint = primary,
-    surfaceContainerLowest = if (highContrast) HighContrastDarkBackground else DarkSurfaceContainerLowest,
-    surfaceContainerLow = if (highContrast) HighContrastDarkBackground else DarkSurfaceContainerLow,
-    surfaceContainer = if (highContrast) HighContrastDarkSurface else DarkSurfaceContainer,
-    surfaceContainerHigh = if (highContrast) HighContrastDarkSurfaceVariant else DarkSurfaceContainerHigh,
-    surfaceContainerHighest = if (highContrast) HighContrastDarkSurfaceVariant else DarkSurfaceContainerHighest,
-    outline = if (highContrast) HighContrastDarkOutline else DarkOutline,
-    outlineVariant = if (highContrast) HighContrastDarkOutlineVariant else DarkCardBorder
-)
+/**
+ * Elevação tonal sutil no Modo Claro (`1.dp`) sobre o Canvas pastel.
+ */
+@Composable
+fun campusCardElevation(lightElevation: Dp = 1.dp): Dp {
+    val isDark = LocalCampusThemeController.current.isDark
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
+    return if (!isDark && !highContrast) lightElevation else 0.dp
+}
+
+/**
+ * Cor de destaque segura para texto/ícones pequenos sobre Surface 1 / Canvas.
+ */
+@Composable
+fun campusAccentTextColor(): Color {
+    val controller = LocalCampusThemeController.current
+    val palette = controller.accentColor.palette(controller.isDark)
+    return if (controller.isDark) palette.highlight else palette.primary
+}
 
 private fun campusColorSchemeFor(
     darkTheme: Boolean,
     accentColor: CampusAccentColor,
     highContrast: Boolean = false
 ): ColorScheme {
+    val pal = accentColor.palette(darkTheme)
+    val inverse = accentColor.palette(!darkTheme).primary
+
     return if (darkTheme) {
-        when (accentColor) {
-            CampusAccentColor.GREEN -> buildDarkColorScheme(
-                primary = DarkPrimaryGreen,
-                onPrimary = DarkOnPrimary,
-                primaryContainer = DarkSelectedPillBg,
-                onPrimaryContainer = DarkSelectedPillText,
-                inversePrimary = DarkInversePrimaryGreen,
-                highContrast = highContrast
-            )
-            CampusAccentColor.RED -> buildDarkColorScheme(
-                primary = DarkPrimaryRed,
-                onPrimary = DarkOnPrimary,
-                primaryContainer = DarkPrimaryContainerRed,
-                onPrimaryContainer = DarkOnPrimaryContainerRed,
-                inversePrimary = DarkInversePrimaryRed,
-                highContrast = highContrast
-            )
-            CampusAccentColor.ORANGE -> buildDarkColorScheme(
-                primary = DarkPrimaryOrange,
-                onPrimary = DarkOnPrimary,
-                primaryContainer = DarkPrimaryContainerOrange,
-                onPrimaryContainer = DarkOnPrimaryContainerOrange,
-                inversePrimary = DarkInversePrimaryOrange,
-                highContrast = highContrast
-            )
-            CampusAccentColor.PURPLE -> buildDarkColorScheme(
-                primary = DarkPrimaryPurple,
-                onPrimary = DarkOnPrimary,
-                primaryContainer = DarkPrimaryContainerPurple,
-                onPrimaryContainer = DarkOnPrimaryContainerPurple,
-                inversePrimary = DarkInversePrimaryPurple,
-                highContrast = highContrast
-            )
-            CampusAccentColor.YELLOW -> buildDarkColorScheme(
-                primary = DarkPrimaryYellow,
-                onPrimary = DarkOnPrimaryYellow,
-                primaryContainer = DarkPrimaryContainerYellow,
-                onPrimaryContainer = DarkOnPrimaryContainerYellow,
-                inversePrimary = DarkInversePrimaryYellow,
-                highContrast = highContrast
-            )
-            CampusAccentColor.CYAN -> buildDarkColorScheme(
-                primary = DarkPrimaryCyan,
-                onPrimary = DarkOnPrimaryCyan,
-                primaryContainer = DarkPrimaryContainerCyan,
-                onPrimaryContainer = DarkOnPrimaryContainerCyan,
-                inversePrimary = DarkInversePrimaryCyan,
-                highContrast = highContrast
-            )
-            CampusAccentColor.BROWN -> buildDarkColorScheme(
-                primary = DarkPrimaryBrown,
-                onPrimary = DarkOnPrimaryBrown,
-                primaryContainer = DarkPrimaryContainerBrown,
-                onPrimaryContainer = DarkOnPrimaryContainerBrown,
-                inversePrimary = DarkInversePrimaryBrown,
-                highContrast = highContrast
-            )
-            CampusAccentColor.PINK -> buildDarkColorScheme(
-                primary = DarkPrimaryPink,
-                onPrimary = DarkOnPrimaryPink,
-                primaryContainer = DarkPrimaryContainerPink,
-                onPrimaryContainer = DarkOnPrimaryContainerPink,
-                inversePrimary = DarkInversePrimaryPink,
-                highContrast = highContrast
-            )
-            CampusAccentColor.BLUE -> buildDarkColorScheme(
-                primary = DarkPrimaryBlue,
-                onPrimary = DarkOnPrimaryBlue,
-                primaryContainer = DarkPrimaryContainerBlue,
-                onPrimaryContainer = DarkOnPrimaryContainerBlue,
-                inversePrimary = DarkInversePrimaryBlue,
-                highContrast = highContrast
-            )
-        }
+        darkColorScheme(
+            primary = pal.primary,
+            onPrimary = pal.onPrimary,
+            primaryContainer = pal.surface2,
+            onPrimaryContainer = pal.highlight,
+            inversePrimary = inverse,
+            secondary = pal.primary,
+            onSecondary = pal.onPrimary,
+            secondaryContainer = pal.surface2,
+            onSecondaryContainer = pal.highlight,
+            tertiary = DepartmentCompPurple,
+            onTertiary = Color.White,
+            background = if (highContrast) HighContrastDarkBackground else pal.canvas,
+            onBackground = if (highContrast) HighContrastDarkTextPrimary else pal.ink,
+            surface = if (highContrast) HighContrastDarkSurface else pal.surface1,
+            onSurface = if (highContrast) HighContrastDarkTextPrimary else pal.ink,
+            surfaceVariant = if (highContrast) HighContrastDarkSurfaceVariant else pal.surface2,
+            onSurfaceVariant = if (highContrast) HighContrastDarkTextSecondary else pal.onSurfaceVariant,
+            surfaceTint = Color.Transparent,
+            surfaceContainerLowest = if (highContrast) HighContrastDarkBackground else pal.canvas,
+            surfaceContainerLow = if (highContrast) HighContrastDarkBackground else pal.surface1,
+            surfaceContainer = if (highContrast) HighContrastDarkSurface else pal.surface1,
+            surfaceContainerHigh = if (highContrast) HighContrastDarkSurfaceVariant else pal.surface2,
+            surfaceContainerHighest = if (highContrast) HighContrastDarkSurfaceVariant else pal.surface2,
+            outline = if (highContrast) HighContrastDarkOutline else pal.outline,
+            outlineVariant = if (highContrast) HighContrastDarkOutlineVariant else pal.outlineVariant
+        )
     } else {
-        when (accentColor) {
-            CampusAccentColor.GREEN -> buildLightColorScheme(
-                primary = LightPrimaryGreen,
-                onPrimary = LightOnPrimary,
-                primaryContainer = LightSelectedPillBg,
-                onPrimaryContainer = LightSelectedPillText,
-                inversePrimary = LightInversePrimaryGreen,
-                highContrast = highContrast
-            )
-            CampusAccentColor.RED -> buildLightColorScheme(
-                primary = LightPrimaryRed,
-                onPrimary = LightOnPrimary,
-                primaryContainer = LightPrimaryContainerRed,
-                onPrimaryContainer = LightOnPrimaryContainerRed,
-                inversePrimary = LightInversePrimaryRed,
-                highContrast = highContrast
-            )
-            CampusAccentColor.ORANGE -> buildLightColorScheme(
-                primary = LightPrimaryOrange,
-                onPrimary = LightOnPrimary,
-                primaryContainer = LightPrimaryContainerOrange,
-                onPrimaryContainer = LightOnPrimaryContainerOrange,
-                inversePrimary = LightInversePrimaryOrange,
-                highContrast = highContrast
-            )
-            CampusAccentColor.PURPLE -> buildLightColorScheme(
-                primary = LightPrimaryPurple,
-                onPrimary = LightOnPrimary,
-                primaryContainer = LightPrimaryContainerPurple,
-                onPrimaryContainer = LightOnPrimaryContainerPurple,
-                inversePrimary = LightInversePrimaryPurple,
-                highContrast = highContrast
-            )
-            CampusAccentColor.YELLOW -> buildLightColorScheme(
-                primary = LightPrimaryYellow,
-                onPrimary = LightOnPrimaryYellow,
-                primaryContainer = LightPrimaryContainerYellow,
-                onPrimaryContainer = LightOnPrimaryContainerYellow,
-                inversePrimary = LightInversePrimaryYellow,
-                highContrast = highContrast
-            )
-            CampusAccentColor.CYAN -> buildLightColorScheme(
-                primary = LightPrimaryCyan,
-                onPrimary = LightOnPrimaryCyan,
-                primaryContainer = LightPrimaryContainerCyan,
-                onPrimaryContainer = LightOnPrimaryContainerCyan,
-                inversePrimary = LightInversePrimaryCyan,
-                highContrast = highContrast
-            )
-            CampusAccentColor.BROWN -> buildLightColorScheme(
-                primary = LightPrimaryBrown,
-                onPrimary = LightOnPrimaryBrown,
-                primaryContainer = LightPrimaryContainerBrown,
-                onPrimaryContainer = LightOnPrimaryContainerBrown,
-                inversePrimary = LightInversePrimaryBrown,
-                highContrast = highContrast
-            )
-            CampusAccentColor.PINK -> buildLightColorScheme(
-                primary = LightPrimaryPink,
-                onPrimary = LightOnPrimaryPink,
-                primaryContainer = LightPrimaryContainerPink,
-                onPrimaryContainer = LightOnPrimaryContainerPink,
-                inversePrimary = LightInversePrimaryPink,
-                highContrast = highContrast
-            )
-            CampusAccentColor.BLUE -> buildLightColorScheme(
-                primary = LightPrimaryBlue,
-                onPrimary = LightOnPrimaryBlue,
-                primaryContainer = LightPrimaryContainerBlue,
-                onPrimaryContainer = LightOnPrimaryContainerBlue,
-                inversePrimary = LightInversePrimaryBlue,
-                highContrast = highContrast
-            )
-        }
+        lightColorScheme(
+            primary = pal.primary,
+            onPrimary = pal.onPrimary,
+            primaryContainer = pal.surface2,
+            onPrimaryContainer = pal.ink,
+            inversePrimary = inverse,
+            secondary = pal.primary,
+            onSecondary = pal.onPrimary,
+            secondaryContainer = pal.surface2,
+            onSecondaryContainer = pal.ink,
+            tertiary = DepartmentCompPurple,
+            onTertiary = Color.White,
+            background = if (highContrast) HighContrastLightBackground else pal.canvas,
+            onBackground = if (highContrast) HighContrastLightTextPrimary else pal.ink,
+            surface = if (highContrast) HighContrastLightSurface else pal.surface1,
+            onSurface = if (highContrast) HighContrastLightTextPrimary else pal.ink,
+            surfaceVariant = if (highContrast) HighContrastLightSurfaceVariant else pal.surface2,
+            onSurfaceVariant = if (highContrast) HighContrastLightTextSecondary else pal.onSurfaceVariant,
+            surfaceTint = Color.Transparent,
+            surfaceContainerLowest = if (highContrast) HighContrastLightSurface else pal.surface1,
+            surfaceContainerLow = if (highContrast) HighContrastLightSurface else pal.canvas,
+            surfaceContainer = if (highContrast) HighContrastLightSurface else pal.surface1,
+            surfaceContainerHigh = if (highContrast) HighContrastLightSurfaceVariant else pal.surface2,
+            surfaceContainerHighest = if (highContrast) HighContrastLightSurfaceVariant else pal.surface2,
+            outline = if (highContrast) HighContrastLightOutline else pal.outline,
+            outlineVariant = if (highContrast) HighContrastLightOutlineVariant else pal.outlineVariant
+        )
     }
 }
 
 @Composable
 fun CampusTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    accentColor: CampusAccentColor = CampusAccentColor.GREEN,
+    accentColor: CampusAccentColor = CampusAccentColor.RED,
     accessibility: CampusAccessibilitySettings = CampusAccessibilitySettings(),
     onToggleDarkTheme: () -> Unit = {},
     onSelectAccentColor: (CampusAccentColor) -> Unit = {},

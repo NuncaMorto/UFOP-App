@@ -18,7 +18,10 @@ targets:
           - "Resources/Info.plist"
           - "Resources/Assets.xcassets/**"
           - "Resources/Data/**"
+          - "Resources/Fonts/**"
       - path: CampusUFOP/Resources/Assets.xcassets
+        buildPhase: resources
+      - path: CampusUFOP/Resources/Fonts
         buildPhase: resources
       - path: CampusUFOP/Resources/Data
         optional: true
@@ -27,8 +30,8 @@ targets:
       base:
         PRODUCT_NAME: VidaAcademica
         PRODUCT_BUNDLE_IDENTIFIER: io.github.nuncamorto.vidaacademica
-        MARKETING_VERSION: "1.9.18"
-        CURRENT_PROJECT_VERSION: "35"
+        MARKETING_VERSION: "1.9.19"
+        CURRENT_PROJECT_VERSION: "36"
         SWIFT_VERSION: "5.9"
         SWIFT_STRICT_CONCURRENCY: minimal
         INFOPLIST_FILE: CampusUFOP/Resources/Info.plist

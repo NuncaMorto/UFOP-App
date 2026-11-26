@@ -217,7 +217,7 @@ public struct DynamicCurriculumGridView: View {
 
 #Preview("DynamicCurriculumGridView - Light") {
     ZStack {
-        LiquidGlassBackdrop(accent: .green, highContrast: false)
+        LiquidGlassBackdrop(accent: .red, highContrast: false)
         DynamicCurriculumGridView(store: CampusStore())
     }
     .environment(CampusAppearanceController())
@@ -226,7 +226,7 @@ public struct DynamicCurriculumGridView: View {
 
 #Preview("DynamicCurriculumGridView - Dark") {
     ZStack {
-        LiquidGlassBackdrop(accent: .green, highContrast: false)
+        LiquidGlassBackdrop(accent: .red, highContrast: false)
         DynamicCurriculumGridView(store: CampusStore())
     }
     .environment(CampusAppearanceController())

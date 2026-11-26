@@ -180,8 +180,8 @@ private struct DisciplineAssessmentRow: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(.system(size: 15, weight: .semibold))
+                Text(formatAcademicAssessmentTitle(item.title))
+                    .font(CampusTheme.font(size: 15, weight: .semibold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     .strikethrough(item.completed, color: CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
 

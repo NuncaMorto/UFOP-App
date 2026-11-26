@@ -28,7 +28,7 @@ public struct ClassCheckInSheetView: View {
 
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
-    private var accentColorObj: CampusAccentColor { appearance?.accentColor ?? .green }
+    private var accentColorObj: CampusAccentColor { appearance?.accentColor ?? .red }
 
     public var body: some View {
         ZStack {
@@ -122,24 +122,10 @@ public struct ClassCheckInSheetView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Label(detail.timeRange, systemImage: "clock.fill")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 14, weight: .semibold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Spacer()
-
-                HStack(spacing: 5) {
-                    Text("☀️")
-                        .font(.system(size: 13))
-                    Text(detail.weatherLabel)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.weatherBadgeBackground(for: colorScheme))
-                )
             }
 
             Divider()
@@ -259,15 +245,15 @@ public struct ClassCheckInSheetView: View {
         }
     }
 
-    // MARK: - 3 Vertically Stacked Wide Pill Buttons
+    // MARK: - 3 Semantic Horizontal Presence Cards
 
     private var verticalStatusPillsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Como será sua presença hoje?")
-                .font(.system(size: 13, weight: .semibold))
+                .font(CampusTheme.font(size: 13, weight: .semibold))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
-            VStack(spacing: 10) {
+            HStack(spacing: 8) {
                 ForEach(AttendanceStatus.allCases) { status in
                     statusPillButton(for: status)
                 }
@@ -278,42 +264,52 @@ public struct ClassCheckInSheetView: View {
     private func statusPillButton(for status: AttendanceStatus) -> some View {
         let isSelected = selectedStatus == status
 
-        let activeColor: Color = {
+        let semanticColor: Color = {
             switch status {
             case .attending:
-                return accentColorObj.primary(for: colorScheme)
+                return colorScheme == .dark ? Color(hex: 0x34D399) : Color(hex: 0x166534)
             case .absent:
-                return Color(hex: 0xDC2626)
+                return colorScheme == .dark ? Color(hex: 0xFB7185) : Color(hex: 0xBE123C)
             case .cancelled:
-                return colorScheme == .dark ? Color(hex: 0x475569) : Color(hex: 0x1E293B)
+                return colorScheme == .dark ? Color(hex: 0xFBBF24) : Color(hex: 0xB45309)
             }
         }()
+
+        let fillColor: Color = isSelected
+            ? semanticColor.opacity(colorScheme == .dark ? 0.22 : 0.14)
+            : accentColorObj.surface2(for: colorScheme)
+
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
         return Button {
             withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
                 selectedStatus = status
             }
         } label: {
-            HStack(spacing: 12) {
+            VStack(spacing: 6) {
                 Image(systemName: status.systemImage)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isSelected ? semanticColor : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                 Text(status.buttonTitle)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
-                }
+                    .font(CampusTheme.font(size: 12, weight: isSelected ? .bold : .medium))
+                    .foregroundStyle(isSelected ? semanticColor : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
-            .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, minHeight: max(52, minTouch))
-            .liquidGlassCapsule(selected: isSelected, accent: activeColor, interactive: true, highContrast: hc)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: max(78, minTouch + 24))
+            .background(shape.fill(fillColor))
+            .overlay(
+                shape.strokeBorder(
+                    isSelected ? semanticColor : (hc ? CampusTheme.cardBorder(for: colorScheme, highContrast: true) : .clear),
+                    lineWidth: isSelected ? 1.5 : (hc ? 1.5 : 0)
+                )
+            )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     // MARK: - Footnote

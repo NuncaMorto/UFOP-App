@@ -11,8 +11,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -47,6 +50,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.DayPillItem
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.tabularNums
 
 @Composable
 internal fun MonthAndWeekSelectorRow(
@@ -133,13 +139,13 @@ internal fun MonthAndWeekSelectorRow(
             }
 
             Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                shape = RoundedCornerShape(CampusPillRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder()
             ) {
                 Text(
                     text = "SEMANA $weekNumber",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.tabularNums(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -214,6 +220,7 @@ internal fun WeekDayPillsRow(
     selectedIsoDate: String,
     isDark: Boolean,
     largeTouchTargets: Boolean,
+    daysWithEvents: Set<String> = emptySet(),
     onSelectDay: (String) -> Unit
 ) {
     Row(
@@ -222,10 +229,11 @@ internal fun WeekDayPillsRow(
     ) {
         days.forEach { day ->
             val isSelected = day.isoDate == selectedIsoDate
+            val hasEvents = day.isoDate in daysWithEvents
             val containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surface
+                Color.Transparent
             }
             val contentColor = if (isSelected) {
                 MaterialTheme.colorScheme.onPrimaryContainer
@@ -248,19 +256,13 @@ internal fun WeekDayPillsRow(
                         selected = isSelected
                         role = Role.Tab
                         contentDescription = "$fullDayName, dia ${day.dayNumber}" +
+                            (if (hasEvents) ", com atividades" else "") +
                             if (isSelected) ", selecionado" else ""
                     }
                     .clickable { onSelectDay(day.isoDate) },
                 shape = RoundedCornerShape(20.dp),
                 color = containerColor,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    }
-                )
+                border = campusCardBorder(if (isSelected) 1.5.dp else 1.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp),
@@ -271,18 +273,31 @@ internal fun WeekDayPillsRow(
                         text = day.dayShort,
                         style = MaterialTheme.typography.labelSmall,
                         color = secondaryTextColor,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,
                         softWrap = false
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = day.dayNumber.toString(),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.tabularNums(),
                         color = contentColor,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         softWrap = false
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when {
+                                    isSelected -> MaterialTheme.colorScheme.primary
+                                    hasEvents -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                                    else -> Color.Transparent
+                                }
+                            )
                     )
                 }
             }

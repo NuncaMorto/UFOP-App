@@ -2,6 +2,49 @@ use super::overlay::LoadedFeature;
 use super::resolver::normalize_lookup_key;
 use super::types::{MapLayer, PoiType, SearchResult};
 
+fn category_pt_aliases(raw_cat: &str) -> &'static [&'static str] {
+    match raw_cat {
+        "classroom" => &["SALA", "SALA DE AULA", "SALAS", "AULA"],
+        "lab" | "laboratory" => &["LABORATORIO", "LABORATORIOS", "LAB"],
+        "library" => &["BIBLIOTECA", "BIBLIOTECAS"],
+        "dining" => &[
+            "ALIMENTACAO",
+            "RESTAURANTE",
+            "CANTINA",
+            "LANCHONETE",
+            "RU",
+            "REFEITORIO",
+        ],
+        "faculty_office" => &[
+            "SECRETARIA",
+            "DOCENTES",
+            "GABINETE",
+            "COLEGIADO",
+            "DEPARTAMENTO",
+        ],
+        "administrative" => &["ADMINISTRATIVO", "ADMINISTRACAO", "REITORIA", "DIRETORIA"],
+        "academic" | "academic_zone" => &[
+            "ACADEMICO",
+            "BLOCO ACADEMICO",
+            "ENSINO",
+            "INSTITUTO",
+            "ESCOLA",
+        ],
+        "parking" | "parking_aisle" => &["ESTACIONAMENTO", "VAGAS"],
+        "sports" | "sports_building" | "soccer" | "beachvolleyball" => {
+            &["ESPORTE", "ESPORTES", "QUADRA", "GINASIO", "CAMPO", "AREIA"]
+        }
+        "health" => &["SAUDE", "CENTRO DE SAUDE", "AMBULATORIO", "MEDICO"],
+        "housing" => &["MORADIA", "ALOJAMENTO", "RESIDENCIA"],
+        "support" => &["APOIO", "SERVICOS", "MANUTENCAO", "PORTARIA", "GUARITA"],
+        "toilet" | "wc" => &["BANHEIRO", "SANITARIO", "WC"],
+        "auditorium" => &["AUDITORIO", "ANFITEATRO"],
+        "entrance" => &["ENTRADA", "ACESSO", "PORTARIA"],
+        "park" | "grass" => &["PRACA", "PARQUE", "GRAMADO", "AREA VERDE"],
+        _ => &[],
+    }
+}
+
 fn matches_poi_filter(feat: &LoadedFeature, filter: PoiType) -> bool {
     if feat.info.poi_type == Some(filter) {
         return true;
@@ -107,6 +150,26 @@ pub fn search_features(
                 best = Some(best.map_or((820, "departments"), |b| b.max((820, "departments"))));
             } else if nd.contains(&norm_query) {
                 best = Some(best.map_or((580, "departments"), |b| b.max((580, "departments"))));
+            }
+        }
+
+        if norm_query.len() >= 2
+            && let Some(cat) = &feat.info.category
+        {
+            let raw_lower = cat.to_ascii_lowercase();
+            let norm_cat = normalize_lookup_key(cat);
+            if norm_cat == norm_query {
+                best = Some(best.map_or((760, "category"), |b| b.max((760, "category"))));
+            } else {
+                for alias in category_pt_aliases(&raw_lower) {
+                    if *alias == norm_query {
+                        best = Some(best.map_or((760, "category"), |b| b.max((760, "category"))));
+                    } else if alias.contains(&norm_query)
+                        || (alias.len() >= 4 && norm_query.contains(alias))
+                    {
+                        best = Some(best.map_or((540, "category"), |b| b.max((540, "category"))));
+                    }
+                }
             }
         }
 

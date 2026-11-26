@@ -126,7 +126,13 @@ fun ActivitiesPlaceholderScreen(
     val selectedCourseLabel = disciplines.find { it.courseId == selectedFilterCourseId }?.name
         ?: "Todas as disciplinas"
     val useTwoColumnCards = adaptive.widthClass != CampusWindowWidthClass.COMPACT
-    val activityRows = remember(filteredEntries) { filteredEntries.chunked(2) }
+    val horizonGroups = remember(filteredEntries) {
+        partitionPendingActivitiesByHorizon(filteredEntries)
+    }
+    val completedMatchingEntries = remember(filteredEntries) {
+        filteredEntries.filter { it.assessment.completed }
+    }
+    var completedSectionExpanded by rememberSaveable { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -234,18 +240,175 @@ fun ActivitiesPlaceholderScreen(
                         typeFilterLabel = typeFilterLabel
                     )
                 }
-            } else if (useTwoColumnCards) {
-                items(
-                    items = activityRows,
-                    key = { row -> "act_row_${row.joinToString("_") { it.assessment.id }}" }
-                ) { rowEntries ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        rowEntries.forEach { entry ->
-                            Box(modifier = Modifier.weight(1f)) {
+            } else if (onlyCompleted) {
+                if (useTwoColumnCards) {
+                    val completedRows = filteredEntries.chunked(2)
+                    items(
+                        items = completedRows,
+                        key = { row -> "act_onlydone_row_${row.joinToString("_") { it.assessment.id }}" }
+                    ) { rowEntries ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            rowEntries.forEach { entry ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    ConsolidatedAssessmentCard(
+                                        entry = entry,
+                                        courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
+                                        isDark = isDark,
+                                        minTouchTarget = minTouchTarget,
+                                        onToggleCompleted = {
+                                            repository.toggleAssessmentCompleted(
+                                                assessmentId = entry.assessment.id,
+                                                completed = !entry.assessment.completed
+                                            )
+                                        },
+                                        onClick = { activeAssessmentDetailId = entry.assessment.id }
+                                    )
+                                }
+                            }
+                            if (rowEntries.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                } else {
+                    items(
+                        items = filteredEntries,
+                        key = { "onlydone_${it.assessment.id}" }
+                    ) { entry ->
+                        ConsolidatedAssessmentCard(
+                            entry = entry,
+                            courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
+                            isDark = isDark,
+                            minTouchTarget = minTouchTarget,
+                            onToggleCompleted = {
+                                repository.toggleAssessmentCompleted(
+                                    assessmentId = entry.assessment.id,
+                                    completed = !entry.assessment.completed
+                                )
+                            },
+                            onClick = { activeAssessmentDetailId = entry.assessment.id }
+                        )
+                    }
+                }
+            } else {
+                horizonGroups.forEach { group ->
+                    item(key = "horizon_header_${group.horizon.name}") {
+                        ActivitiesHorizonHeader(
+                            horizon = group.horizon,
+                            label = group.label,
+                            count = group.items.size,
+                            isDark = isDark
+                        )
+                    }
+                    if (useTwoColumnCards) {
+                        val rows = group.items.chunked(2)
+                        items(
+                            items = rows,
+                            key = { row -> "hz_${group.horizon.name}_${row.joinToString("_") { it.assessment.id }}" }
+                        ) { rowEntries ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                rowEntries.forEach { entry ->
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        ConsolidatedAssessmentCard(
+                                            entry = entry,
+                                            courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
+                                            isDark = isDark,
+                                            minTouchTarget = minTouchTarget,
+                                            onToggleCompleted = {
+                                                repository.toggleAssessmentCompleted(
+                                                    assessmentId = entry.assessment.id,
+                                                    completed = !entry.assessment.completed
+                                                )
+                                            },
+                                            onClick = { activeAssessmentDetailId = entry.assessment.id }
+                                        )
+                                    }
+                                }
+                                if (rowEntries.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    } else {
+                        items(
+                            items = group.items,
+                            key = { "hz_${group.horizon.name}_${it.assessment.id}" }
+                        ) { entry ->
+                            ConsolidatedAssessmentCard(
+                                entry = entry,
+                                courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
+                                isDark = isDark,
+                                minTouchTarget = minTouchTarget,
+                                onToggleCompleted = {
+                                    repository.toggleAssessmentCompleted(
+                                        assessmentId = entry.assessment.id,
+                                        completed = !entry.assessment.completed
+                                    )
+                                },
+                                onClick = { activeAssessmentDetailId = entry.assessment.id }
+                            )
+                        }
+                    }
+                }
+
+                if (completedMatchingEntries.isNotEmpty()) {
+                    item(key = "completed_collapse_header") {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ActivitiesCompletedCollapseHeader(
+                            count = completedMatchingEntries.size,
+                            expanded = completedSectionExpanded,
+                            isDark = isDark,
+                            minTouchTarget = minTouchTarget,
+                            onToggle = { completedSectionExpanded = !completedSectionExpanded }
+                        )
+                    }
+                    if (completedSectionExpanded) {
+                        if (useTwoColumnCards) {
+                            val doneRows = completedMatchingEntries.chunked(2)
+                            items(
+                                items = doneRows,
+                                key = { row -> "done_row_${row.joinToString("_") { it.assessment.id }}" }
+                            ) { rowEntries ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    rowEntries.forEach { entry ->
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            ConsolidatedAssessmentCard(
+                                                entry = entry,
+                                                courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
+                                                isDark = isDark,
+                                                minTouchTarget = minTouchTarget,
+                                                onToggleCompleted = {
+                                                    repository.toggleAssessmentCompleted(
+                                                        assessmentId = entry.assessment.id,
+                                                        completed = !entry.assessment.completed
+                                                    )
+                                                },
+                                                onClick = { activeAssessmentDetailId = entry.assessment.id }
+                                            )
+                                        }
+                                    }
+                                    if (rowEntries.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        } else {
+                            items(
+                                items = completedMatchingEntries,
+                                key = { "done_${it.assessment.id}" }
+                            ) { entry ->
                                 ConsolidatedAssessmentCard(
                                     entry = entry,
                                     courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
@@ -261,29 +424,7 @@ fun ActivitiesPlaceholderScreen(
                                 )
                             }
                         }
-                        if (rowEntries.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
                     }
-                }
-            } else {
-                items(
-                    items = filteredEntries,
-                    key = { it.assessment.id }
-                ) { entry ->
-                    ConsolidatedAssessmentCard(
-                        entry = entry,
-                        courseCode = courseCodeById[entry.assessment.courseId].orEmpty(),
-                        isDark = isDark,
-                        minTouchTarget = minTouchTarget,
-                        onToggleCompleted = {
-                            repository.toggleAssessmentCompleted(
-                                assessmentId = entry.assessment.id,
-                                completed = !entry.assessment.completed
-                            )
-                        },
-                        onClick = { activeAssessmentDetailId = entry.assessment.id }
-                    )
                 }
             }
 

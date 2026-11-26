@@ -3,7 +3,6 @@ package br.ufop.campus.ui.agenda
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,8 +41,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.DayActivityIndicator
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.CommitmentNeutralGray
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.parseHexColor
+import br.ufop.campus.ui.theme.tabularNums
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -65,10 +69,11 @@ internal fun ExpandableSemesterCalendarCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        tonalElevation = 2.dp
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(),
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -134,7 +139,7 @@ internal fun ExpandableSemesterCalendarCard(
                         targetValue = if (isCurrentMonth) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surfaceVariant
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f)
                         },
                         animationSpec = if (reduceMotion) snap() else spring(),
                         label = "SemesterMonthPillBg"
@@ -144,20 +149,13 @@ internal fun ExpandableSemesterCalendarCard(
                         modifier = Modifier
                             .weight(1f)
                             .defaultMinSize(minHeight = if (largeTouchTargets) 56.dp else 48.dp)
-                            .clip(RoundedCornerShape(50))
+                            .clip(RoundedCornerShape(CampusPillRadius))
                             .clickable(role = Role.Button) {
                                 onSelectMonth(YearMonth.of(displayedYearMonth.year, monthValue))
                             },
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(CampusPillRadius),
                         color = pillBg,
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isCurrentMonth) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
-                            }
-                        )
+                        border = campusCardBorder(if (isCurrentMonth) 1.5.dp else 1.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -324,7 +322,7 @@ private fun CalendarDayCell(
         ) {
             Text(
                 text = dayNumber.toString(),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.tabularNums(),
                 color = cellTextColor,
                 fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium
             )

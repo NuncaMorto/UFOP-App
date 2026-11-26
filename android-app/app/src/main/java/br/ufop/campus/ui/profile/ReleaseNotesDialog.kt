@@ -42,7 +42,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 data class ReleaseNoteEntry(
     val version: String,
@@ -55,10 +63,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.18",
-            title = "Ajuste no Ícone Monocromático (Material You)",
+            version = "v1.9.19",
+            title = "Redesign Completo de UI/UX, Onest & 9 Escadas Tonais",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Tipografia Onest offline (400–800) com numerais tabulares em horários, faltas, cargas horárias, porcentagens e CRE no Android e iOS.",
+                "9 escadas tonais WCAG 2.1 AA (Mata, Vinho padrão, Terracota, Ametista, Ouro Velho, Mineral, Cacau, Rubi e Cobalto) com degraus Canvas -> Surface 1 -> Surface 2.",
+                "Agenda, Atividades, Disciplinas, Matriz e Grade Dinâmica renovadas com destaque ao vivo de aulas, janelas livres, check-in em 3 cartões, agrupamento temporal e seção agrupada de 26dp.",
+                "Perfil horizontal com edição, 3 blocos Bento, alerta âmbar (>= 50% faltas), CRE \"Em curso\" simulável, grade 3x3 com pré-visualização e Mapa 2D com créditos discretos e busca PT-BR."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.18",
+            title = "Ajuste no Ícone Monocromático (Material You)",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Correção do ícone monocromático (Material You / Android 13+) para exibição nítida e correta nos temas dinâmicos da tela inicial.",
                 "Atualização do favicon oficial e da identidade visual na página de download."
@@ -291,13 +311,10 @@ fun ReleaseNotesDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp, vertical = 24.dp)
                 .widthIn(max = 520.dp),
-            shape = RoundedCornerShape(26.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            border = BorderStroke(
-                width = if (a11y.highContrastMode) 2.dp else 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
+            shape = RoundedCornerShape(CampusSheetRadius),
+            color = MaterialTheme.colorScheme.background,
+            tonalElevation = 0.dp,
+            border = campusCardBorder(2.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth()
@@ -410,27 +427,21 @@ private fun ReleaseVersionCard(
     release: ReleaseNoteEntry,
     highContrast: Boolean
 ) {
+    val isDark = LocalCampusThemeController.current.isDark
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val greenCheckColor = accessibleTextColor(StatusAttendingGreen, isDark, surfaceColor)
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = if (release.isLatest) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-        },
-        border = BorderStroke(
-            width = if (release.isLatest || highContrast) 1.5.dp else 1.dp,
-            color = if (release.isLatest) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = surfaceColor,
+        border = if (highContrast) BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline) else campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
@@ -470,11 +481,11 @@ private fun ReleaseVersionCard(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(999.dp),
+                    shape = RoundedCornerShape(CampusPillRadius),
                     color = if (release.isLatest) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant
+                        MaterialTheme.colorScheme.surfaceContainerHigh
                     }
                 ) {
                     Text(
@@ -482,7 +493,7 @@ private fun ReleaseVersionCard(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = if (release.isLatest) {
-                            MaterialTheme.colorScheme.onPrimary
+                            MaterialTheme.colorScheme.onPrimaryContainer
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
@@ -507,11 +518,7 @@ private fun ReleaseVersionCard(
                         Icon(
                             imageVector = Icons.Outlined.CheckCircle,
                             contentDescription = null,
-                            tint = if (release.isLatest) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            tint = greenCheckColor,
                             modifier = Modifier
                                 .padding(top = 2.dp)
                                 .size(15.dp)
@@ -520,7 +527,7 @@ private fun ReleaseVersionCard(
                         Text(
                             text = bullet,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

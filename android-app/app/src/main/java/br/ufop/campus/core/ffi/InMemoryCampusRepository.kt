@@ -100,7 +100,7 @@ class InMemoryCampusRepository(
 
     // Sprint 9 state
     internal var darkThemePreference: String = "SYSTEM"
-    internal var accentColorPreference: String = "GREEN"
+    internal var accentColorPreference: String = "RED"
     internal var exportFolderTreeUri: String? = null
     internal var exportFolderDisplayLabel: String = DEFAULT_EXPORT_FOLDER_LABEL
 
@@ -157,7 +157,7 @@ class InMemoryCampusRepository(
         totalRequiredHours = 3610
         importedCompletedHours = 0
         darkThemePreference = "SYSTEM"
-        accentColorPreference = "GREEN"
+        accentColorPreference = "RED"
         exportFolderTreeUri = null
         exportFolderDisplayLabel = DEFAULT_EXPORT_FOLDER_LABEL
         accessibilitySettings = CampusAccessibilitySettings()

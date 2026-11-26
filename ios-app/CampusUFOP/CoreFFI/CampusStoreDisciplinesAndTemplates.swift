@@ -87,6 +87,13 @@ public extension CampusStore {
         persistEncryptedState()
     }
 
+    public func updateDisciplineAbsences(disciplineId: String, totalAbsences: Int) {
+        guard let idx = disciplines.firstIndex(where: { $0.id == disciplineId }) else { return }
+        let clamped = max(0, totalAbsences)
+        disciplines[idx].currentAbsences = clamped
+        persistEncryptedState()
+    }
+
     public func updateDisciplineColor(disciplineId: String, colorKey: DepartmentColorKey) {
         if let idx = disciplines.firstIndex(where: { $0.id == disciplineId }) {
             disciplines[idx].colorKey = colorKey
