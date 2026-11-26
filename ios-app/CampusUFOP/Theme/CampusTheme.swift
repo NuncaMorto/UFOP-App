@@ -208,6 +208,10 @@ public enum CampusAccentColor: String, CaseIterable, Codable, Identifiable, Send
         surface2(for: scheme)
     }
 
+    public func textOnHighlightSurface(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? highlight(for: scheme) : ink(for: scheme)
+    }
+
     public static func fromKey(_ raw: String?) -> CampusAccentColor {
         guard let raw else { return .red }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

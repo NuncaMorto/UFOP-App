@@ -411,7 +411,7 @@ public struct ActivitiesView: View {
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 2)
-                                .background(Capsule().fill(CampusTheme.surface1(for: appearance?.accentColor ?? .red, scheme: colorScheme)))
+                                .background(Capsule().fill((appearance?.accentColor ?? .red).surface1(for: colorScheme)))
 
                             Spacer()
 
@@ -422,7 +422,7 @@ public struct ActivitiesView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
                         .frame(maxWidth: .infinity)
-                        .liquidGlassCard(useSurface2: true, highContrast: hc)
+                        .liquidGlassCard(highContrast: hc, useSurface2: true)
                     }
                     .buttonStyle(.plain)
                     .minimumTouchTarget(minTouch)
