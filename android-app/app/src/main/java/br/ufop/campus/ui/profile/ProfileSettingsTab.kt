@@ -18,9 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Explore
@@ -42,6 +45,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -86,7 +90,9 @@ private fun ProfilePersonalizationSubView(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     selectedAccent: CampusAccentColor,
-    onSelectAccent: (CampusAccentColor) -> Unit
+    onSelectAccent: (CampusAccentColor) -> Unit,
+    attendanceIndicatorStyle: String,
+    onSelectAttendanceIndicatorStyle: (String) -> Unit
 ) {
     val minTouchTarget = campusMinTouchTarget()
 
@@ -111,6 +117,42 @@ private fun ProfilePersonalizationSubView(
                         onCheckedChange = { onToggleTheme() },
                         modifier = Modifier.heightIn(min = minTouchTarget),
                         colors = campusSwitchColors()
+                    )
+                }
+            )
+        }
+
+        SettingsCategoryGroup(title = "Indicador de presença na Agenda") {
+            val isBadgeSelected = attendanceIndicatorStyle != "CARD_BORDER"
+            SettingsMenuRow(
+                icon = Icons.AutoMirrored.Outlined.Label,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "Badge no card (padrão)",
+                subtitle = "Exibe a pílula de status ao lado do horário (Vou à aula, Cancelada, Vou faltar)",
+                isSelected = isBadgeSelected,
+                onClick = { onSelectAttendanceIndicatorStyle("BADGE") },
+                trailing = {
+                    RadioButton(
+                        selected = isBadgeSelected,
+                        onClick = { onSelectAttendanceIndicatorStyle("BADGE") }
+                    )
+                }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            )
+            SettingsMenuRow(
+                icon = Icons.Outlined.CropSquare,
+                iconTint = MaterialTheme.colorScheme.primary,
+                title = "Borda colorida no card",
+                subtitle = "Remove a pílula interna e aplica borda contínua na cor semântica do status",
+                isSelected = !isBadgeSelected,
+                onClick = { onSelectAttendanceIndicatorStyle("CARD_BORDER") },
+                trailing = {
+                    RadioButton(
+                        selected = !isBadgeSelected,
+                        onClick = { onSelectAttendanceIndicatorStyle("CARD_BORDER") }
                     )
                 }
             )
@@ -365,7 +407,9 @@ internal fun ProfileSettingsTab(
                         isDarkTheme = themeController.isDark,
                         onToggleTheme = { themeController.toggleTheme() },
                         selectedAccent = themeController.accentColor,
-                        onSelectAccent = { themeController.selectAccentColor(it) }
+                        onSelectAccent = { themeController.selectAccentColor(it) },
+                        attendanceIndicatorStyle = themeController.attendanceIndicatorStyle,
+                        onSelectAttendanceIndicatorStyle = { themeController.selectAttendanceIndicatorStyle(it) }
                     )
                 }
 

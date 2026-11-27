@@ -1,6 +1,7 @@
 package br.ufop.campus.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Escada tonal curada por tema/cor de destaque com contraste WCAG 2.1 AA garantido.
@@ -223,9 +224,27 @@ fun contrastRatio(foreground: Color, background: Color): Double {
 fun accessibleContentColorOn(background: Color): Color =
     if (contrastRatio(Color.White, background) >= 4.5) Color.White else Color(0xFF111315)
 
+private const val COLOR_CACHE_MAX_ENTRIES = 512
+
+private data class AccessibleTextCacheKey(
+    val baseValue: ULong,
+    val isDarkSurface: Boolean,
+    val surfaceValue: ULong,
+    val minContrastBits: Long
+)
+
+private data class ParseHexCacheKey(
+    val raw: String,
+    val fallbackValue: ULong
+)
+
+private val accessibleTextColorCache = ConcurrentHashMap<AccessibleTextCacheKey, Color>()
+private val parseHexColorCache = ConcurrentHashMap<ParseHexCacheKey, Color>()
+
 /**
  * Retorna uma cor de texto acessível para a superfície dada, interpolando na direção
  * de branco (modo escuro) ou preto carvão (modo claro) até atingir contrastRatio >= minContrast.
+ * Resultados são cacheados de forma determinística e thread-safe para evitar recálculos durante scroll.
  */
 fun accessibleTextColor(
     baseColor: Color,
@@ -233,19 +252,38 @@ fun accessibleTextColor(
     surfaceColor: Color = if (isDarkSurface) DarkSurface else LightSurface,
     minContrast: Double = 4.5
 ): Color {
-    if (contrastRatio(baseColor, surfaceColor) >= minContrast) return baseColor
-    val target = if (isDarkSurface) Color.White else Color(0xFF111315)
-    for (i in 1..100) {
-        val t = i / 100f
-        val r = baseColor.red + (target.red - baseColor.red) * t
-        val g = baseColor.green + (target.green - baseColor.green) * t
-        val b = baseColor.blue + (target.blue - baseColor.blue) * t
-        val candidate = Color(r, g, b, 1f)
-        if (contrastRatio(candidate, surfaceColor) >= minContrast) {
-            return candidate
+    val key = AccessibleTextCacheKey(
+        baseValue = baseColor.value,
+        isDarkSurface = isDarkSurface,
+        surfaceValue = surfaceColor.value,
+        minContrastBits = minContrast.toBits()
+    )
+    accessibleTextColorCache[key]?.let { return it }
+
+    val computed = if (contrastRatio(baseColor, surfaceColor) >= minContrast) {
+        baseColor
+    } else {
+        val target = if (isDarkSurface) Color.White else Color(0xFF111315)
+        var resolved = target
+        for (i in 1..100) {
+            val t = i / 100f
+            val r = baseColor.red + (target.red - baseColor.red) * t
+            val g = baseColor.green + (target.green - baseColor.green) * t
+            val b = baseColor.blue + (target.blue - baseColor.blue) * t
+            val candidate = Color(r, g, b, 1f)
+            if (contrastRatio(candidate, surfaceColor) >= minContrast) {
+                resolved = candidate
+                break
+            }
         }
+        resolved
     }
-    return target
+
+    if (accessibleTextColorCache.size >= COLOR_CACHE_MAX_ENTRIES) {
+        accessibleTextColorCache.clear()
+    }
+    accessibleTextColorCache[key] = computed
+    return computed
 }
 
 /**
@@ -288,8 +326,11 @@ fun semanticAbsenceRiskColor(currentAbsences: Int, maxAbsences: Int, isDark: Boo
 }
 
 fun parseHexColor(colorHex: String, fallback: Color = DepartmentMathBlue): Color {
+    val key = ParseHexCacheKey(raw = colorHex, fallbackValue = fallback.value)
+    parseHexColorCache[key]?.let { return it }
+
     val clean = colorHex.trim().removePrefix("#")
-    return try {
+    val parsed = try {
         when (clean.length) {
             6 -> Color(clean.toLong(16) or 0xFF000000L)
             8 -> Color(clean.toLong(16))
@@ -298,4 +339,10 @@ fun parseHexColor(colorHex: String, fallback: Color = DepartmentMathBlue): Color
     } catch (_: Exception) {
         fallback
     }
+
+    if (parseHexColorCache.size >= COLOR_CACHE_MAX_ENTRIES) {
+        parseHexColorCache.clear()
+    }
+    parseHexColorCache[key] = parsed
+    return parsed
 }

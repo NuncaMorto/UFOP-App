@@ -271,6 +271,7 @@ public final class CampusAppearanceController {
     private static let keyAppearanceMode = "campus.ufop.appearanceMode"
     private static let keyAccentColor = "campus.ufop.accentColor"
     private static let keyAccessibility = "campus.ufop.accessibilitySettings"
+    public static let keyAttendanceIndicatorStyle = "campus.ufop.attendanceIndicatorStyle"
 
     private static var sharedDefaults: UserDefaults? {
         UserDefaults(suiteName: appGroupSuiteName)
@@ -300,6 +301,22 @@ public final class CampusAppearanceController {
         }
     }
 
+    public var attendanceIndicatorStyle: String {
+        didSet {
+            let normalized = Self.normalizeAttendanceIndicatorStyle(attendanceIndicatorStyle)
+            if attendanceIndicatorStyle != normalized {
+                attendanceIndicatorStyle = normalized
+                return
+            }
+            UserDefaults.standard.set(normalized, forKey: Self.keyAttendanceIndicatorStyle)
+        }
+    }
+
+    public static func normalizeAttendanceIndicatorStyle(_ raw: String?) -> String {
+        let cleaned = raw?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        return cleaned == "CARD_BORDER" ? "CARD_BORDER" : "BADGE"
+    }
+
     public init() {
         let defaults = UserDefaults.standard
         let shared = Self.sharedDefaults
@@ -317,6 +334,9 @@ public final class CampusAppearanceController {
         } else {
             self.accessibility = CampusAccessibilitySettings()
         }
+        self.attendanceIndicatorStyle = Self.normalizeAttendanceIndicatorStyle(
+            defaults.string(forKey: Self.keyAttendanceIndicatorStyle)
+        )
     }
 
     public func reloadWidgetTimelines() {
@@ -363,6 +383,7 @@ public final class CampusAppearanceController {
         appearanceModeRaw = "system"
         accentColor = .red
         accessibility = CampusAccessibilitySettings()
+        attendanceIndicatorStyle = "BADGE"
     }
 }
 
@@ -491,12 +512,12 @@ public enum CampusTheme {
         accent.highlight(for: scheme)
     }
 
-    public static func weatherBadgeBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: 0x3A3112) : Color(hex: 0xFFE066)
+    public static func weatherBadgeBackground(for scheme: ColorScheme, accent: CampusAccentColor = .red) -> Color {
+        accent.surface2(for: scheme)
     }
 
-    public static func weatherBadgeText(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: 0xFDE047) : Color(hex: 0x5C4800)
+    public static func weatherBadgeText(for scheme: ColorScheme, accent: CampusAccentColor = .red) -> Color {
+        accent.textOnHighlightSurface(for: scheme)
     }
 
     public static func floatingButtonBackground(for scheme: ColorScheme, accent: CampusAccentColor = .red) -> Color {
@@ -523,32 +544,72 @@ public enum CampusTheme {
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
     }
 
+    private final class AccessibleColorCacheBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: [String: Color] = [:]
+        private let maxEntries = 512
+
+        func get(_ key: String) -> Color? {
+            lock.lock()
+            defer { lock.unlock() }
+            return storage[key]
+        }
+
+        func set(_ color: Color, for key: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            if storage.count >= maxEntries {
+                storage.removeAll(keepingCapacity: true)
+            }
+            storage[key] = color
+        }
+    }
+
+    private static let accessibleColorCache = AccessibleColorCacheBox()
+
     public static func accessibleTextColor(
         _ base: Color,
         scheme: ColorScheme,
         minContrast: Double = 4.5,
         accent: CampusAccentColor = .red
     ) -> Color {
-        let surface = accent.surface1(for: scheme)
-        if contrastRatio(base, against: surface) >= minContrast {
-            return base
-        }
-        let target: (r: Double, g: Double, b: Double) = scheme == .dark ? (1, 1, 1) : (0.07, 0.08, 0.09)
         let c = base.srgbComponents
-        for step in 1...100 {
-            let t = Double(step) / 100.0
-            let candidate = Color(
-                .sRGB,
-                red: c.r + (target.r - c.r) * t,
-                green: c.g + (target.g - c.g) * t,
-                blue: c.b + (target.b - c.b) * t,
-                opacity: 1.0
-            )
-            if contrastRatio(candidate, against: surface) >= minContrast {
-                return candidate
-            }
+        let rQ = Int((c.r * 255.0).rounded())
+        let gQ = Int((c.g * 255.0).rounded())
+        let bQ = Int((c.b * 255.0).rounded())
+        let contrastQ = Int((minContrast * 100.0).rounded())
+        let cacheKey = "\(rQ)_\(gQ)_\(bQ)_\(scheme == .dark ? 1 : 0)_\(contrastQ)_\(accent.rawValue)"
+
+        if let cached = accessibleColorCache.get(cacheKey) {
+            return cached
         }
-        return scheme == .dark ? .white : Color(hex: 0x111315)
+
+        let surface = accent.surface1(for: scheme)
+        let resolved: Color
+        if contrastRatio(base, against: surface) >= minContrast {
+            resolved = base
+        } else {
+            let target: (r: Double, g: Double, b: Double) = scheme == .dark ? (1, 1, 1) : (0.07, 0.08, 0.09)
+            var found: Color? = nil
+            for step in 1...100 {
+                let t = Double(step) / 100.0
+                let candidate = Color(
+                    .sRGB,
+                    red: c.r + (target.r - c.r) * t,
+                    green: c.g + (target.g - c.g) * t,
+                    blue: c.b + (target.b - c.b) * t,
+                    opacity: 1.0
+                )
+                if contrastRatio(candidate, against: surface) >= minContrast {
+                    found = candidate
+                    break
+                }
+            }
+            resolved = found ?? (scheme == .dark ? .white : Color(hex: 0x111315))
+        }
+
+        accessibleColorCache.set(resolved, for: cacheKey)
+        return resolved
     }
 
     public static func semanticAbsenceRiskLevel(currentAbsences: Int, maxAbsences: Int) -> Int {
@@ -906,6 +967,7 @@ public struct LiquidGlassPrimaryButton<Label: View>: View {
 
 public struct WeatherPillBadge: View {
     public let label: String
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
 
     public init(label: String) {
@@ -913,15 +975,23 @@ public struct WeatherPillBadge: View {
     }
 
     public var body: some View {
+        let accentObj = appearance?.accentColor ?? .red
+        let hc = appearance?.accessibility.highContrastMode ?? false
         Text(label)
             .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
-            .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme))
+            .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme, accent: accentObj))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .background(
                 Capsule(style: .continuous)
-                    .fill(CampusTheme.weatherBadgeBackground(for: colorScheme))
+                    .fill(CampusTheme.weatherBadgeBackground(for: colorScheme, accent: accentObj))
             )
+            .overlay {
+                if hc {
+                    Capsule(style: .continuous)
+                        .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 1.5)
+                }
+            }
     }
 }
 
@@ -929,17 +999,20 @@ public struct AccentBarCardContainer<Content: View>: View {
     public let accentColor: Color
     public let highContrast: Bool
     public let useSurface2: Bool
+    public let borderOverrideColor: Color?
     public let content: Content
 
     public init(
         accentColor: Color,
         highContrast: Bool = false,
         useSurface2: Bool = false,
+        borderOverrideColor: Color? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.accentColor = accentColor
         self.highContrast = highContrast
         self.useSurface2 = useSurface2
+        self.borderOverrideColor = borderOverrideColor
         self.content = content()
     }
 
@@ -963,5 +1036,11 @@ public struct AccentBarCardContainer<Content: View>: View {
             highContrast: highContrast,
             useSurface2: useSurface2
         )
+        .overlay {
+            if let borderColor = borderOverrideColor {
+                RoundedRectangle(cornerRadius: CampusTheme.cardCornerRadius, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: highContrast ? 2 : 1.75)
+            }
+        }
     }
 }

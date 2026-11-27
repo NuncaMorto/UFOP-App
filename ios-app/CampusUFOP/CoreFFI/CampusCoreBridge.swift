@@ -15,6 +15,8 @@ public final class CampusStore {
     public var isEadByCourseId: [String: Bool] = [:]
     public var turmaByCourseId: [String: String] = [:]
     public var dynamicGridCompletedByMatrix: [String: [String]] = [:]
+    public var selectedCurriculumVersionsByCourse: [String: String] = [:]
+    public var attendanceIndicatorStyle: String = "BADGE"
 
     public var disciplinesLayoutMode: String {
         didSet { UserDefaults.standard.set(disciplinesLayoutMode, forKey: "campus.ufop.disciplinesLayoutMode") }
@@ -71,6 +73,20 @@ public final class CampusStore {
         self.dynamicGridOrientation = defaults.string(forKey: "campus.ufop.dynamicGridOrientation") ?? "horizontal"
         self.guidedTourCompleted = defaults.bool(forKey: "campus.ufop.guidedTourCompleted")
         self.lastSeenReleaseVersion = defaults.string(forKey: "campus.ufop.lastSeenReleaseVersion") ?? ""
+        self.attendanceIndicatorStyle = Self.normalizeAttendanceIndicatorStyle(
+            defaults.string(forKey: "campus.ufop.attendanceIndicatorStyle")
+        )
+        if let savedVersions = defaults.dictionary(forKey: "campus.ufop.selectedCurriculumVersionsByCourse") as? [String: String] {
+            var normalized: [String: String] = [:]
+            for (k, v) in savedVersions {
+                let cleanKey = k.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                let cleanVal = v.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleanKey.isEmpty && !cleanVal.isEmpty {
+                    normalized[cleanKey] = cleanVal
+                }
+            }
+            self.selectedCurriculumVersionsByCourse = normalized
+        }
 
         seedUFOP2026_2Data()
         loadPersistedEncryptedStateIfAvailable()
@@ -106,18 +122,75 @@ public final class CampusStore {
         ("2026-11-22", "DOM", "22", "Domingo, 22 de novembro")
     ]
 
+    public static func normalizeAttendanceIndicatorStyle(_ raw: String?) -> String {
+        let cleaned = raw?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
+        return cleaned == "CARD_BORDER" ? "CARD_BORDER" : "BADGE"
+    }
+
+    /// Extrai somente a sigla do departamento antes de separadores (`·`, `-`, `–`, `—` ou `/`).
+    /// Exemplo: `"DECOM · Ciência da Computação"` -> `"DECOM"`.
+    public static func departmentAcronym(from raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let separators = CharacterSet(charactersIn: "·-–—/")
+        for part in trimmed.components(separatedBy: separators) {
+            let clean = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !clean.isEmpty {
+                return clean
+            }
+        }
+        return trimmed
+    }
+
+    public func setAttendanceIndicatorStyle(_ style: String) {
+        let normalized = Self.normalizeAttendanceIndicatorStyle(style)
+        guard attendanceIndicatorStyle != normalized else { return }
+        attendanceIndicatorStyle = normalized
+        UserDefaults.standard.set(normalized, forKey: "campus.ufop.attendanceIndicatorStyle")
+        persistEncryptedState()
+    }
+
+    public func selectedCurriculumVersion(for courseCode: String) -> String? {
+        let key = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !key.isEmpty else { return nil }
+        return selectedCurriculumVersionsByCourse[key]
+    }
+
+    public func setSelectedCurriculumVersion(_ version: String, for courseCode: String) {
+        let key = courseCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let cleanVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        if cleanVersion.isEmpty {
+            guard selectedCurriculumVersionsByCourse[key] != nil else { return }
+            selectedCurriculumVersionsByCourse.removeValue(forKey: key)
+        } else {
+            guard selectedCurriculumVersionsByCourse[key] != cleanVersion else { return }
+            selectedCurriculumVersionsByCourse[key] = cleanVersion
+        }
+        UserDefaults.standard.set(selectedCurriculumVersionsByCourse, forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
+        persistEncryptedState()
+    }
+
+    private static let isoDateParser: DateFormatter = {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        return parser
+    }()
+
+    private static let ptBrFullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.dateFormat = "EEEE, dd 'de' MMMM"
+        return formatter
+    }()
+
     internal static func fullPortugueseDateLabel(for dateIso: String) -> String {
         if let match = weekMetadata.first(where: { $0.iso == dateIso }) {
             return match.fullHeader
         }
-        let parser = DateFormatter()
-        parser.locale = Locale(identifier: "en_US_POSIX")
-        parser.dateFormat = "yyyy-MM-dd"
-        if let parsed = parser.date(from: dateIso) {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "pt_BR")
-            formatter.dateFormat = "EEEE, dd 'de' MMMM"
-            let raw = formatter.string(from: parsed)
+        if let parsed = isoDateParser.date(from: dateIso) {
+            let raw = ptBrFullDateFormatter.string(from: parsed)
             return raw.prefix(1).uppercased() + raw.dropFirst()
         }
         return dateIso.isEmpty ? "Terça-feira, 17 de novembro" : dateIso

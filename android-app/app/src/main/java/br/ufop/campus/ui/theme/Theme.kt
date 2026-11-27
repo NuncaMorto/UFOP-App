@@ -283,7 +283,9 @@ data class CampusThemeController(
     val isDark: Boolean = false,
     val toggleTheme: () -> Unit = {},
     val accentColor: CampusAccentColor = CampusAccentColor.RED,
-    val selectAccentColor: (CampusAccentColor) -> Unit = {}
+    val selectAccentColor: (CampusAccentColor) -> Unit = {},
+    val attendanceIndicatorStyle: String = "BADGE",
+    val selectAttendanceIndicatorStyle: (String) -> Unit = {}
 )
 
 val LocalCampusThemeController = staticCompositionLocalOf { CampusThemeController() }
@@ -389,9 +391,11 @@ private fun campusColorSchemeFor(
 fun CampusTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     accentColor: CampusAccentColor = CampusAccentColor.RED,
+    attendanceIndicatorStyle: String = "BADGE",
     accessibility: CampusAccessibilitySettings = CampusAccessibilitySettings(),
     onToggleDarkTheme: () -> Unit = {},
     onSelectAccentColor: (CampusAccentColor) -> Unit = {},
+    onSelectAttendanceIndicatorStyle: (String) -> Unit = {},
     onUpdateAccessibility: (CampusAccessibilitySettings) -> Unit = {},
     content: @Composable () -> Unit
 ) {
@@ -404,7 +408,9 @@ fun CampusTheme(
         isDark = darkTheme,
         toggleTheme = onToggleDarkTheme,
         accentColor = accentColor,
-        selectAccentColor = onSelectAccentColor
+        selectAccentColor = onSelectAccentColor,
+        attendanceIndicatorStyle = attendanceIndicatorStyle,
+        selectAttendanceIndicatorStyle = onSelectAttendanceIndicatorStyle
     )
     val accessibilityController = CampusAccessibilityController(
         settings = accessibility,

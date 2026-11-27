@@ -316,6 +316,13 @@ interface CampusCoreRepository {
     fun getDynamicGridCompletedCodes(matrixId: String): Set<String>
     fun saveDynamicGridCompletedCodes(matrixId: String, completedCodes: Set<String>)
     fun getDynamicGridAllCompleted(): Map<String, Set<String>>
+
+    // v1.9.21: Estilo de indicador de presença na Agenda & versão de currículo persistida por curso
+    fun getAttendanceIndicatorStyle(): String
+    fun setAttendanceIndicatorStyle(style: String)
+    fun getSelectedCurriculumVersion(courseCode: String): String?
+    fun setSelectedCurriculumVersion(courseCode: String, version: String)
+    fun getAllSelectedCurriculumVersions(): Map<String, String>
 }
 
 typealias InMemoryCampusCoreRepository = InMemoryCampusRepository

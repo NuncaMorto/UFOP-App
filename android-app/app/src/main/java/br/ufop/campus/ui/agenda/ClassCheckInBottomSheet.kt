@@ -60,11 +60,13 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.AttendanceStatus
 import br.ufop.campus.core.ffi.ClassCheckInDetail
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
+import br.ufop.campus.core.ffi.extractDepartmentAcronym
 import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.map.isEadMapLocation
 import br.ufop.campus.ui.components.CampusTimePickerField
@@ -190,10 +192,13 @@ fun ClassCheckInBottomSheet(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = detail.departmentName,
+                            text = extractDepartmentAcronym(detail.departmentName),
                             style = MaterialTheme.typography.labelMedium,
                             color = readableAccentText,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
@@ -214,36 +219,21 @@ fun ClassCheckInBottomSheet(
                 ) {
                     if (!isEditing && detail.courseId.isNotBlank()) {
                         Surface(
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .clip(RoundedCornerShape(CampusPillRadius))
-                                .clickable(
-                                    role = Role.Button,
-                                    onClickLabel = "Editar dados da aula"
-                                ) {
-                                    onClearEditError()
-                                    isEditing = true
-                                },
-                            shape = RoundedCornerShape(CampusPillRadius),
+                            onClick = {
+                                onClearEditError()
+                                isEditing = true
+                            },
+                            modifier = Modifier.size(minTouchTarget),
+                            shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             border = campusCardBorder()
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Outlined.Edit,
-                                    contentDescription = null,
+                                    contentDescription = "Editar aula",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Text(
-                                    text = "Editar",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.SemiBold
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
@@ -253,7 +243,8 @@ fun ClassCheckInBottomSheet(
                         onClick = onDismiss,
                         modifier = Modifier.size(minTouchTarget),
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = campusCardBorder()
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(

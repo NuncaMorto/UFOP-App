@@ -72,11 +72,12 @@ internal fun GradeSelectorDropdown(
     onRequestRemoveFriend: (FriendScheduleInfo) -> Unit,
     onImportFile: () -> Unit,
     onOpenImportTextDialog: () -> Unit,
-    onOpenQrScanner: () -> Unit = {}
+    onOpenQrScanner: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Box {
+    Box(modifier = modifier) {
         val userDisplayName = studentProfile.fullName.ifBlank { "Você" }
         val selectorAvatar = resolveGradeSelectorAvatarSource(
             activeFriend = activeFriend,

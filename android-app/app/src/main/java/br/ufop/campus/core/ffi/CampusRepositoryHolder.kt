@@ -24,6 +24,7 @@ object CampusRepositoryHolder {
         get() = BuildConfig.VERSION_NAME
     const val KEY_DARK_THEME_MODE = "dark_theme_mode"
     const val KEY_ACCENT_COLOR = "accent_color_key"
+    const val KEY_ATTENDANCE_INDICATOR_STYLE = "attendance_indicator_style"
     const val KEY_GUIDED_TOUR_COMPLETED = "guided_tour_completed"
     const val KEY_LAST_RELEASE_VERSION = "last_seen_release_version"
     const val KEY_A11Y_SCREEN_READER = "a11y_screen_reader_optimized"
@@ -227,6 +228,62 @@ object CampusRepositoryHolder {
                 VidaAcademicaWidgetProvider.requestWidgetUpdate(appContext)
             }
         )
+    }
+
+    internal fun loadSavedAttendanceIndicatorStyleFromPrefs(
+        prefs: SharedPreferences?,
+        repository: CampusCoreRepository
+    ): String {
+        val rawPrefs = runCatching {
+            prefs?.getString(KEY_ATTENDANCE_INDICATOR_STYLE, null)
+        }.getOrNull()?.trim()?.uppercase()
+
+        if (rawPrefs == "BADGE" || rawPrefs == "CARD_BORDER") {
+            return rawPrefs
+        }
+
+        val repoStyle = runCatching { repository.getAttendanceIndicatorStyle() }
+            .getOrNull()
+            ?.trim()
+            ?.uppercase()
+
+        return if (repoStyle == "CARD_BORDER") "CARD_BORDER" else "BADGE"
+    }
+
+    fun loadSavedAttendanceIndicatorStyle(
+        context: Context,
+        repository: CampusCoreRepository
+    ): String {
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull()
+        return loadSavedAttendanceIndicatorStyleFromPrefs(prefs, repository)
+    }
+
+    internal fun saveAttendanceIndicatorStyleToPrefs(
+        prefs: SharedPreferences?,
+        repository: CampusCoreRepository,
+        style: String
+    ): String {
+        val normalized = normalizeAttendanceIndicatorStyle(style)
+        runCatching {
+            prefs?.edit()
+                ?.putString(KEY_ATTENDANCE_INDICATOR_STYLE, normalized)
+                ?.commit()
+        }
+        repository.setAttendanceIndicatorStyle(normalized)
+        return normalized
+    }
+
+    fun saveAttendanceIndicatorStyle(
+        context: Context,
+        repository: CampusCoreRepository,
+        style: String
+    ): String {
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull()
+        return saveAttendanceIndicatorStyleToPrefs(prefs, repository, style)
     }
 
     internal fun loadAccessibilitySettingsFromPrefs(
@@ -598,6 +655,7 @@ object CampusRepositoryHolder {
             prefs?.edit()
                 ?.remove(KEY_DARK_THEME_MODE)
                 ?.remove(KEY_ACCENT_COLOR)
+                ?.remove(KEY_ATTENDANCE_INDICATOR_STYLE)
                 ?.remove(KEY_GUIDED_TOUR_COMPLETED)
                 ?.remove(KEY_LAST_RELEASE_VERSION)
                 ?.remove(KEY_A11Y_SCREEN_READER)

@@ -68,6 +68,55 @@ internal struct ProfileSettingsSectionView: View {
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
             CampusAccentPalettePreviewGrid(appearance: appearance)
+
+            Divider()
+                .opacity(0.35)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Indicador de presença na Agenda")
+                    .font(CampusTheme.font(size: 13, weight: .semibold, boldBoost: boldBoost))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+
+                let indicatorOptions: [(key: String, label: String, icon: String)] = [
+                    ("BADGE", "Badge no card", "tag.fill"),
+                    ("CARD_BORDER", "Borda colorida", "square")
+                ]
+
+                HStack(spacing: 8) {
+                    ForEach(indicatorOptions, id: \.key) { option in
+                        let isSelected = appearance.attendanceIndicatorStyle == option.key
+                        Button {
+                            withAnimation(.snappy) {
+                                appearance.attendanceIndicatorStyle = option.key
+                                store.setAttendanceIndicatorStyle(option.key)
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: option.icon)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(option.label)
+                                    .font(CampusTheme.font(size: 12, weight: .bold, boldBoost: boldBoost))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                            .frame(maxWidth: .infinity, minHeight: max(42, minTouch))
+                            .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: highContrast)
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                    }
+                }
+
+                Text(
+                    appearance.attendanceIndicatorStyle == "CARD_BORDER"
+                        ? "Remove a pílula interna e contorna o card na cor semântica do status (verde, âmbar ou vermelho)."
+                        : "Padrão: exibe a pílula colorida de status (Vou à aula, Cancelada ou Vou faltar) dentro do card."
+                )
+                .font(CampusTheme.font(size: 11))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(16)
         .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
@@ -290,6 +339,7 @@ internal struct ProfileFaqSectionView: View {
     let onRequestSignOut: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
 
     private let faqEntries: [ProfileFaqEntry] = [
         ProfileFaqEntry(
@@ -320,22 +370,53 @@ internal struct ProfileFaqSectionView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("AVISO DE INDEPENDÊNCIA")
-                .font(CampusTheme.font(size: 11, weight: .bold))
-                .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+        let accessibleAccent = CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme)
 
-            Text("Projeto estudantil sem vínculo institucional")
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                GitHubOctocatShape()
+                    .fill(accessibleAccent)
+                    .frame(width: 20, height: 20)
+                    .accessibilityHidden(true)
+
+                Text("AVISO DE INDEPENDÊNCIA")
+                    .font(CampusTheme.font(size: 11, weight: .bold))
+                    .foregroundStyle(accessibleAccent)
+            }
+
+            Text("Projeto estudantil independente e de código aberto")
                 .font(CampusTheme.font(size: 15, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
-            Text("Este é um aplicativo independente, desenvolvido por estudantes e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).")
-                .font(.system(size: 12))
+            Text("Este é um aplicativo independente, desenvolvido por estudantes sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP). O código-fonte é aberto, auditável e focado em privacidade local e rapidez offline.")
+                .font(CampusTheme.font(size: 12))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                if let url = URL(string: "https://github.com/NuncaMorto/Vida-Academica") {
+                    openURL(url)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    GitHubOctocatShape()
+                        .fill(accessibleAccent)
+                        .frame(width: 16, height: 16)
+                        .accessibilityHidden(true)
+                    Text("Acessar repositório no GitHub")
+                        .font(CampusTheme.font(size: 13, weight: .bold))
+                        .foregroundStyle(accessibleAccent)
+                }
+                .frame(maxWidth: .infinity, minHeight: max(48, minTouch))
+                .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+            .accessibilityLabel("Acessar repositório no GitHub")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
 
         VStack(spacing: 10) {
             ForEach(faqEntries) { entry in
@@ -365,12 +446,6 @@ internal struct ProfileFaqSectionView: View {
             }
         }
 
-        ProfileAboutOpenSourceCard(
-            primaryAccent: primaryAccent,
-            highContrast: highContrast,
-            minTouch: minTouch
-        )
-
         Button(role: .destructive) {
             onRequestSignOut()
         } label: {
@@ -391,46 +466,42 @@ internal struct ProfileFaqSectionView: View {
     }
 }
 
-private struct ProfileAboutOpenSourceCard: View {
-    let primaryAccent: Color
-    let highContrast: Bool
-    let minTouch: CGFloat
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
-
-                Text("Sobre o Vida Acadêmica & Código Aberto")
-                    .font(CampusTheme.font(size: 15, weight: .bold))
-                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-            }
-
-            Text("Aplicativo open source desenvolvido para estudantes da UFOP, com foco em privacidade local, rapidez offline e acessibilidade.")
-                .font(CampusTheme.font(size: 12))
-                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button {
-                if let url = URL(string: "https://github.com/NuncaMorto/Vida-Academica") {
-                    openURL(url)
-                }
-            } label: {
-                Label("Acessar repositório no GitHub", systemImage: "arrow.up.right.square")
-                    .font(CampusTheme.font(size: 13, weight: .bold))
-                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
-                    .frame(maxWidth: .infinity, minHeight: max(48, minTouch))
-                    .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
-            }
-            .buttonStyle(.plain)
-            .minimumTouchTarget(minTouch)
+private struct GitHubOctocatShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 24.0
+        let sy = rect.height / 24.0
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
         }
-        .padding(16)
-        .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
+
+        var path = Path()
+        path.move(to: pt(12.0, 0.3))
+        path.addCurve(to: pt(0.0, 12.3), control1: pt(5.37, 0.3), control2: pt(0.0, 5.67))
+        path.addCurve(to: pt(8.21, 23.69), control1: pt(0.0, 17.6), control2: pt(3.44, 22.1))
+        path.addCurve(to: pt(9.03, 23.11), control1: pt(8.81, 23.8), control2: pt(9.03, 23.43))
+        path.addCurve(to: pt(9.01, 21.05), control1: pt(9.03, 22.82), control2: pt(9.02, 22.06))
+        path.addCurve(to: pt(4.97, 19.44), control1: pt(5.67, 21.78), control2: pt(4.97, 19.44))
+        path.addCurve(to: pt(3.64, 17.68), control1: pt(4.42, 18.05), control2: pt(3.64, 17.68))
+        path.addCurve(to: pt(3.72, 16.95), control1: pt(2.55, 16.93), control2: pt(3.72, 16.95))
+        path.addCurve(to: pt(5.56, 18.19), control1: pt(4.92, 17.03), control2: pt(5.56, 18.19))
+        path.addCurve(to: pt(9.05, 19.19), control1: pt(6.63, 20.02), control2: pt(8.37, 19.49))
+        path.addCurve(to: pt(9.81, 17.59), control1: pt(9.16, 18.41), control2: pt(9.47, 17.89))
+        path.addCurve(to: pt(4.34, 11.66), control1: pt(7.14, 17.29), control2: pt(4.34, 16.26))
+        path.addCurve(to: pt(5.58, 8.44), control1: pt(4.34, 10.35), control2: pt(4.81, 9.28))
+        path.addCurve(to: pt(5.70, 5.26), control1: pt(5.46, 8.14), control2: pt(5.04, 6.92))
+        path.addCurve(to: pt(9.00, 6.49), control1: pt(5.70, 5.26), control2: pt(6.71, 4.94))
+        path.addCurve(to: pt(12.0, 6.09), control1: pt(9.96, 6.22), control2: pt(10.98, 6.09))
+        path.addCurve(to: pt(15.0, 6.49), control1: pt(13.02, 6.09), control2: pt(14.04, 6.23))
+        path.addCurve(to: pt(18.30, 5.26), control1: pt(17.29, 4.94), control2: pt(18.30, 5.26))
+        path.addCurve(to: pt(18.42, 8.44), control1: pt(18.95, 6.91), control2: pt(18.54, 8.13))
+        path.addCurve(to: pt(19.66, 11.66), control1: pt(19.19, 9.28), control2: pt(19.66, 10.35))
+        path.addCurve(to: pt(14.18, 17.58), control1: pt(19.66, 16.27), control2: pt(16.85, 17.28))
+        path.addCurve(to: pt(14.99, 19.80), control1: pt(14.61, 17.95), control2: pt(14.99, 18.68))
+        path.addCurve(to: pt(14.98, 23.09), control1: pt(14.99, 21.40), control2: pt(14.98, 22.70))
+        path.addCurve(to: pt(15.81, 23.67), control1: pt(14.98, 23.41), control2: pt(15.20, 23.79))
+        path.addCurve(to: pt(24.0, 12.3), control1: pt(20.56, 22.1), control2: pt(24.0, 17.6))
+        path.addCurve(to: pt(12.0, 0.3), control1: pt(24.0, 5.67), control2: pt(18.63, 0.3))
+        path.closeSubpath()
+        return path
     }
 }

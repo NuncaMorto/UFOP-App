@@ -438,34 +438,39 @@ private val avatarBitmapCache: LruCache<String, ImageBitmap> by lazy {
     LruCache<String, ImageBitmap>(8)
 }
 
-/** Decodifica o avatar em background (<= 384px) com cache em memória (LruCache) para evitar flash de iniciais. */
+private val avatarLatestByPath = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
+
+/** Decodifica o avatar em background (<= 384px) com cache em memória (LruCache) sem I/O na main thread. */
 @Composable
 internal fun rememberAvatarBitmap(avatarPath: String?, revision: Int = 0): ImageBitmap? {
-    val cacheKey = remember(avatarPath, revision) {
-        if (avatarPath.isNullOrBlank()) {
-            null
-        } else {
-            val lastModified = runCatching { File(avatarPath).lastModified() }.getOrDefault(0L)
-            "$avatarPath:$lastModified:$revision"
-        }
+    val cleanPath = avatarPath?.takeIf { it.isNotBlank() }
+    val initialCached = remember(cleanPath) {
+        cleanPath?.let { avatarLatestByPath[it] }
     }
-    val cachedBitmap = remember(cacheKey) {
-        cacheKey?.let { avatarBitmapCache.get(it) }
-    }
-    val state = produceState<ImageBitmap?>(initialValue = cachedBitmap, key1 = cacheKey) {
-        if (cacheKey == null || avatarPath.isNullOrBlank()) {
+    val state = produceState<ImageBitmap?>(initialValue = initialCached, key1 = cleanPath, key2 = revision) {
+        if (cleanPath == null) {
             value = null
             return@produceState
         }
-        avatarBitmapCache.get(cacheKey)?.let { hit ->
-            value = hit
-            return@produceState
+        val resolved = withContext(Dispatchers.IO) {
+            val file = File(cleanPath)
+            if (!file.exists() || !file.isFile) {
+                avatarLatestByPath.remove(cleanPath)
+                return@withContext null
+            }
+            val cacheKey = "$cleanPath:${file.lastModified()}:$revision"
+            avatarBitmapCache.get(cacheKey)?.let { hit ->
+                avatarLatestByPath[cleanPath] = hit
+                return@withContext hit
+            }
+            val decoded = decodeSampledBitmapFromFile(cleanPath, 384)
+            if (decoded != null) {
+                avatarBitmapCache.put(cacheKey, decoded)
+                avatarLatestByPath[cleanPath] = decoded
+            }
+            decoded
         }
-        val decoded = withContext(Dispatchers.IO) { decodeSampledBitmapFromFile(avatarPath, 384) }
-        if (decoded != null) {
-            avatarBitmapCache.put(cacheKey, decoded)
-        }
-        value = decoded
+        value = resolved
     }
     return state.value
 }

@@ -92,6 +92,7 @@ import br.ufop.campus.core.ffi.AssessmentWithCourse
 import br.ufop.campus.core.ffi.CourseScheduleSlotItem
 import br.ufop.campus.core.ffi.DisciplineDetail
 import br.ufop.campus.core.ffi.SyllabusImportReport
+import br.ufop.campus.core.ffi.extractDepartmentAcronym
 import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.map.extractCourseSectionFromNotes
 import br.ufop.campus.core.map.isEadMapLocation
@@ -521,12 +522,12 @@ fun DisciplineDetailBottomSheet(
                                 .background(accentColor)
                         )
                         Text(
-                            text = effectiveSummary.departmentName,
+                            text = extractDepartmentAcronym(effectiveSummary.departmentName),
                             style = MaterialTheme.typography.labelLarge,
                             color = accessibleAccent,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f, fill = false),
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis
                         )
                         if (courseCode.isNotBlank()) {

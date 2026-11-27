@@ -160,7 +160,7 @@ fun ActivitiesPlaceholderScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
+            item(key = "activities_header") {
                 ActivitiesHeader(
                     activeSemester = activeSemester,
                     pendingCount = pendingCount,
@@ -179,7 +179,7 @@ fun ActivitiesPlaceholderScreen(
             }
 
             if (syllabusImportBannerMessage != null) {
-                item {
+                item(key = "activities_syllabus_banner") {
                     ActivitiesSyllabusImportBanner(
                         message = syllabusImportBannerMessage!!,
                         isWarning = syllabusImportBannerIsWarning,
@@ -191,12 +191,12 @@ fun ActivitiesPlaceholderScreen(
             }
 
             if (emptyCoursesNotice && disciplines.isEmpty()) {
-                item {
+                item(key = "activities_empty_courses_banner") {
                     ActivitiesEmptyCoursesBanner()
                 }
             }
 
-            item {
+            item(key = "activities_filter_bar") {
                 ActivitiesFilterBar(
                     typeFilterLabel = typeFilterLabel,
                     hasActiveTypeFilter = hasActiveTypeFilter,
@@ -234,7 +234,7 @@ fun ActivitiesPlaceholderScreen(
             }
 
             if (filteredEntries.isEmpty()) {
-                item {
+                item(key = "activities_empty_state") {
                     ActivitiesEmptyStateCard(
                         hasDisciplines = disciplines.isNotEmpty(),
                         typeFilterLabel = typeFilterLabel
@@ -428,7 +428,7 @@ fun ActivitiesPlaceholderScreen(
                 }
             }
 
-            item {
+            item(key = "activities_footer") {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Toque em uma avaliação para editar data, horário ou título, excluir ou marcar como concluída.",

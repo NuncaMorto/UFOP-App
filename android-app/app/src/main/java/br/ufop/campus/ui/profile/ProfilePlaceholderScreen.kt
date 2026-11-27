@@ -883,13 +883,7 @@ fun ProfilePlaceholderScreen(
             }
 
             ProfileDestination.FAQ -> {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    ProfileFaqSubView()
-                    ProfileAboutOpenSourceCard()
-                }
+                ProfileFaqSubView()
             }
         }
     }

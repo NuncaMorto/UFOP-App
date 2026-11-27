@@ -22,8 +22,8 @@ public enum CampusTab: Hashable, CaseIterable, Sendable {
     public var systemImage: String {
         switch self {
         case .agenda: return "calendar"
-        case .disciplines: return "book.closed.fill"
-        case .activities: return "checklist"
+        case .disciplines: return "books.vertical"
+        case .activities: return "checkmark.circle"
         case .profile: return "person.crop.circle"
         case .map: return "map"
         }
@@ -31,8 +31,11 @@ public enum CampusTab: Hashable, CaseIterable, Sendable {
 
     public var selectedSystemImage: String {
         switch self {
+        case .agenda: return "calendar"
+        case .disciplines: return "books.vertical.fill"
+        case .activities: return "checkmark.circle.fill"
+        case .profile: return "person.crop.circle.fill"
         case .map: return "map.fill"
-        default: return systemImage
         }
     }
 }

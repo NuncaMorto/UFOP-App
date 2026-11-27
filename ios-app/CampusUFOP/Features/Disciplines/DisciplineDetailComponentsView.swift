@@ -65,16 +65,32 @@ internal struct DisciplineDetailTopBar: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let deptAcronym = CampusStore.departmentAcronym(from: summary.department)
+        let accessibleDept = CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme)
+
         HStack(spacing: 8) {
+            if !deptAcronym.isEmpty {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(deptColor)
+                        .frame(width: 8, height: 8)
+                    Text(deptAcronym)
+                        .font(CampusTheme.font(size: 13, weight: .semibold))
+                        .foregroundStyle(accessibleDept)
+                        .lineLimit(1)
+                }
+            }
+
             Text(summary.code)
                 .font(CampusTheme.tabularFont(size: 12, weight: .bold))
-                .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
+                .foregroundStyle(accessibleDept)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule(style: .continuous)
                         .fill(CampusTheme.departmentSoftTint(for: summary.colorKey, scheme: colorScheme))
                 )
+                .lineLimit(1)
 
             Text(summary.semester)
                 .font(CampusTheme.tabularFont(size: 12, weight: .bold))

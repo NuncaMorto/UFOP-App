@@ -1,7 +1,9 @@
 package br.ufop.campus.ui.navigation
 
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
@@ -11,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,14 +30,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -72,6 +80,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -104,27 +113,33 @@ import java.io.File
 
 enum class CampusTab(
     val label: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val selectedIcon: ImageVector
 ) {
     AGENDA(
         label = "Agenda",
-        icon = Icons.Default.DateRange
+        icon = Icons.Rounded.CalendarToday,
+        selectedIcon = Icons.Rounded.CalendarMonth
     ),
     DISCIPLINES(
         label = "Disciplinas",
-        icon = Icons.AutoMirrored.Filled.List
+        icon = Icons.Outlined.AutoStories,
+        selectedIcon = Icons.Rounded.AutoStories
     ),
     ACTIVITIES(
         label = "Atividades",
-        icon = Icons.Default.CheckCircle
+        icon = Icons.Rounded.TaskAlt,
+        selectedIcon = Icons.Rounded.CheckCircle
     ),
     PROFILE(
         label = "Perfil",
-        icon = Icons.Default.Person
+        icon = Icons.Rounded.Person,
+        selectedIcon = Icons.Rounded.Person
     ),
     MAP(
         label = "Mapa",
-        icon = Icons.Outlined.Map
+        icon = Icons.Outlined.Map,
+        selectedIcon = Icons.Rounded.Map
     );
 
     companion object {
@@ -363,9 +378,12 @@ fun CampusNavigation(
                         avatarPath = studentProfile.avatarPath,
                         studentName = studentProfile.fullName,
                         avatarRefreshKey = mutationVersion,
+                        trackTabBounds = shouldShowGuidedTour,
                         onSelectTab = handleSelectTab,
                         onTabPositioned = { tab, rect ->
-                            tabBounds[tab] = rect
+                            if (shouldShowGuidedTour && tabBounds[tab] != rect) {
+                                tabBounds[tab] = rect
+                            }
                         },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
@@ -412,9 +430,12 @@ fun CampusNavigation(
                     avatarPath = studentProfile.avatarPath,
                     studentName = studentProfile.fullName,
                     avatarRefreshKey = mutationVersion,
+                    trackTabBounds = shouldShowGuidedTour,
                     onSelectTab = handleSelectTab,
                     onTabPositioned = { tab, rect ->
-                        tabBounds[tab] = rect
+                        if (shouldShowGuidedTour && tabBounds[tab] != rect) {
+                            tabBounds[tab] = rect
+                        }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -581,6 +602,38 @@ fun CampusNavigation(
     }
 }
 
+private val navAvatarBitmapCache: LruCache<String, ImageBitmap> by lazy {
+    LruCache<String, ImageBitmap>(6)
+}
+
+private val navAvatarLatestByPath = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
+
+private val NAV_SPRING_SPEC = spring<Float>(dampingRatio = 0.80f, stiffness = 420f)
+
+@Composable
+private fun rememberCachedNavAvatarBitmap(
+    avatarPath: String?,
+    avatarRefreshKey: Any
+): ImageBitmap? {
+    val initialBitmap = remember(avatarPath) {
+        avatarPath?.takeIf { it.isNotBlank() }?.let { navAvatarLatestByPath[it] }
+    }
+    val avatarBitmap by produceState<ImageBitmap?>(
+        initialValue = initialBitmap,
+        key1 = avatarPath,
+        key2 = avatarRefreshKey
+    ) {
+        value = if (avatarPath.isNullOrBlank()) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                decodeNavAvatarBitmapCached(avatarPath, maxSizePx = 96)
+            }
+        }
+    }
+    return avatarBitmap
+}
+
 @Composable
 private fun FloatingVerticalCampusNavigationIsland(
     selectedTab: CampusTab,
@@ -589,27 +642,42 @@ private fun FloatingVerticalCampusNavigationIsland(
     avatarPath: String?,
     studentName: String,
     avatarRefreshKey: Any,
+    trackTabBounds: Boolean,
     onSelectTab: (CampusTab) -> Unit,
     onTabPositioned: (CampusTab, Rect) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val avatarBitmap by produceState<ImageBitmap?>(
-        initialValue = null,
-        key1 = avatarPath,
-        key2 = avatarRefreshKey
-    ) {
-        value = if (avatarPath.isNullOrBlank()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                decodeNavAvatarBitmap(avatarPath, maxSizePx = 96)
-            }
-        }
-    }
-
+    val avatarBitmap = rememberCachedNavAvatarBitmap(avatarPath, avatarRefreshKey)
+    val density = LocalDensity.current
     val capsuleBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
     val capsuleBorder = campusCardBorder(strokeWidth = 2.dp)
     val activeAccentText = campusAccentTextColor()
+
+    var lastPrimaryIndex by remember { mutableIntStateOf(0) }
+    val primaryIndex = CampusTab.primaryTabs.indexOf(selectedTab)
+    val isPrimarySelected = primaryIndex >= 0
+    val targetPrimaryIndex = if (isPrimarySelected) primaryIndex else lastPrimaryIndex
+    LaunchedEffect(primaryIndex) {
+        if (primaryIndex >= 0) {
+            lastPrimaryIndex = primaryIndex
+        }
+    }
+
+    val animatedIndex by animateFloatAsState(
+        targetValue = targetPrimaryIndex.toFloat(),
+        animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+        label = "VerticalNavPillSlideIndex"
+    )
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (isPrimarySelected) 1f else 0f,
+        animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+        label = "VerticalNavPillAlpha"
+    )
+    val pillScale by animateFloatAsState(
+        targetValue = if (isPrimarySelected) 1f else 0.86f,
+        animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+        label = "VerticalNavPillScale"
+    )
 
     Column(
         modifier = modifier,
@@ -624,87 +692,116 @@ private fun FloatingVerticalCampusNavigationIsland(
             tonalElevation = 0.dp,
             border = capsuleBorder
         ) {
-            Column(
+            val itemHeightDp = 58.dp
+            val gapDp = 4.dp
+            val itemHeightPx = with(density) { itemHeightDp.toPx() }
+            val gapPx = with(density) { gapDp.toPx() }
+
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 5.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(horizontal = 5.dp, vertical = 8.dp)
             ) {
-                CampusTab.primaryTabs.forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    val pillColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        } else {
-                            Color.Transparent
-                        },
-                        animationSpec = if (reduceMotion) snap() else spring(),
-                        label = "VerticalIslandPillBg_${tab.name}"
-                    )
-                    val itemColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        animationSpec = if (reduceMotion) snap() else spring(),
-                        label = "VerticalIslandContent_${tab.name}"
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(itemHeightDp)
+                        .graphicsLayer {
+                            translationY = animatedIndex * (itemHeightPx + gapPx)
+                            scaleX = pillScale
+                            scaleY = pillScale
+                            alpha = pillAlpha
+                        }
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                )
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(58.dp)
-                            .onGloballyPositioned { coords ->
-                                onTabPositioned(tab, coords.boundsInRoot())
-                            }
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(pillColor)
-                            .semantics {
-                                selected = isSelected
-                                contentDescription = "Aba ${tab.label}"
-                            }
-                            .clickable(
-                                role = Role.Tab,
-                                onClick = { onSelectTab(tab) }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 2.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (tab == CampusTab.PROFILE) {
-                                ProfileTabAvatarIcon(
-                                    avatarBitmap = avatarBitmap,
-                                    studentName = studentName,
-                                    isSelected = isSelected,
-                                    contentColor = itemColor
-                                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(gapDp)
+                ) {
+                    CampusTab.primaryTabs.forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        val itemColor by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
                             } else {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = itemColor,
-                                    modifier = Modifier.size(21.dp)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            animationSpec = if (reduceMotion) snap() else spring(),
+                            label = "VerticalIslandContent_${tab.name}"
+                        )
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.08f else 1.0f,
+                            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+                            label = "VerticalIslandIconScale_${tab.name}"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(itemHeightDp)
+                                .then(
+                                    if (trackTabBounds) {
+                                        Modifier.onGloballyPositioned { coords ->
+                                            onTabPositioned(tab, coords.boundsInRoot())
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .clip(RoundedCornerShape(999.dp))
+                                .semantics {
+                                    selected = isSelected
+                                    contentDescription = "Aba ${tab.label}"
+                                }
+                                .clickable(
+                                    role = Role.Tab,
+                                    onClick = { onSelectTab(tab) }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 2.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                if (tab == CampusTab.PROFILE) {
+                                    ProfileTabAvatarIcon(
+                                        avatarBitmap = avatarBitmap,
+                                        studentName = studentName,
+                                        isSelected = isSelected,
+                                        contentColor = itemColor
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (isSelected) tab.selectedIcon else tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = itemColor,
+                                        modifier = Modifier
+                                            .size(21.dp)
+                                            .graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                Text(
+                                    text = tab.label,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
+                                    letterSpacing = (-0.2).sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = itemColor,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = tab.label,
-                                fontSize = 10.sp,
-                                lineHeight = 12.sp,
-                                letterSpacing = (-0.2).sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = itemColor,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
                     }
                 }
@@ -712,14 +809,20 @@ private fun FloatingVerticalCampusNavigationIsland(
         }
 
         val isMapSelected = selectedTab == CampusTab.MAP
-        val mapPillColor by animateColorAsState(
-            targetValue = if (isMapSelected) {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            } else {
-                Color.Transparent
-            },
-            animationSpec = if (reduceMotion) snap() else spring(),
-            label = "VerticalIslandMapBtnBg"
+        val mapPillAlpha by animateFloatAsState(
+            targetValue = if (isMapSelected) 1f else 0f,
+            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+            label = "VerticalIslandMapBtnAlpha"
+        )
+        val mapPillScale by animateFloatAsState(
+            targetValue = if (isMapSelected) 1f else 0.84f,
+            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+            label = "VerticalIslandMapBtnScale"
+        )
+        val mapIconScale by animateFloatAsState(
+            targetValue = if (isMapSelected) 1.08f else 1.0f,
+            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+            label = "VerticalIslandMapIconScale"
         )
         val mapIconColor by animateColorAsState(
             targetValue = if (isMapSelected) {
@@ -743,11 +846,16 @@ private fun FloatingVerticalCampusNavigationIsland(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(5.dp)
-                    .onGloballyPositioned { coords ->
-                        onTabPositioned(CampusTab.MAP, coords.boundsInRoot())
-                    }
+                    .then(
+                        if (trackTabBounds) {
+                            Modifier.onGloballyPositioned { coords ->
+                                onTabPositioned(CampusTab.MAP, coords.boundsInRoot())
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
                     .clip(CircleShape)
-                    .background(mapPillColor)
                     .semantics {
                         selected = isMapSelected
                         contentDescription = "Aba Mapa"
@@ -758,11 +866,27 @@ private fun FloatingVerticalCampusNavigationIsland(
                     ),
                 contentAlignment = Alignment.Center
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = mapPillScale
+                            scaleY = mapPillScale
+                            alpha = mapPillAlpha
+                        }
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                )
                 Icon(
-                    imageVector = if (isMapSelected) Icons.Filled.Map else CampusTab.MAP.icon,
+                    imageVector = if (isMapSelected) CampusTab.MAP.selectedIcon else CampusTab.MAP.icon,
                     contentDescription = "Mapa",
                     tint = mapIconColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer {
+                            scaleX = mapIconScale
+                            scaleY = mapIconScale
+                        }
                 )
             }
         }
@@ -777,27 +901,42 @@ private fun FloatingCampusNavigationBar(
     avatarPath: String?,
     studentName: String,
     avatarRefreshKey: Any,
+    trackTabBounds: Boolean,
     onSelectTab: (CampusTab) -> Unit,
     onTabPositioned: (CampusTab, Rect) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val avatarBitmap by produceState<ImageBitmap?>(
-        initialValue = null,
-        key1 = avatarPath,
-        key2 = avatarRefreshKey
-    ) {
-        value = if (avatarPath.isNullOrBlank()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                decodeNavAvatarBitmap(avatarPath, maxSizePx = 96)
-            }
-        }
-    }
-
+    val avatarBitmap = rememberCachedNavAvatarBitmap(avatarPath, avatarRefreshKey)
+    val density = LocalDensity.current
     val capsuleBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
     val capsuleBorder = campusCardBorder(strokeWidth = 2.dp)
     val activeAccentText = campusAccentTextColor()
+
+    var lastPrimaryIndex by remember { mutableIntStateOf(0) }
+    val primaryIndex = CampusTab.primaryTabs.indexOf(selectedTab)
+    val isPrimarySelected = primaryIndex >= 0
+    val targetPrimaryIndex = if (isPrimarySelected) primaryIndex else lastPrimaryIndex
+    LaunchedEffect(primaryIndex) {
+        if (primaryIndex >= 0) {
+            lastPrimaryIndex = primaryIndex
+        }
+    }
+
+    val animatedIndex by animateFloatAsState(
+        targetValue = targetPrimaryIndex.toFloat(),
+        animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+        label = "FloatingNavPillSlideIndex"
+    )
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (isPrimarySelected) 1f else 0f,
+        animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+        label = "FloatingNavPillAlpha"
+    )
+    val pillScale by animateFloatAsState(
+        targetValue = if (isPrimarySelected) 1f else 0.86f,
+        animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+        label = "FloatingNavPillScale"
+    )
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -814,87 +953,118 @@ private fun FloatingCampusNavigationBar(
             tonalElevation = 0.dp,
             border = capsuleBorder
         ) {
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 4.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 4.dp, vertical = 5.dp)
             ) {
-                CampusTab.primaryTabs.forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    val pillColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        } else {
-                            Color.Transparent
-                        },
-                        animationSpec = if (reduceMotion) snap() else spring(),
-                        label = "FloatingNavPillBg_${tab.name}"
-                    )
-                    val itemColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        animationSpec = if (reduceMotion) snap() else spring(),
-                        label = "FloatingNavContent_${tab.name}"
-                    )
+                val tabCount = CampusTab.primaryTabs.size
+                val gapDp = 2.dp
+                val gapPx = with(density) { gapDp.toPx() }
+                val totalWidthPx = constraints.maxWidth.toFloat()
+                val slotWidthPx = ((totalWidthPx - gapPx * (tabCount - 1)) / tabCount).coerceAtLeast(0f)
+                val slotWidthDp = with(density) { slotWidthPx.toDp() }
 
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .onGloballyPositioned { coords ->
-                                onTabPositioned(tab, coords.boundsInRoot())
-                            }
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(pillColor)
-                            .semantics {
-                                selected = isSelected
-                                contentDescription = "Aba ${tab.label}"
-                            }
-                            .clickable(
-                                role = Role.Tab,
-                                onClick = { onSelectTab(tab) }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 2.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (tab == CampusTab.PROFILE) {
-                                ProfileTabAvatarIcon(
-                                    avatarBitmap = avatarBitmap,
-                                    studentName = studentName,
-                                    isSelected = isSelected,
-                                    contentColor = itemColor
-                                )
+                Box(
+                    modifier = Modifier
+                        .width(slotWidthDp)
+                        .fillMaxHeight()
+                        .graphicsLayer {
+                            translationX = animatedIndex * (slotWidthPx + gapPx)
+                            scaleX = pillScale
+                            scaleY = pillScale
+                            alpha = pillAlpha
+                        }
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(gapDp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CampusTab.primaryTabs.forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        val itemColor by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
                             } else {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.label,
-                                    tint = itemColor,
-                                    modifier = Modifier.size(21.dp)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            animationSpec = if (reduceMotion) snap() else spring(),
+                            label = "FloatingNavContent_${tab.name}"
+                        )
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.08f else 1.0f,
+                            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+                            label = "FloatingNavIconScale_${tab.name}"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .then(
+                                    if (trackTabBounds) {
+                                        Modifier.onGloballyPositioned { coords ->
+                                            onTabPositioned(tab, coords.boundsInRoot())
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .clip(RoundedCornerShape(999.dp))
+                                .semantics {
+                                    selected = isSelected
+                                    contentDescription = "Aba ${tab.label}"
+                                }
+                                .clickable(
+                                    role = Role.Tab,
+                                    onClick = { onSelectTab(tab) }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 2.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                if (tab == CampusTab.PROFILE) {
+                                    ProfileTabAvatarIcon(
+                                        avatarBitmap = avatarBitmap,
+                                        studentName = studentName,
+                                        isSelected = isSelected,
+                                        contentColor = itemColor
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (isSelected) tab.selectedIcon else tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = itemColor,
+                                        modifier = Modifier
+                                            .size(21.dp)
+                                            .graphicsLayer {
+                                                scaleX = iconScale
+                                                scaleY = iconScale
+                                            }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                Text(
+                                    text = tab.label,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
+                                    letterSpacing = (-0.2).sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = itemColor,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = tab.label,
-                                fontSize = 10.sp,
-                                lineHeight = 12.sp,
-                                letterSpacing = (-0.2).sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = itemColor,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
                     }
                 }
@@ -902,14 +1072,20 @@ private fun FloatingCampusNavigationBar(
         }
 
         val isMapSelected = selectedTab == CampusTab.MAP
-        val mapPillColor by animateColorAsState(
-            targetValue = if (isMapSelected) {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            } else {
-                Color.Transparent
-            },
-            animationSpec = if (reduceMotion) snap() else spring(),
-            label = "FloatingMapBtnBg"
+        val mapPillAlpha by animateFloatAsState(
+            targetValue = if (isMapSelected) 1f else 0f,
+            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+            label = "FloatingMapBtnAlpha"
+        )
+        val mapPillScale by animateFloatAsState(
+            targetValue = if (isMapSelected) 1f else 0.84f,
+            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+            label = "FloatingMapBtnScale"
+        )
+        val mapIconScale by animateFloatAsState(
+            targetValue = if (isMapSelected) 1.08f else 1.0f,
+            animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
+            label = "FloatingMapIconScale"
         )
         val mapIconColor by animateColorAsState(
             targetValue = if (isMapSelected) {
@@ -933,11 +1109,16 @@ private fun FloatingCampusNavigationBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(5.dp)
-                    .onGloballyPositioned { coords ->
-                        onTabPositioned(CampusTab.MAP, coords.boundsInRoot())
-                    }
+                    .then(
+                        if (trackTabBounds) {
+                            Modifier.onGloballyPositioned { coords ->
+                                onTabPositioned(CampusTab.MAP, coords.boundsInRoot())
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
                     .clip(CircleShape)
-                    .background(mapPillColor)
                     .semantics {
                         selected = isMapSelected
                         contentDescription = "Aba Mapa"
@@ -948,11 +1129,27 @@ private fun FloatingCampusNavigationBar(
                     ),
                 contentAlignment = Alignment.Center
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = mapPillScale
+                            scaleY = mapPillScale
+                            alpha = mapPillAlpha
+                        }
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                )
                 Icon(
-                    imageVector = if (isMapSelected) Icons.Filled.Map else CampusTab.MAP.icon,
+                    imageVector = if (isMapSelected) CampusTab.MAP.selectedIcon else CampusTab.MAP.icon,
                     contentDescription = "Mapa",
                     tint = mapIconColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer {
+                            scaleX = mapIconScale
+                            scaleY = mapIconScale
+                        }
                 )
             }
         }
@@ -1031,10 +1228,18 @@ private fun extractNavInitials(fullName: String): String {
     }
 }
 
-private fun decodeNavAvatarBitmap(path: String, maxSizePx: Int = 96): ImageBitmap? {
+private fun decodeNavAvatarBitmapCached(path: String, maxSizePx: Int = 96): ImageBitmap? {
     val file = File(path)
-    if (!file.exists() || !file.isFile) return null
-    return runCatching {
+    if (!file.exists() || !file.isFile) {
+        navAvatarLatestByPath.remove(path)
+        return null
+    }
+    val key = "$path:${file.lastModified()}:$maxSizePx"
+    navAvatarBitmapCache.get(key)?.let { hit ->
+        navAvatarLatestByPath[path] = hit
+        return hit
+    }
+    val decoded = runCatching {
         val bounds = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
         }
@@ -1052,4 +1257,9 @@ private fun decodeNavAvatarBitmap(path: String, maxSizePx: Int = 96): ImageBitma
         }
         BitmapFactory.decodeFile(file.absolutePath, decodeOptions)?.asImageBitmap()
     }.getOrNull()
+    if (decoded != null) {
+        navAvatarBitmapCache.put(key, decoded)
+        navAvatarLatestByPath[path] = decoded
+    }
+    return decoded
 }

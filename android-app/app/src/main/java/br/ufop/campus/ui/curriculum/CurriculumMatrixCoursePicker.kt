@@ -36,8 +36,9 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -172,11 +174,108 @@ internal fun CurriculumMatrixTopBar(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun CurriculumVersionDropdownSelector(
+    availableVersions: List<UfopCourseCurriculum>,
+    selectedCurriculumVersion: String,
+    minTouchTarget: Dp = 48.dp,
+    onSelectVersion: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val activeVersion = availableVersions.firstOrNull { it.curriculumVersion == selectedCurriculumVersion }
+        ?: availableVersions.firstOrNull()
+    val selectedLabel = activeVersion?.let {
+        formatCurriculumVersionLabel(it.curriculumVersion, it.effectiveFromYear, it.effectiveFromSemester)
+    } ?: selectedCurriculumVersion
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = minTouchTarget),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = campusCardBorder()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = selectedLabel,
+                    style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Selecionar versão da matriz",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            availableVersions.forEach { version ->
+                val isSelected = version.curriculumVersion == selectedCurriculumVersion
+                val label = formatCurriculumVersionLabel(
+                    version.curriculumVersion,
+                    version.effectiveFromYear,
+                    version.effectiveFromSemester
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyMedium.tabularNums(),
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    },
+                    trailingIcon = if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selecionado",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelectVersion(version.curriculumVersion)
+                    }
+                )
+            }
+        }
+    }
+}
+
 @Composable
 internal fun CurriculumVersionSelectorCard(
     availableVersions: List<UfopCourseCurriculum>,
     selectedCurriculumVersion: String,
+    minTouchTarget: Dp = 48.dp,
     onSelectVersion: (String) -> Unit
 ) {
     Surface(
@@ -189,8 +288,8 @@ internal fun CurriculumVersionSelectorCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = "Versão da matriz curricular",
@@ -198,42 +297,12 @@ internal fun CurriculumVersionSelectorCard(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                availableVersions.forEach { version ->
-                    val isVersionSelected = version.curriculumVersion == selectedCurriculumVersion
-                    val versionLabel = version.curriculumVersion.ifBlank {
-                        "${version.effectiveFromYear}/${version.effectiveFromSemester}"
-                    }
-                    FilterChip(
-                        selected = isVersionSelected,
-                        onClick = { onSelectVersion(version.curriculumVersion) },
-                        label = {
-                            Text(
-                                text = versionLabel,
-                                fontWeight = if (isVersionSelected) {
-                                    FontWeight.Bold
-                                } else {
-                                    FontWeight.Medium
-                                }
-                            )
-                        },
-                        leadingIcon = if (isVersionSelected) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                )
-                            }
-                        } else {
-                            null
-                        }
-                    )
-                }
-            }
+            CurriculumVersionDropdownSelector(
+                availableVersions = availableVersions,
+                selectedCurriculumVersion = selectedCurriculumVersion,
+                minTouchTarget = minTouchTarget,
+                onSelectVersion = onSelectVersion
+            )
         }
     }
 }
@@ -406,15 +475,18 @@ internal fun CurriculumLegacyReferencesCard(
                     val matrixUrl = officialLinks?.officialMatrixUrl?.takeIf { it.isNotBlank() }
                     val driveUrl = officialLinks?.drivePdfUrl?.takeIf { it.isNotBlank() }
                     if (matrixUrl != null || driveUrl != null) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (matrixUrl != null) {
-                                OutlinedButton(
+                                FilledTonalButton(
                                     onClick = { onOpenUrl(matrixUrl) },
-                                    modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
-                                    shape = RoundedCornerShape(16.dp)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .defaultMinSize(minHeight = minTouchTarget),
+                                    shape = RoundedCornerShape(CampusPillRadius),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
@@ -422,14 +494,21 @@ internal fun CurriculumLegacyReferencesCard(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Portal oficial UFOP")
+                                    Text(
+                                        text = "Portal oficial UFOP",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                             if (driveUrl != null) {
-                                OutlinedButton(
+                                FilledTonalButton(
                                     onClick = { onOpenUrl(driveUrl) },
-                                    modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
-                                    shape = RoundedCornerShape(16.dp)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .defaultMinSize(minHeight = minTouchTarget),
+                                    shape = RoundedCornerShape(CampusPillRadius),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
@@ -437,7 +516,11 @@ internal fun CurriculumLegacyReferencesCard(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("PDF matriz 2026/2")
+                                    Text(
+                                        text = "PDF matriz 2026/2",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                         }
@@ -458,15 +541,15 @@ private fun LegacyReferenceItemRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = campusCardBorder()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -511,11 +594,13 @@ private fun LegacyReferenceItemRow(
                 )
             }
 
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { onOpenUrl(reference.url) },
-                modifier = Modifier.defaultMinSize(minHeight = minTouchTarget),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = minTouchTarget),
+                shape = RoundedCornerShape(CampusPillRadius),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
@@ -550,7 +635,6 @@ internal fun CourseWorkloadSummaryCard(
     var isSummaryExpanded by rememberSaveable(course.code, course.curriculumVersion) {
         mutableStateOf(false)
     }
-    val hasCreData = creReport != null && (creReport.completedHours > 0 || creReport.semesters.isNotEmpty())
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -573,7 +657,7 @@ internal fun CourseWorkloadSummaryCard(
                     .clickable { isSummaryExpanded = !isSummaryExpanded }
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
@@ -584,7 +668,7 @@ internal fun CourseWorkloadSummaryCard(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.semantics { heading() }
                     )
@@ -607,41 +691,29 @@ internal fun CourseWorkloadSummaryCard(
                     )
                 }
 
-                if (hasCreData && creReport != null) {
-                    Surface(
-                        shape = RoundedCornerShape(CampusPillRadius),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = String.format(Locale("pt", "BR"), "CRE %.2f", creReport.overallCre),
-                            style = MaterialTheme.typography.labelSmall.tabularNums(),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                Surface(
+                    onClick = { isSummaryExpanded = !isSummaryExpanded },
+                    modifier = Modifier.size(minTouchTarget),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = campusCardBorder()
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isSummaryExpanded) {
+                                Icons.Default.KeyboardArrowUp
+                            } else {
+                                Icons.Default.KeyboardArrowDown
+                            },
+                            contentDescription = if (isSummaryExpanded) {
+                                "Recolher detalhes do curso"
+                            } else {
+                                "Expandir detalhes do curso"
+                            },
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = if (isSummaryExpanded) "Ocultar" else "Detalhes",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Icon(
-                        imageVector = if (isSummaryExpanded) {
-                            Icons.Default.KeyboardArrowUp
-                        } else {
-                            Icons.Default.KeyboardArrowDown
-                        },
-                        contentDescription = if (isSummaryExpanded) "Recolher resumo da matriz" else "Expandir resumo da matriz",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
                 }
             }
 
@@ -708,8 +780,11 @@ internal fun CourseWorkloadSummaryCard(
                         val visibleStatus = course.status
                             .trim()
                             .takeIf { it.isNotBlank() && !it.equals("Coletada", ignoreCase = true) }
+                        val formattedVersion = course.curriculumVersion
+                            .takeIf { it.isNotBlank() }
+                            ?.let { "Versão ${formatCurriculumVersionLabel(it, course.effectiveFromYear, course.effectiveFromSemester)}" }
                         val versionText = listOfNotNull(
-                            course.curriculumVersion.takeIf { it.isNotBlank() }?.let { "Versão $it" },
+                            formattedVersion,
                             visibleStatus
                         ).joinToString(" · ")
                         if (versionText.isNotEmpty()) {
@@ -731,42 +806,12 @@ internal fun CourseWorkloadSummaryCard(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    availableVersions.forEach { version ->
-                                        val isVersionSelected = version.curriculumVersion == selectedCurriculumVersion
-                                        val versionLabel = version.curriculumVersion.ifBlank {
-                                            "${version.effectiveFromYear}/${version.effectiveFromSemester}"
-                                        }
-                                        FilterChip(
-                                            selected = isVersionSelected,
-                                            onClick = { onSelectVersion(version.curriculumVersion) },
-                                            label = {
-                                                Text(
-                                                    text = versionLabel,
-                                                    fontWeight = if (isVersionSelected) {
-                                                        FontWeight.Bold
-                                                    } else {
-                                                        FontWeight.Medium
-                                                    }
-                                                )
-                                            },
-                                            leadingIcon = if (isVersionSelected) {
-                                                {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                                    )
-                                                }
-                                            } else {
-                                                null
-                                            }
-                                        )
-                                    }
-                                }
+                                CurriculumVersionDropdownSelector(
+                                    availableVersions = availableVersions,
+                                    selectedCurriculumVersion = selectedCurriculumVersion,
+                                    minTouchTarget = minTouchTarget,
+                                    onSelectVersion = onSelectVersion
+                                )
                             }
                         }
                     }

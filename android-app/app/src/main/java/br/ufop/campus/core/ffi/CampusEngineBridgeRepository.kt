@@ -834,6 +834,29 @@ class CampusEngineBridgeRepository(
         fallback.getDynamicGridAllCompleted()
     }
 
+    // v1.9.21: Estilo de indicador de presença & versão de currículo por curso
+    override fun getAttendanceIndicatorStyle(): String = synchronized(lock) {
+        fallback.getAttendanceIndicatorStyle()
+    }
+
+    override fun setAttendanceIndicatorStyle(style: String): Unit = synchronized(lock) {
+        fallback.setAttendanceIndicatorStyle(style)
+        _mutationVersion.value += 1L
+    }
+
+    override fun getSelectedCurriculumVersion(courseCode: String): String? = synchronized(lock) {
+        fallback.getSelectedCurriculumVersion(courseCode)
+    }
+
+    override fun setSelectedCurriculumVersion(courseCode: String, version: String): Unit = synchronized(lock) {
+        fallback.setSelectedCurriculumVersion(courseCode, version)
+        _mutationVersion.value += 1L
+    }
+
+    override fun getAllSelectedCurriculumVersions(): Map<String, String> = synchronized(lock) {
+        fallback.getAllSelectedCurriculumVersions()
+    }
+
     private fun mapCampusException(
         err: br.ufop.campus.core.uniffi.CampusException
     ): RuntimeException = when (err) {

@@ -110,7 +110,7 @@ internal fun CampusMapSearchBar(
     var campusMenuExpanded by remember { mutableStateOf(false) }
     val activeCampus = campuses.firstOrNull { it.campusId == activeCampusId } ?: campuses.firstOrNull()
     val activeCampusShortLabel = when (activeCampus?.campusId) {
-        "OP_MC" -> "Morro"
+        "OP_MC" -> "Ouro Preto"
         "JM_ICEA" -> "ICEA"
         "MA_ICHS" -> "ICHS"
         "MA_ICSA" -> "ICSA"
@@ -133,7 +133,7 @@ internal fun CampusMapSearchBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = barHeight)
-                .padding(start = 14.dp, end = if (campuses.isNotEmpty()) 6.dp else 12.dp),
+                .padding(start = 14.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(

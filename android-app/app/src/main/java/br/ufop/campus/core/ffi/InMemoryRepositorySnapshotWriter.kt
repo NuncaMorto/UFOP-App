@@ -12,6 +12,7 @@ internal fun InMemoryCampusRepository.buildPersistedJsonLocked(): JSONObject {
     root.put("darkThemePreference", darkThemePreference)
     root.put("accentColorPreference", accentColorPreference)
     root.put("accent_color_key", accentColorPreference)
+    root.put("attendanceIndicatorStyle", attendanceIndicatorStyle)
     if (exportFolderTreeUri != null) {
         root.put("exportFolderTreeUri", exportFolderTreeUri)
     } else {
@@ -248,6 +249,12 @@ internal fun InMemoryCampusRepository.buildPersistedJsonLocked(): JSONObject {
         dynamicGridJson.put(matrixId, arr)
     }
     root.put("dynamicGridCompletedByMatrix", dynamicGridJson)
+
+    val curriculumVersionsJson = JSONObject()
+    selectedCurriculumVersionsByCourse.forEach { (courseCode, version) ->
+        curriculumVersionsJson.put(courseCode, version)
+    }
+    root.put("selectedCurriculumVersionsByCourse", curriculumVersionsJson)
 
     return root
 }

@@ -146,16 +146,41 @@ private fun normalizePlain(text: String): String =
         .replace(COMBINING_MARKS_REGEX, "")
         .lowercase()
 
+private val PT_BR_INTEGER_FORMAT = ThreadLocal.withInitial {
+    NumberFormat.getIntegerInstance(Locale("pt", "BR"))
+}
+
+private val REGEX_EXPRESSAO_TITLE = Regex("\\bExpressao\\b")
+private val REGEX_EXPRESSAO_LOWER = Regex("\\bexpressao\\b")
+private val REGEX_EXPRESSAO_UPPER = Regex("\\bEXPRESSAO\\b")
+private val REGEX_GRAFICA_TITLE = Regex("\\bGrafica\\b")
+private val REGEX_GRAFICA_LOWER = Regex("\\bgrafica\\b")
+private val REGEX_GRAFICA_UPPER = Regex("\\bGRAFICA\\b")
+private val REGEX_CURRICULO_WORD = Regex("\\bcurr[ií]culo\\b", RegexOption.IGNORE_CASE)
+private val REGEX_VERSAO_WORD = Regex("\\bvers[aã]o\\b", RegexOption.IGNORE_CASE)
+
 internal fun formatHoursPtBr(hours: Int): String =
-    NumberFormat.getIntegerInstance(Locale("pt", "BR")).format(hours)
+    (PT_BR_INTEGER_FORMAT.get() ?: NumberFormat.getIntegerInstance(Locale("pt", "BR"))).format(hours)
 
 internal fun normalizeCurriculumDisplayName(raw: String): String {
     return raw
-        .replace(Regex("\\bExpressao\\b"), "Expressão")
-        .replace(Regex("\\bexpressao\\b"), "expressão")
-        .replace(Regex("\\bEXPRESSAO\\b"), "EXPRESSÃO")
-        .replace(Regex("\\bGrafica\\b"), "Gráfica")
-        .replace(Regex("\\bgrafica\\b"), "gráfica")
+        .replace(REGEX_EXPRESSAO_TITLE, "Expressão")
+        .replace(REGEX_EXPRESSAO_LOWER, "expressão")
+        .replace(REGEX_EXPRESSAO_UPPER, "EXPRESSÃO")
+        .replace(REGEX_GRAFICA_TITLE, "Gráfica")
+        .replace(REGEX_GRAFICA_LOWER, "gráfica")
+        .replace(REGEX_GRAFICA_UPPER, "GRÁFICA")
+}
+
+internal fun formatCurriculumVersionLabel(
+    rawVersion: String,
+    effectiveFromYear: Int,
+    effectiveFromSemester: Int
+): String {
+    val base = rawVersion.trim().ifBlank { "$effectiveFromYear/$effectiveFromSemester" }
+    return base
+        .replace(REGEX_CURRICULO_WORD, "Currículo")
+        .replace(REGEX_VERSAO_WORD, "Versão")
 }
 
 internal fun extractCodeToken(raw: String): String {
@@ -239,20 +264,39 @@ fun CurriculumMatrixModal(
         }
     }
 
-    var selectedCurriculumVersion by rememberSaveable(
-        selectedCourseCode,
-        defaultResolvedVersion?.curriculumVersion
-    ) {
-        mutableStateOf(defaultResolvedVersion?.curriculumVersion)
+    val persistedCurriculumVersion = remember(baseCourse?.code, availableVersions, mutationVersion) {
+        val code = baseCourse?.code ?: return@remember null
+        val saved = repository.getSelectedCurriculumVersion(code) ?: return@remember null
+        availableVersions.firstOrNull { it.curriculumVersion == saved }?.curriculumVersion
+    }
+
+    val resolvedInitialVersion = persistedCurriculumVersion ?: defaultResolvedVersion?.curriculumVersion
+
+    var selectedCurriculumVersion by rememberSaveable(baseCourse?.code, persistedCurriculumVersion) {
+        mutableStateOf(resolvedInitialVersion)
+    }
+
+    LaunchedEffect(baseCourse?.code, resolvedInitialVersion, availableVersions) {
+        if (persistedCurriculumVersion != null) {
+            if (selectedCurriculumVersion != persistedCurriculumVersion) {
+                selectedCurriculumVersion = persistedCurriculumVersion
+            }
+        } else if (selectedCurriculumVersion.isNullOrBlank() ||
+            availableVersions.none { it.curriculumVersion == selectedCurriculumVersion }
+        ) {
+            selectedCurriculumVersion = resolvedInitialVersion
+        }
     }
 
     val selectedCourse = remember(
         availableVersions,
         selectedCurriculumVersion,
+        persistedCurriculumVersion,
         defaultResolvedVersion,
         baseCourse
     ) {
         availableVersions.firstOrNull { it.curriculumVersion == selectedCurriculumVersion }
+            ?: availableVersions.firstOrNull { it.curriculumVersion == persistedCurriculumVersion }
             ?: defaultResolvedVersion
             ?: baseCourse
     }
@@ -518,7 +562,12 @@ fun CurriculumMatrixModal(
                                 minTouchTarget = minTouchTarget,
                                 availableVersions = availableVersions,
                                 selectedCurriculumVersion = selectedCourse.curriculumVersion,
-                                onSelectVersion = { selectedCurriculumVersion = it }
+                                onSelectVersion = { version ->
+                                    selectedCurriculumVersion = version
+                                    baseCourse?.code?.let { code ->
+                                        repository.setSelectedCurriculumVersion(code, version)
+                                    }
+                                }
                             )
                         }
 

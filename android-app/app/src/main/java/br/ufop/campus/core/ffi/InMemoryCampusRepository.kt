@@ -115,6 +115,10 @@ class InMemoryCampusRepository(
     // v1.9.8: Grade Dinâmica Interativa (matrixId -> códigos concluídos)
     internal val dynamicGridCompletedByMatrix: MutableMap<String, MutableSet<String>> = linkedMapOf()
 
+    // v1.9.21: Indicador de presença nos cards da Agenda ("BADGE" | "CARD_BORDER") e versão de currículo por curso
+    internal var attendanceIndicatorStyle: String = "BADGE"
+    internal val selectedCurriculumVersionsByCourse: MutableMap<String, String> = linkedMapOf()
+
     private val defaultCoursesSnapshot = LinkedHashMap(courses)
     private val defaultSlotsSnapshot = slots.toList()
     private val defaultCommitmentsSnapshot = commitments.toList()
@@ -164,6 +168,8 @@ class InMemoryCampusRepository(
         guidedTourCompleted = false
         lastSeenReleaseVersion = ""
         dynamicGridCompletedByMatrix.clear()
+        attendanceIndicatorStyle = "BADGE"
+        selectedCurriculumVersionsByCourse.clear()
         departmentSwatches.forEach { swatch ->
             departmentColorOverrides[swatch.id] = swatch.colorHex
         }
@@ -588,6 +594,21 @@ class InMemoryCampusRepository(
 
     override fun getDynamicGridAllCompleted(): Map<String, Set<String>> =
         getDynamicGridAllCompletedImpl()
+
+    override fun getAttendanceIndicatorStyle(): String =
+        getAttendanceIndicatorStyleImpl()
+
+    override fun setAttendanceIndicatorStyle(style: String) =
+        setAttendanceIndicatorStyleImpl(style)
+
+    override fun getSelectedCurriculumVersion(courseCode: String): String? =
+        getSelectedCurriculumVersionImpl(courseCode)
+
+    override fun setSelectedCurriculumVersion(courseCode: String, version: String) =
+        setSelectedCurriculumVersionImpl(courseCode, version)
+
+    override fun getAllSelectedCurriculumVersions(): Map<String, String> =
+        getAllSelectedCurriculumVersionsImpl()
 
     override fun getExportFolderConfig(): ExportFolderConfig = getExportFolderConfigImpl()
 

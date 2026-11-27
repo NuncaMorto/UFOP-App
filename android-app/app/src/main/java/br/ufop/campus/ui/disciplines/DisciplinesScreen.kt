@@ -72,7 +72,6 @@ fun DisciplinesScreen(
         factory = DisciplinesViewModel.provideFactory(repository)
     )
     val uiState by viewModel.uiState.collectAsState()
-    val mutationVersion by repository.mutationVersion.collectAsState()
     val context = LocalContext.current
     val isDark = LocalCampusThemeController.current.isDark
     val adaptive = LocalCampusAdaptiveLayout.current
@@ -324,9 +323,7 @@ fun DisciplinesScreen(
                         key = { "list_${it.courseId}" },
                         contentType = { "discipline_list_card" }
                     ) { card ->
-                        val courseSlots = remember(card.courseId, mutationVersion) {
-                            repository.listCourseSlots(card.courseId)
-                        }
+                        val courseSlots = uiState.slotsByCourseId[card.courseId].orEmpty()
                         DisciplineListCard(
                             card = card,
                             slots = courseSlots,
@@ -347,9 +344,7 @@ fun DisciplinesScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             rowCards.forEach { card ->
-                                val courseSlots = remember(card.courseId, mutationVersion) {
-                                    repository.listCourseSlots(card.courseId)
-                                }
+                                val courseSlots = uiState.slotsByCourseId[card.courseId].orEmpty()
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)

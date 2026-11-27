@@ -20,6 +20,8 @@ private struct PersistedCampusState: Codable {
     var turmaByCourseId: [String: String]
     var dynamicGridCompletedByMatrix: [String: [String]]?
     var friendSchedules: [FriendSchedule]?
+    var attendanceIndicatorStyle: String?
+    var selectedCurriculumVersionsByCourse: [String: String]?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion
@@ -39,10 +41,12 @@ private struct PersistedCampusState: Codable {
         case turmaByCourseId
         case dynamicGridCompletedByMatrix
         case friendSchedules
+        case attendanceIndicatorStyle
+        case selectedCurriculumVersionsByCourse
     }
 
     init(
-        schemaVersion: Int = 5,
+        schemaVersion: Int = 6,
         studentProfile: StudentProfile,
         selectedSemesterFilter: String,
         activeCampusId: String,
@@ -58,7 +62,9 @@ private struct PersistedCampusState: Codable {
         isEadByCourseId: [String: Bool],
         turmaByCourseId: [String: String],
         dynamicGridCompletedByMatrix: [String: [String]]?,
-        friendSchedules: [FriendSchedule]?
+        friendSchedules: [FriendSchedule]?,
+        attendanceIndicatorStyle: String? = "BADGE",
+        selectedCurriculumVersionsByCourse: [String: String]? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.studentProfile = studentProfile
@@ -77,6 +83,8 @@ private struct PersistedCampusState: Codable {
         self.turmaByCourseId = turmaByCourseId
         self.dynamicGridCompletedByMatrix = dynamicGridCompletedByMatrix
         self.friendSchedules = friendSchedules
+        self.attendanceIndicatorStyle = attendanceIndicatorStyle
+        self.selectedCurriculumVersionsByCourse = selectedCurriculumVersionsByCourse
     }
 
     init(from decoder: Decoder) throws {
@@ -98,6 +106,8 @@ private struct PersistedCampusState: Codable {
         self.turmaByCourseId = try container.decodeIfPresent([String: String].self, forKey: .turmaByCourseId) ?? [:]
         self.dynamicGridCompletedByMatrix = try container.decodeIfPresent([String: [String]].self, forKey: .dynamicGridCompletedByMatrix)
         self.friendSchedules = try container.decodeIfPresent([FriendSchedule].self, forKey: .friendSchedules)
+        self.attendanceIndicatorStyle = try container.decodeIfPresent(String.self, forKey: .attendanceIndicatorStyle)
+        self.selectedCurriculumVersionsByCourse = try container.decodeIfPresent([String: String].self, forKey: .selectedCurriculumVersionsByCourse)
     }
 }
 
@@ -154,7 +164,9 @@ public extension CampusStore {
             isEadByCourseId: isEadByCourseId,
             turmaByCourseId: turmaByCourseId,
             dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix,
-            friendSchedules: friendSchedules
+            friendSchedules: friendSchedules,
+            attendanceIndicatorStyle: attendanceIndicatorStyle,
+            selectedCurriculumVersionsByCourse: selectedCurriculumVersionsByCourse
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -277,6 +289,10 @@ public extension CampusStore {
         isEadByCourseId = [:]
         turmaByCourseId = [:]
         dynamicGridCompletedByMatrix = [:]
+        selectedCurriculumVersionsByCourse = [:]
+        attendanceIndicatorStyle = "BADGE"
+        UserDefaults.standard.removeObject(forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
+        UserDefaults.standard.removeObject(forKey: "campus.ufop.attendanceIndicatorStyle")
         friendSchedules = []
         selectedFriendScheduleId = nil
         requestedTimetablePresentation = false
@@ -320,7 +336,9 @@ public extension CampusStore {
             isEadByCourseId: isEadByCourseId,
             turmaByCourseId: turmaByCourseId,
             dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix,
-            friendSchedules: friendSchedules
+            friendSchedules: friendSchedules,
+            attendanceIndicatorStyle: attendanceIndicatorStyle,
+            selectedCurriculumVersionsByCourse: selectedCurriculumVersionsByCourse
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -363,6 +381,10 @@ public extension CampusStore {
         isEadByCourseId = [:]
         turmaByCourseId = [:]
         dynamicGridCompletedByMatrix = [:]
+        selectedCurriculumVersionsByCourse = [:]
+        attendanceIndicatorStyle = "BADGE"
+        UserDefaults.standard.removeObject(forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
+        UserDefaults.standard.removeObject(forKey: "campus.ufop.attendanceIndicatorStyle")
         friendSchedules = []
         selectedFriendScheduleId = nil
         requestedTimetablePresentation = false
@@ -389,6 +411,23 @@ public extension CampusStore {
         self.turmaByCourseId = snapshot.turmaByCourseId
         self.dynamicGridCompletedByMatrix = snapshot.dynamicGridCompletedByMatrix ?? [:]
         self.friendSchedules = snapshot.friendSchedules ?? []
+        if let restoredStyle = snapshot.attendanceIndicatorStyle {
+            let normalized = Self.normalizeAttendanceIndicatorStyle(restoredStyle)
+            self.attendanceIndicatorStyle = normalized
+            UserDefaults.standard.set(normalized, forKey: "campus.ufop.attendanceIndicatorStyle")
+        }
+        if let restoredVersions = snapshot.selectedCurriculumVersionsByCourse {
+            var normalized: [String: String] = [:]
+            for (k, v) in restoredVersions {
+                let cleanKey = k.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                let cleanVal = v.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleanKey.isEmpty && !cleanVal.isEmpty {
+                    normalized[cleanKey] = cleanVal
+                }
+            }
+            self.selectedCurriculumVersionsByCourse = normalized
+            UserDefaults.standard.set(normalized, forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
+        }
         if let activeFriendId = selectedFriendScheduleId,
            !self.friendSchedules.contains(where: { $0.id == activeFriendId }) {
             self.selectedFriendScheduleId = nil

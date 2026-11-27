@@ -1,5 +1,6 @@
 package br.ufop.campus.ui.agenda
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +47,11 @@ import br.ufop.campus.core.ffi.AttendanceStatus
 import br.ufop.campus.core.ffi.TimelineItemKind
 import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.DarkStatusAbsentRed
+import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
+import br.ufop.campus.ui.theme.DarkStatusCancelledAmber
+import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
@@ -351,6 +357,12 @@ private fun attendanceStatusLabel(status: AttendanceStatus): String = when (stat
     AttendanceStatus.CANCELLED -> "Aula cancelada"
 }
 
+private fun attendanceStatusBorderColor(status: AttendanceStatus, isDark: Boolean) = when (status) {
+    AttendanceStatus.ATTENDING -> if (isDark) DarkStatusAttendingGreen else StatusAttendingGreen
+    AttendanceStatus.ABSENT -> if (isDark) DarkStatusAbsentRed else StatusAbsentRed
+    AttendanceStatus.CANCELLED -> if (isDark) DarkStatusCancelledAmber else StatusCancelledAmber
+}
+
 @Composable
 internal fun AgendaTimelineCard(
     item: AgendaTimelineItem,
@@ -359,11 +371,27 @@ internal fun AgendaTimelineCard(
     inlineNextClassLabel: String? = null,
     onClick: () -> Unit
 ) {
+    val themeController = LocalCampusThemeController.current
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
+    val statusBorderColor = if (themeController.attendanceIndicatorStyle == "CARD_BORDER") {
+        item.status?.let { attendanceStatusBorderColor(it, isDark) }
+    } else {
+        null
+    }
+    val useBorderIndicator = statusBorderColor != null
     val accentColor = parseHexColor(item.colorHex)
     val isClickable = (item.kind == TimelineItemKind.CLASS_SESSION && item.slotId != null) ||
         item.kind == TimelineItemKind.COMMITMENT
     val cleanLocation = remember(item.location) { sanitizeAgendaLocation(item.location) }
     val cleanSubtitle = remember(item.subtitle) { sanitizeAgendaSubtitle(item.subtitle) }
+    val cardBorder = if (statusBorderColor != null) {
+        BorderStroke(
+            width = if (highContrast) 2.dp else 1.75.dp,
+            color = statusBorderColor
+        )
+    } else {
+        campusCardBorder(if (inlineNextClassLabel != null) 1.5.dp else 1.dp)
+    }
 
     val cardContentDescription = remember(item, cleanLocation, cleanSubtitle, inlineNextClassLabel) {
         buildString {
@@ -411,7 +439,7 @@ internal fun AgendaTimelineCard(
         } else {
             MaterialTheme.colorScheme.surface
         },
-        border = campusCardBorder(if (inlineNextClassLabel != null) 1.5.dp else 1.dp),
+        border = cardBorder,
         shadowElevation = campusCardElevation()
     ) {
         Row(
@@ -462,8 +490,10 @@ internal fun AgendaTimelineCard(
                         softWrap = false
                     )
 
-                    item.status?.let { status ->
-                        AttendanceStatusBadge(status = status, isDark = isDark)
+                    if (!useBorderIndicator) {
+                        item.status?.let { status ->
+                            AttendanceStatusBadge(status = status, isDark = isDark)
+                        }
                     }
 
                     if (inlineNextClassLabel != null) {

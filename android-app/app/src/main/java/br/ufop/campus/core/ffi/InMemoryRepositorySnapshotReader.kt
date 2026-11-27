@@ -29,6 +29,11 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
         normalizeAccentColorKey(raw)
     }.getOrDefault("RED")
 
+    val loadedAttendanceIndicatorStyle = runCatching {
+        val raw = root.optNonNullString("attendanceIndicatorStyle")
+        normalizeAttendanceIndicatorStyle(raw)
+    }.getOrDefault("BADGE")
+
     val loadedExportUri = runCatching {
         root.optNonNullString("exportFolderTreeUri").trim().takeIf { it.isNotEmpty() }
     }.getOrNull()
@@ -106,6 +111,7 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
     }.getOrDefault("")
     val loadedAccessibilitySettings = restoreAccessibilitySettingsFromJson(root)
     val loadedDynamicGrid = restoreDynamicGridFromJson(root)
+    val loadedCurriculumVersions = restoreSelectedCurriculumVersionsFromJson(root)
 
     courses.clear()
     loadedCourses.forEach { (id, seed) ->
@@ -143,6 +149,7 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
     lastWeatherFetchEpochMs = loadedWeatherFetchMs
     darkThemePreference = loadedDarkPref
     accentColorPreference = loadedAccentColor
+    attendanceIndicatorStyle = loadedAttendanceIndicatorStyle
     exportFolderTreeUri = loadedExportUri
     exportFolderDisplayLabel = loadedExportLabel
     accessibilitySettings = loadedAccessibilitySettings
@@ -150,6 +157,8 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
     lastSeenReleaseVersion = loadedLastSeenReleaseVersion
     dynamicGridCompletedByMatrix.clear()
     dynamicGridCompletedByMatrix.putAll(loadedDynamicGrid)
+    selectedCurriculumVersionsByCourse.clear()
+    selectedCurriculumVersionsByCourse.putAll(loadedCurriculumVersions)
     roomAllocationIndex?.let { index ->
         enrichExistingRoomAllocationsLocked(index)
     }
@@ -586,4 +595,24 @@ private fun restoreDynamicGridFromJson(root: JSONObject): LinkedHashMap<String, 
         }
     }
     return loadedDynamicGrid
+}
+
+private fun restoreSelectedCurriculumVersionsFromJson(root: JSONObject): LinkedHashMap<String, String> {
+    val loaded = linkedMapOf<String, String>()
+    runCatching {
+        val obj = root.optJSONObject("selectedCurriculumVersionsByCourse") ?: return@runCatching
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            runCatching {
+                val rawKey = keys.next()
+                val courseCode = rawKey.trim().uppercase()
+                if (courseCode.isEmpty() || obj.isNull(rawKey)) return@runCatching
+                val version = obj.optString(rawKey, "").trim()
+                if (version.isNotEmpty()) {
+                    loaded[courseCode] = version
+                }
+            }
+        }
+    }
+    return loaded
 }

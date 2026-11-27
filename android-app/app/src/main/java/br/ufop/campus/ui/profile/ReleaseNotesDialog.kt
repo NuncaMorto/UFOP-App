@@ -63,10 +63,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.20",
-            title = "Widgets Renovados, Novo Site & Fluxos Inteligentes",
+            version = "v1.9.21",
+            title = "Navegação Fluida, Persistência & Otimização de Performance",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Indicador configurável de presença na Agenda (Badge no card ou Borda colorida contínua) em Personalização, sincronizado no backup .ufopbackup, junto à remoção do indicador de semana e badge de clima tematizado pelas 9 paletas.",
+                "Cabeçalhos de modais mais limpos mostrando apenas a sigla do departamento (ex.: DECOM), botão circular de edição na aula e no Perfil, matrícula tabular sem prefixo e dropdown tonal de campus no Editar Perfil.",
+                "Matriz Curricular com cabeçalho limpo, seletor dropdown tonal de versão persistido por curso (sem reset automático) e botões alinhados; Grade Horária sem quebra horizontal com controles icon-only; Mapa 2D com rótulo \"Ouro Preto\"; Feedback 2×2 e card unificado de Independência & GitHub no topo do FAQ.",
+                "Barra de abas renovada com ícones arredondados harmônicos com Onest e pílula deslizante fluida via GPU, além de otimizações de cache de contraste WCAG, regex/formatadores, chaves estáveis em listas e avatar fora da main thread."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.20",
+            title = "Widgets Renovados, Novo Site & Fluxos Inteligentes",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Widgets 4×2 e 2×2 redesenhados para leitura rápida no corredor, com contagem regressiva tabular, sala em destaque, próximo prazo no rodapé, estado \"Dia livre\", toque contextual (Agenda/Atividades) e sincronismo com as 9 paletas e Claro/Escuro.",
                 "Página de download reconstruída em Onest + JetBrains Mono com seletor interativo das 9 paletas sincronizado ao mockup do app e verificação recolhível de SHA-256.",

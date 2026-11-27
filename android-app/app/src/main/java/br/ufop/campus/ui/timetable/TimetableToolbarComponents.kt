@@ -23,17 +23,22 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ScreenRotation
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.UnfoldLess
 import androidx.compose.material.icons.outlined.UnfoldMore
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -152,68 +157,61 @@ internal fun TimetableTopBar(
             }
         }
 
-        // Barra de controles em no máximo 2 linhas limpas: Linha 1 (Seletores & Compartilhamento), Linha 2 (Visualização)
+        // Barra de controles em 2 linhas limpas: Linha 1 (Seletores + Compartilhar circular), Linha 2 (Ícones de visualização + Faixa horária)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            GradeSelectorDropdown(
-                selectedGradeLabel = selectedGradeLabel,
-                activeFriend = activeFriend,
-                studentProfile = studentProfile,
-                friendSchedules = friendSchedules,
-                isDark = isDark,
-                toolbarVisualHeight = toolbarVisualHeight,
-                onSelectMyGrade = onSelectMyGrade,
-                onSelectFriend = onSelectFriend,
-                onRequestRemoveFriend = onRequestRemoveFriend,
-                onImportFile = onImportFile,
-                onOpenImportTextDialog = onOpenImportTextDialog,
-                onOpenQrScanner = onOpenQrScanner
-            )
-
-            SemesterSelectorDropdown(
-                effectiveSemester = effectiveSemester,
-                availableSemesters = availableSemesters,
-                toolbarVisualHeight = toolbarVisualHeight,
-                onSelectSemester = onSelectSemester
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Botão Compartilhar (.ufopgrade)
-            Surface(
-                onClick = onShareGrade,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .defaultMinSize(minHeight = toolbarVisualHeight),
-                shape = RoundedCornerShape(CampusPillRadius),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                border = campusCardBorder()
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(
-                        horizontal = 11.dp,
-                        vertical = if (largeTouchTargets) 10.dp else 6.dp
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                GradeSelectorDropdown(
+                    selectedGradeLabel = selectedGradeLabel,
+                    activeFriend = activeFriend,
+                    studentProfile = studentProfile,
+                    friendSchedules = friendSchedules,
+                    isDark = isDark,
+                    toolbarVisualHeight = toolbarVisualHeight,
+                    onSelectMyGrade = onSelectMyGrade,
+                    onSelectFriend = onSelectFriend,
+                    onRequestRemoveFriend = onRequestRemoveFriend,
+                    onImportFile = onImportFile,
+                    onOpenImportTextDialog = onOpenImportTextDialog,
+                    onOpenQrScanner = onOpenQrScanner,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+
+                SemesterSelectorDropdown(
+                    effectiveSemester = effectiveSemester,
+                    availableSemesters = availableSemesters,
+                    toolbarVisualHeight = toolbarVisualHeight,
+                    onSelectSemester = onSelectSemester
+                )
+            }
+
+            // Botão circular tonal Compartilhar (.ufopgrade) — sempre fixo na extremidade direita
+            val shareVisualSize = if (largeTouchTargets) minTouchTarget else 40.dp
+            IconButton(
+                onClick = onShareGrade,
+                modifier = Modifier.size(minTouchTarget)
+            ) {
+                Surface(
+                    modifier = Modifier.size(shareVisualSize),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    border = campusCardBorder()
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Share,
-                        contentDescription = "Compartilhar grade",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Compartilhar",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        maxLines = 1,
-                        softWrap = false
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.Share,
+                            contentDescription = "Compartilhar grade",
+                            modifier = Modifier.size(if (largeTouchTargets) 22.dp else 18.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
         }
@@ -223,11 +221,10 @@ internal fun TimetableTopBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TimetableToolbarChip(
-                label = if (isLandscape) "Horizontal" else "Vertical",
+            TimetableToolbarIconButton(
                 icon = Icons.Outlined.ScreenRotation,
-                isActive = !isLandscape,
-                visualHeight = toolbarVisualHeight,
+                isActive = isLandscape,
+                tooltipText = if (isLandscape) "Orientação horizontal" else "Orientação vertical",
                 contentDescriptionText = if (isLandscape) {
                     "Orientação horizontal ativa. Toque para alternar para vertical"
                 } else {
@@ -238,15 +235,23 @@ internal fun TimetableTopBar(
                 } else {
                     "Alternar para orientação horizontal"
                 },
+                visualSize = if (largeTouchTargets) minTouchTarget else 40.dp,
+                minTouchTarget = minTouchTarget,
                 onClick = onToggleLandscape
             )
 
-            TimetableToolbarChip(
-                label = if (isReducedMode) "Compacto" else "Normal",
+            TimetableToolbarIconButton(
                 icon = if (isReducedMode) Icons.Outlined.UnfoldMore else Icons.Outlined.UnfoldLess,
                 isActive = isReducedMode,
-                visualHeight = toolbarVisualHeight,
+                tooltipText = if (isReducedMode) "Densidade compacta" else "Densidade normal",
+                contentDescriptionText = if (isReducedMode) {
+                    "Modo compacto ativo. Toque para alternar para normal"
+                } else {
+                    "Modo normal ativo. Toque para alternar para compacto"
+                },
                 onClickLabel = if (isReducedMode) "Alternar para modo normal" else "Alternar para modo compacto",
+                visualSize = if (largeTouchTargets) minTouchTarget else 40.dp,
+                minTouchTarget = minTouchTarget,
                 onClick = onToggleReducedMode
             )
 
@@ -315,6 +320,62 @@ private fun SemesterSelectorDropdown(
                     onClick = {
                         onSelectSemester(semesterOption)
                         expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimetableToolbarIconButton(
+    icon: ImageVector,
+    isActive: Boolean,
+    tooltipText: String,
+    contentDescriptionText: String,
+    onClickLabel: String,
+    visualSize: Dp,
+    minTouchTarget: Dp,
+    onClick: () -> Unit
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(text = tooltipText)
+            }
+        },
+        state = rememberTooltipState()
+    ) {
+        Surface(
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .size(visualSize)
+                .clip(CircleShape)
+                .semantics(mergeDescendants = true) {
+                    selected = isActive
+                    role = Role.Button
+                    contentDescription = contentDescriptionText
+                }
+                .clickable(onClickLabel = onClickLabel, onClick = onClick),
+            shape = CircleShape,
+            color = if (isActive) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+            border = campusCardBorder()
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (minTouchTarget >= 56.dp) 22.dp else 18.dp),
+                    tint = if (isActive) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
             }
@@ -432,7 +493,9 @@ internal fun ExpressiveSelectorPill(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,

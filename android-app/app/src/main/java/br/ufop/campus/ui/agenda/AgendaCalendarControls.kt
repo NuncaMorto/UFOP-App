@@ -57,7 +57,6 @@ import br.ufop.campus.ui.theme.tabularNums
 @Composable
 internal fun MonthAndWeekSelectorRow(
     monthYearLabel: String,
-    weekNumber: Int,
     isCalendarExpanded: Boolean,
     showTodayButton: Boolean,
     reduceMotion: Boolean,
@@ -123,36 +122,15 @@ internal fun MonthAndWeekSelectorRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        AnimatedVisibility(
+            visible = showTodayButton,
+            enter = if (reduceMotion) EnterTransition.None else fadeIn() + scaleIn(),
+            exit = if (reduceMotion) ExitTransition.None else fadeOut() + scaleOut()
         ) {
-            AnimatedVisibility(
-                visible = showTodayButton,
-                enter = if (reduceMotion) EnterTransition.None else fadeIn() + scaleIn(),
-                exit = if (reduceMotion) ExitTransition.None else fadeOut() + scaleOut()
-            ) {
-                TodayFloatingPill(
-                    largeTouchTargets = largeTouchTargets,
-                    onClick = onJumpToToday
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(CampusPillRadius),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = campusCardBorder()
-            ) {
-                Text(
-                    text = "SEMANA $weekNumber",
-                    style = MaterialTheme.typography.labelSmall.tabularNums(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            }
+            TodayFloatingPill(
+                largeTouchTargets = largeTouchTargets,
+                onClick = onJumpToToday
+            )
         }
     }
 }

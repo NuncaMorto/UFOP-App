@@ -69,18 +69,19 @@ public struct ClassCheckInSheetView: View {
 
     private var topBar: some View {
         let deptColor = CampusTheme.departmentColor(for: selectedColorKey)
-        let accessibleDeptColor = CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme)
+        let accessibleDeptColor = CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme, accent: accentColorObj)
+        let deptAcronym = CampusStore.departmentAcronym(from: detail.department)
 
         return HStack {
-            Text(detail.department)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(accessibleDeptColor)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(CampusTheme.departmentSoftTint(for: selectedColorKey, scheme: colorScheme))
-                )
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(deptColor)
+                    .frame(width: 8, height: 8)
+                Text(deptAcronym)
+                    .font(CampusTheme.font(size: 13, weight: .semibold))
+                    .foregroundStyle(accessibleDeptColor)
+                    .lineLimit(1)
+            }
 
             Spacer()
 

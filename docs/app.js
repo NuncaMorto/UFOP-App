@@ -1,7 +1,7 @@
 const REPO = "NuncaMorto/Vida-Academica";
 const API_RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=8`;
 const FALLBACK_TAG = "v1.9.19";
-const FALLBACK_URL = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.20";
+const FALLBACK_URL = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.21";
 
 const ACCENT_STORAGE_KEY = "vida_academica_site_accent";
 const THEME_STORAGE_KEY = "vida_academica_site_theme";
@@ -236,7 +236,7 @@ async function hydrateReleases() {
   const historyDetails = $("history-details");
   const historyList = $("history-list");
 
-  $("ver-badge").textContent = "v1.9.20 · Beta";
+  $("ver-badge").textContent = "v1.9.21 · Beta";
 
   try {
     const res = await fetch(API_RELEASES, { headers: { Accept: "application/vnd.github+json" } });
@@ -320,7 +320,7 @@ async function hydrateReleases() {
     if (latestTitle) latestTitle.textContent = `Vida Acadêmica ${FALLBACK_TAG}`;
     if (latestTag) latestTag.textContent = FALLBACK_TAG;
     if (latestNotes) {
-      latestNotes.textContent = "Não foi possível carregar as notas automaticamente agora. Abrindo a página da versão v1.9.20 no GitHub para consulta completa.";
+      latestNotes.textContent = "Não foi possível carregar as notas automaticamente agora. Abrindo a página da versão v1.9.21 no GitHub para consulta completa.";
     }
     const shaEl = $("sha-value");
     if (shaEl) {
@@ -330,7 +330,7 @@ async function hydrateReleases() {
       btn.addEventListener("click", (e) => {
         if (!btn.hasAttribute("download")) {
           e.preventDefault();
-          triggerFallback(btn, "Abrindo a página da versão v1.9.20 no GitHub.");
+          triggerFallback(btn, "Abrindo a página da versão v1.9.21 no GitHub.");
         }
       });
     }

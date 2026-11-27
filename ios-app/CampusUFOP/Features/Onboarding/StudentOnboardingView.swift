@@ -252,6 +252,7 @@ public struct StudentOnboardingView: View {
         guard let bundle = pendingBackupBundle else { return }
         do {
             _ = try store.importEncryptedBackup(bundle, password: backupPassword)
+            appearance.attendanceIndicatorStyle = store.attendanceIndicatorStyle
             pendingBackupBundle = nil
             backupPassword = ""
         } catch {

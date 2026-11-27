@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.21 — Refinamento de UI/UX, Navegação Fluida, Persistência & Performance
+
+- **Android (`1.9.21` · Beta) & iOS (`1.9.21`):**
+  - **Cabeçalhos limpos e indicador de presença configurável na Agenda:** modais de aula, disciplina e avaliação agora exibem apenas a sigla do departamento (ex.: `● DECOM` e `● Circuitos Digitais · DECOM`) com botão circular de edição; nova opção em **Perfil → Configurações → Personalização** para escolher entre **Badge no card (padrão)** ou **Borda colorida no card** (`1.75dp`/`2dp` em Alto Contraste), com persistência local e em backups `.ufopbackup`, além de alinhamento da cor âmbar para aulas canceladas no iOS.
+  - **Agenda, Grade Horária & Mapa 2D mais limpos:** remoção da pílula `SEMANA N` com atalho `Hoje` alinhado à direita e badge de clima tematizado pelas 9 paletas; Grade Horária com seletor truncado sem quebra, botão circular de compartilhar e controles de orientação/densidade somente ícone; seletor de campus no Mapa 2D reposicionado com rótulo claro `"Ouro Preto"`.
+  - **Matriz Curricular, Perfil & FAQ unificado:** cabeçalho da Matriz sem pílula `CRE` e com botão circular chevron, seletor dropdown tonal de versão do currículo com capitalização normalizada (`2026/2 (Currículo 3)`) e **persistência definitiva por curso** (corrigindo o reset automático), botões tonais alinhados em `Matrizes anteriores e PPCs oficiais`; cartão externo de Perfil limpo (apenas matrícula tabular + botão circular de edição) e dropdown de campus no Editar Perfil; `Feedback & Suporte` em grade tonal 2×2 e card unificado de Independência & Código Aberto com ícone vetorial do GitHub no topo do FAQ.
+  - **Barra de abas fluida & Otimização geral de performance:** ícones geométricos arredondados harmônicos com `Onest` (mantendo o avatar/iniciais do Perfil) e indicador tonal deslizante com física spring via `graphicsLayer` (Android) e `matchedGeometryEffect` refinado (iOS), respeitando Redução de Movimento; cache determinístico de contraste WCAG, pré-compilação de regex/formatadores, chaves estáveis em `LazyColumn`/`LazyVStack` e decodificação assíncrona cacheada de avatar fora da main thread.
+
+<!-- versionCode: 38 -->
+
+---
+
 ## v1.9.20 — Widgets Renovados, Novo Site, Mapa Refinado & Fluxos Inteligentes
 
 - **Android (`1.9.20` · Beta), iOS (`1.9.20`) & Site (`docs/`):**

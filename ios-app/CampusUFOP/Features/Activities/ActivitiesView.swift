@@ -88,15 +88,17 @@ public struct ActivitiesView: View {
         baseFilteredActivities.filter(\.isCompleted)
     }
 
-    private var groupedPendingHorizons: [(horizon: ActivityHorizon, items: [AcademicActivityItem])] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+    private func groupedPendingHorizons(
+        for pendingItems: [AcademicActivityItem],
+        today: Date,
+        calendar: Calendar
+    ) -> [(horizon: ActivityHorizon, items: [AcademicActivityItem])] {
         let weekCutoff = calendar.date(byAdding: .day, value: 7, to: today) ?? today
         var overdue: [AcademicActivityItem] = []
         var thisWeek: [AcademicActivityItem] = []
         var upcoming: [AcademicActivityItem] = []
 
-        for item in filteredActivities {
+        for item in pendingItems {
             if let due = CampusStore.parseIsoDate(item.dueDate) {
                 let dueStart = calendar.startOfDay(for: due)
                 if dueStart < today {
@@ -118,10 +120,8 @@ public struct ActivitiesView: View {
         return result
     }
 
-    private func overdueDays(for item: AcademicActivityItem) -> Int? {
+    private func overdueDays(for item: AcademicActivityItem, today: Date, calendar: Calendar) -> Int? {
         guard !item.isCompleted, let due = CampusStore.parseIsoDate(item.dueDate) else { return nil }
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
         let dueStart = calendar.startOfDay(for: due)
         guard dueStart < today else { return nil }
         let diff = calendar.dateComponents([.day], from: dueStart, to: today).day ?? 0
@@ -134,7 +134,7 @@ public struct ActivitiesView: View {
                 LiquidGlassBackdrop(accent: appearance?.accentColor ?? .red, highContrast: hc)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
+                    LazyVStack(alignment: .leading, spacing: 18) {
                         headerSection
 
                         singleRowFilterBar
@@ -390,7 +390,13 @@ public struct ActivitiesView: View {
 
     @ViewBuilder
     private var activitiesListSection: some View {
-        let hasAnyToShow = onlyCompleted ? !filteredActivities.isEmpty : (!filteredActivities.isEmpty || !completedMatchingActivities.isEmpty)
+        let base = baseFilteredActivities
+        let filtered = base.filter { onlyCompleted ? $0.isCompleted : !$0.isCompleted }
+        let completed = base.filter(\.isCompleted)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let hasAnyToShow = onlyCompleted ? !filtered.isEmpty : (!filtered.isEmpty || !completed.isEmpty)
+
         if !hasAnyToShow {
             VStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
@@ -420,17 +426,18 @@ public struct ActivitiesView: View {
             .padding(.horizontal, 18)
             .liquidGlassCard(highContrast: hc)
         } else if onlyCompleted {
-            activitiesCollectionView(items: filteredActivities)
+            activitiesCollectionView(items: filtered, today: today, calendar: calendar)
         } else {
-            VStack(alignment: .leading, spacing: 14) {
-                ForEach(groupedPendingHorizons, id: \.horizon.rawValue) { group in
-                    VStack(alignment: .leading, spacing: 10) {
+            let horizons = groupedPendingHorizons(for: filtered, today: today, calendar: calendar)
+            LazyVStack(alignment: .leading, spacing: 14) {
+                ForEach(horizons, id: \.horizon.rawValue) { group in
+                    LazyVStack(alignment: .leading, spacing: 10) {
                         horizonSectionHeader(horizon: group.horizon, count: group.items.count)
-                        activitiesCollectionView(items: group.items)
+                        activitiesCollectionView(items: group.items, today: today, calendar: calendar)
                     }
                 }
 
-                if !completedMatchingActivities.isEmpty {
+                if !completed.isEmpty {
                     Button {
                         withAnimation(.snappy) {
                             isCompletedExpanded.toggle()
@@ -445,7 +452,7 @@ public struct ActivitiesView: View {
                                 .font(CampusTheme.font(size: 14, weight: .bold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                            Text("\(completedMatchingActivities.count)")
+                            Text("\(completed.count)")
                                 .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                                 .padding(.horizontal, 8)
@@ -467,7 +474,7 @@ public struct ActivitiesView: View {
                     .minimumTouchTarget(minTouch)
 
                     if isCompletedExpanded {
-                        activitiesCollectionView(items: completedMatchingActivities)
+                        activitiesCollectionView(items: completed, today: today, calendar: calendar)
                     }
                 }
             }
@@ -475,17 +482,21 @@ public struct ActivitiesView: View {
     }
 
     @ViewBuilder
-    private func activitiesCollectionView(items: [AcademicActivityItem]) -> some View {
+    private func activitiesCollectionView(
+        items: [AcademicActivityItem],
+        today: Date,
+        calendar: Calendar
+    ) -> some View {
         if isRegular {
             LazyVGrid(columns: regularGridColumns, spacing: 14) {
                 ForEach(items) { item in
-                    activityRow(item: item)
+                    activityRow(item: item, today: today, calendar: calendar)
                 }
             }
         } else {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 12) {
                 ForEach(items) { item in
-                    activityRow(item: item)
+                    activityRow(item: item, today: today, calendar: calendar)
                 }
             }
         }
@@ -525,9 +536,9 @@ public struct ActivitiesView: View {
         .padding(.top, 4)
     }
 
-    private func activityRow(item: AcademicActivityItem) -> some View {
+    private func activityRow(item: AcademicActivityItem, today: Date, calendar: Calendar) -> some View {
         let itemColor = CampusTheme.departmentColor(for: item.colorKey)
-        let overdueDaysCount = overdueDays(for: item)
+        let overdueDaysCount = overdueDays(for: item, today: today, calendar: calendar)
         let isOverdue = overdueDaysCount != nil
         let overdueRed = colorScheme == .dark ? Color(hex: 0xFB7185) : Color(hex: 0xBE123C)
         let badgeTint = isOverdue ? overdueRed : itemColor
@@ -617,6 +628,27 @@ public struct ActivitiesView: View {
 // MARK: - Assessment Detail & Edit Sheet (Vertically Aligned Chips + Native Picker + Confirmation)
 
 public struct AssessmentDetailSheetView: View {
+    private static let isoDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        return df
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let tf = DateFormatter()
+        tf.locale = Locale(identifier: "en_US_POSIX")
+        tf.dateFormat = "HH:mm"
+        return tf
+    }()
+
+    private static let isoDateTimeFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        return df
+    }()
+
     public let activity: AcademicActivityItem
     @Bindable public var store: CampusStore
     public let onRequestDelete: (AcademicActivityItem) -> Void
@@ -663,10 +695,15 @@ public struct AssessmentDetailSheetView: View {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
+                                let deptAcronym = CampusStore.departmentAcronym(from: current.department)
+                                let headerLabel = deptAcronym.isEmpty
+                                    ? current.disciplineName
+                                    : "\(current.disciplineName) · \(deptAcronym)"
                                 Circle().fill(courseColor).frame(width: 8, height: 8)
-                                Text(current.disciplineName)
+                                Text(headerLabel)
                                     .font(CampusTheme.font(size: 13, weight: .semibold))
-                                    .foregroundStyle(CampusTheme.accessibleTextColor(courseColor, scheme: colorScheme))
+                                    .foregroundStyle(CampusTheme.accessibleTextColor(courseColor, scheme: colorScheme, accent: accentObj))
+                                    .lineLimit(1)
                             }
                             Text(formatAcademicAssessmentTitle(current.title))
                                 .font(CampusTheme.font(size: 22, weight: .bold))
@@ -754,18 +791,12 @@ public struct AssessmentDetailSheetView: View {
                                 foreground: accentObj.onPrimary(for: colorScheme),
                                 minHeight: appearance?.accessibility.minTouchHeight ?? 48
                             ) {
-                                let df = DateFormatter()
-                                df.locale = Locale(identifier: "en_US_POSIX")
-                                df.dateFormat = "yyyy-MM-dd"
-                                let tf = DateFormatter()
-                                tf.locale = Locale(identifier: "en_US_POSIX")
-                                tf.dateFormat = "HH:mm"
                                 store.updateAssessment(
                                     id: current.id,
                                     title: editTitle,
                                     kind: editKind,
-                                    dueDate: df.string(from: editDate),
-                                    dueTime: tf.string(from: editDate)
+                                    dueDate: Self.isoDateFormatter.string(from: editDate),
+                                    dueTime: Self.timeFormatter.string(from: editDate)
                                 )
                                 isEditing = false
                             } label: {
@@ -830,16 +861,27 @@ public struct AssessmentDetailSheetView: View {
     }
 
     private func parsedDate(iso: String, hhmm: String) -> Date {
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.dateFormat = "yyyy-MM-dd HH:mm"
-        return df.date(from: "\(iso) \(hhmm)") ?? Date()
+        Self.isoDateTimeFormatter.date(from: "\(iso) \(hhmm)") ?? Date()
     }
 }
 
 // MARK: - Add Assessment Sheet (Auto-Detect Syllabus Top + Manual Section Below)
 
 public struct AddAssessmentSheetView: View {
+    private static let isoDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        return df
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let tf = DateFormatter()
+        tf.locale = Locale(identifier: "en_US_POSIX")
+        tf.dateFormat = "HH:mm"
+        return tf
+    }()
+
     public let store: CampusStore?
     public let disciplines: [DisciplineSummaryCard]
     public let onSyllabusImported: ((String, Bool) -> Void)?
@@ -1017,16 +1059,16 @@ public struct AddAssessmentSheetView: View {
                         foreground: accentObj.onPrimary(for: colorScheme),
                         minHeight: minTouch
                     ) {
-                        let df = DateFormatter()
-                        df.locale = Locale(identifier: "en_US_POSIX")
-                        df.dateFormat = "yyyy-MM-dd"
-                        let tf = DateFormatter()
-                        tf.locale = Locale(identifier: "en_US_POSIX")
-                        tf.dateFormat = "HH:mm"
                         let finalTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             ? "\(selectedKind) avaliativo"
                             : title
-                        onSave(selectedCourseId, finalTitle, selectedKind, df.string(from: dueDateTime), tf.string(from: dueDateTime))
+                        onSave(
+                            selectedCourseId,
+                            finalTitle,
+                            selectedKind,
+                            Self.isoDateFormatter.string(from: dueDateTime),
+                            Self.timeFormatter.string(from: dueDateTime)
+                        )
                     } label: {
                         Text("Salvar avaliação")
                             .font(CampusTheme.font(size: 15, weight: .bold))

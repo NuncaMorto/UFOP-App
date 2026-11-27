@@ -101,6 +101,8 @@ public struct FloatingCampusTabBarView: View {
                 } else {
                     Image(systemName: isSelected ? tab.selectedSystemImage : tab.systemImage)
                         .font(.system(size: 18, weight: isSelected ? .semibold : .medium))
+                        .scaleEffect(isSelected && !reduceMotion ? 1.08 : 1.0)
+                        .animation(reduceMotion ? nil : .spring(response: 0.30, dampingFraction: 0.80), value: isSelected)
                 }
 
                 Text(tab.title)
@@ -187,9 +189,11 @@ public struct FloatingCampusTabBarView: View {
                         .matchedGeometryEffect(id: "floatingTabHighlight", in: tabHighlightNamespace)
                 }
 
-                Image(systemName: isMapSelected ? "map.fill" : "map")
+                Image(systemName: isMapSelected ? CampusTab.map.selectedSystemImage : CampusTab.map.systemImage)
                     .font(.system(size: 21, weight: isMapSelected ? .bold : .semibold))
                     .foregroundStyle(foregroundColor(isSelected: isMapSelected))
+                    .scaleEffect(isMapSelected && !reduceMotion ? 1.08 : 1.0)
+                    .animation(reduceMotion ? nil : .spring(response: 0.30, dampingFraction: 0.80), value: isMapSelected)
             }
             .frame(width: 64, height: 64)
             .contentShape(Circle())
@@ -222,7 +226,7 @@ public struct FloatingCampusTabBarView: View {
         if reduceMotion {
             selectedTab = tab
         } else {
-            withAnimation(.spring(response: 0.30, dampingFraction: 0.84)) {
+            withAnimation(.spring(response: 0.30, dampingFraction: 0.80)) {
                 selectedTab = tab
             }
         }

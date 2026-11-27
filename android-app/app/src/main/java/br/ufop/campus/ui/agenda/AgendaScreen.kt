@@ -73,21 +73,20 @@ fun AgendaScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    item {
+                    item(key = "pane_left_header") {
                         AgendaHeaderSection(
                             campusCity = uiState.activeCampus.city,
                             weatherTempC = uiState.activeCampus.weatherTempC,
                             isDark = themeController.isDark
                         )
                     }
-                    item {
+                    item(key = "pane_left_month_selector") {
                         MonthAndWeekSelectorRow(
                             monthYearLabel = if (uiState.isMonthCalendarExpanded) {
                                 formatYearMonthTitle(uiState.displayedYearMonth)
                             } else {
                                 dayOverview.monthYearLabel
                             },
-                            weekNumber = dayOverview.weekNumber,
                             isCalendarExpanded = uiState.isMonthCalendarExpanded,
                             showTodayButton = !uiState.isViewingToday,
                             reduceMotion = a11y.reduceMotion,
@@ -96,7 +95,7 @@ fun AgendaScreen(
                             onJumpToToday = { viewModel.jumpToToday() }
                         )
                     }
-                    item {
+                    item(key = "pane_left_month_calendar") {
                         AnimatedVisibility(
                             visible = uiState.isMonthCalendarExpanded,
                             enter = if (a11y.reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
@@ -115,7 +114,7 @@ fun AgendaScreen(
                             )
                         }
                     }
-                    item {
+                    item(key = "pane_left_week_strip") {
                         WeekDayPillsRow(
                             days = dayOverview.weekDays,
                             selectedIsoDate = uiState.selectedIsoDate,
@@ -126,7 +125,7 @@ fun AgendaScreen(
                         )
                     }
                     uiState.semesterRangeNotice?.let { notice ->
-                        item {
+                        item(key = "pane_left_semester_notice") {
                             AgendaBannerCard(
                                 message = notice,
                                 isError = false,
@@ -138,7 +137,7 @@ fun AgendaScreen(
                         }
                     }
                     uiState.actionErrorMessage?.let { errMessage ->
-                        item {
+                        item(key = "pane_left_error_banner") {
                             AgendaBannerCard(
                                 message = errMessage,
                                 isError = true,
@@ -152,7 +151,7 @@ fun AgendaScreen(
                     uiState.nextClassPreview
                         ?.takeIf { it.isoDate != uiState.selectedIsoDate }
                         ?.let { nextClass ->
-                            item {
+                            item(key = "pane_left_next_class") {
                                 NextClassHeroCard(
                                     preview = nextClass,
                                     isSameSelectedDay = false,
@@ -162,7 +161,7 @@ fun AgendaScreen(
                                 )
                             }
                         }
-                    item {
+                    item(key = "pane_left_academic_events") {
                         AcademicEventsAccordionCard(
                             events = uiState.academicEvents,
                             selectedIsoDate = uiState.selectedIsoDate,
@@ -171,7 +170,7 @@ fun AgendaScreen(
                             largeTouchTargets = a11y.largeTouchTargets
                         )
                     }
-                    item {
+                    item(key = "pane_left_bottom_spacer") {
                         Spacer(modifier = Modifier.navigationBarsPadding())
                     }
                 }
@@ -192,7 +191,7 @@ fun AgendaScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    item {
+                    item(key = "pane_right_day_summary") {
                         DaySummaryHeader(
                             formattedDate = dayOverview.formattedDate,
                             classesCount = dayOverview.classesCount,
@@ -202,7 +201,7 @@ fun AgendaScreen(
                         )
                     }
                     uiState.statusBannerMessage?.let { message ->
-                        item {
+                        item(key = "pane_right_status_banner") {
                             AgendaBannerCard(
                                 message = message,
                                 isError = false,
@@ -214,7 +213,7 @@ fun AgendaScreen(
                         }
                     }
                     if (dayOverview.items.isEmpty()) {
-                        item {
+                        item(key = "pane_right_empty_state") {
                             AgendaEmptyStateCard(
                                 hasCoursesInSemester = uiState.hasCoursesInSemester,
                                 nextClassPreview = uiState.nextClassPreview,
@@ -259,7 +258,7 @@ fun AgendaScreen(
                             }
                         }
                     }
-                    item {
+                    item(key = "pane_right_bottom_spacer") {
                         Spacer(modifier = Modifier.navigationBarsPadding())
                     }
                 }
@@ -285,8 +284,8 @@ fun AgendaScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Header editorial: Seu dia no campus + badge de clima azul informativo neutro (sem relógio 1Hz)
-                item {
+                // 1. Header editorial: Seu dia no campus + badge de clima tematizado pela paleta ativa
+                item(key = "agenda_header") {
                     AgendaHeaderSection(
                         campusCity = uiState.activeCampus.city,
                         weatherTempC = uiState.activeCampus.weatherTempC,
@@ -294,15 +293,14 @@ fun AgendaScreen(
                     )
                 }
 
-                // 2. Seletor de Mês/Semana: Novembro 2026 ▾ + [Hoje] + SEMANA N
-                item {
+                // 2. Seletor de Mês: Novembro 2026 ▾ à esquerda + [Hoje] à direita
+                item(key = "agenda_month_selector") {
                     MonthAndWeekSelectorRow(
                         monthYearLabel = if (uiState.isMonthCalendarExpanded) {
                             formatYearMonthTitle(uiState.displayedYearMonth)
                         } else {
                             dayOverview.monthYearLabel
                         },
-                        weekNumber = dayOverview.weekNumber,
                         isCalendarExpanded = uiState.isMonthCalendarExpanded,
                         showTodayButton = !uiState.isViewingToday,
                         reduceMotion = a11y.reduceMotion,
@@ -313,7 +311,7 @@ fun AgendaScreen(
                 }
 
                 // 2b. Calendário mensal expansível do semestre letivo com indicadores de atividades
-                item {
+                item(key = "agenda_month_calendar") {
                     AnimatedVisibility(
                         visible = uiState.isMonthCalendarExpanded,
                         enter = if (a11y.reduceMotion) EnterTransition.None else expandVertically() + fadeIn(),
@@ -334,7 +332,7 @@ fun AgendaScreen(
                 }
 
                 // 3. Semana completa sem corte (DOM..SÁB distribuídos em weight(1f))
-                item {
+                item(key = "agenda_week_strip") {
                     WeekDayPillsRow(
                         days = dayOverview.weekDays,
                         selectedIsoDate = uiState.selectedIsoDate,
@@ -347,7 +345,7 @@ fun AgendaScreen(
 
                 // 3b. Banner de aviso de fora do período letivo (IHC-13)
                 uiState.semesterRangeNotice?.let { notice ->
-                    item {
+                    item(key = "agenda_semester_notice") {
                         AgendaBannerCard(
                             message = notice,
                             isError = false,
@@ -361,7 +359,7 @@ fun AgendaScreen(
 
                 // 3c. Banner de erro de ação (IHC-13)
                 uiState.actionErrorMessage?.let { errMessage ->
-                    item {
+                    item(key = "agenda_error_banner") {
                         AgendaBannerCard(
                             message = errMessage,
                             isError = true,
@@ -374,7 +372,7 @@ fun AgendaScreen(
                 }
 
                 // 4. Resumo do Dia + botão "+ Compromisso"
-                item {
+                item(key = "agenda_day_summary") {
                     DaySummaryHeader(
                         formattedDate = dayOverview.formattedDate,
                         classesCount = dayOverview.classesCount,
@@ -388,7 +386,7 @@ fun AgendaScreen(
                 uiState.nextClassPreview
                     ?.takeIf { it.isoDate != uiState.selectedIsoDate }
                     ?.let { nextClass ->
-                        item {
+                        item(key = "agenda_next_class") {
                             NextClassHeroCard(
                                 preview = nextClass,
                                 isSameSelectedDay = false,
@@ -401,7 +399,7 @@ fun AgendaScreen(
 
                 // Banner de confirmação
                 uiState.statusBannerMessage?.let { message ->
-                    item {
+                    item(key = "agenda_status_banner") {
                         AgendaBannerCard(
                             message = message,
                             isError = false,
@@ -415,7 +413,7 @@ fun AgendaScreen(
 
                 // 5. Timeline de Cards ou Estado Vazio
                 if (dayOverview.items.isEmpty()) {
-                    item {
+                    item(key = "agenda_empty_state") {
                         AgendaEmptyStateCard(
                             hasCoursesInSemester = uiState.hasCoursesInSemester,
                             nextClassPreview = uiState.nextClassPreview,
@@ -462,7 +460,7 @@ fun AgendaScreen(
                 }
 
                 // 6. Acordeão colapsável: Próximos eventos do Calendário Acadêmico (fechado por padrão)
-                item {
+                item(key = "agenda_academic_events") {
                     AcademicEventsAccordionCard(
                         events = uiState.academicEvents,
                         selectedIsoDate = uiState.selectedIsoDate,
@@ -473,7 +471,7 @@ fun AgendaScreen(
                 }
 
                 // Folga inferior explícita para barra flutuante + navegação do sistema (IHC-03)
-                item {
+                item(key = "agenda_bottom_spacer") {
                     Spacer(modifier = Modifier.navigationBarsPadding())
                 }
             }

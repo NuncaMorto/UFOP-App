@@ -140,6 +140,14 @@ class MainActivity : ComponentActivity() {
                     )
                 )
             }
+            var attendanceIndicatorStyle by rememberSaveable {
+                mutableStateOf(
+                    CampusRepositoryHolder.loadSavedAttendanceIndicatorStyle(
+                        context = applicationContext,
+                        repository = repository
+                    )
+                )
+            }
             var accessibilitySettings by remember {
                 mutableStateOf(
                     CampusRepositoryHolder.loadAccessibilitySettings(
@@ -165,6 +173,13 @@ class MainActivity : ComponentActivity() {
                 )
                 if (accentColorKey != syncedAccent) {
                     accentColorKey = syncedAccent
+                }
+                val syncedAttendanceStyle = CampusRepositoryHolder.loadSavedAttendanceIndicatorStyle(
+                    context = applicationContext,
+                    repository = repository
+                )
+                if (attendanceIndicatorStyle != syncedAttendanceStyle) {
+                    attendanceIndicatorStyle = syncedAttendanceStyle
                 }
                 val syncedA11y = CampusRepositoryHolder.loadAccessibilitySettings(
                     context = applicationContext,
@@ -196,6 +211,7 @@ class MainActivity : ComponentActivity() {
             CampusTheme(
                 darkTheme = isDarkTheme,
                 accentColor = accentColor,
+                attendanceIndicatorStyle = attendanceIndicatorStyle,
                 accessibility = accessibilitySettings,
                 onToggleDarkTheme = {
                     val nextDark = !isDarkTheme
@@ -213,6 +229,14 @@ class MainActivity : ComponentActivity() {
                         repository = repository,
                         accentKey = selected.storageKey
                     )
+                },
+                onSelectAttendanceIndicatorStyle = { style ->
+                    val saved = CampusRepositoryHolder.saveAttendanceIndicatorStyle(
+                        context = applicationContext,
+                        repository = repository,
+                        style = style
+                    )
+                    attendanceIndicatorStyle = saved
                 },
                 onUpdateAccessibility = { updated ->
                     accessibilitySettings = updated

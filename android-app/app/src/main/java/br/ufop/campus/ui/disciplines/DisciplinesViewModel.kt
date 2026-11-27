@@ -35,6 +35,7 @@ data class DisciplinesUiState(
     val allDepartments: List<DepartmentColorOption> = emptyList(),
     val ufopBuildings: List<UfopBuildingOption> = emptyList(),
     val disciplines: List<DisciplineSummaryCard> = emptyList(),
+    val slotsByCourseId: Map<String, List<CourseScheduleSlotItem>> = emptyMap(),
     val activeDetail: DisciplineDetail? = null,
     val activeDetailSlots: List<CourseScheduleSlotItem> = emptyList(),
     val activeDetailHistory: List<AbsenceHistoryEntry> = emptyList(),
@@ -59,6 +60,11 @@ class DisciplinesViewModel(
     private val initialSelectedSemester = repository.getStudentProfile().activeSemester
         .ifBlank { initialSemesters.first() }
 
+    private val initialDisciplines = repository.listDisciplines(
+        semester = initialSelectedSemester,
+        departmentId = null
+    )
+
     private val _uiState = MutableStateFlow(
         DisciplinesUiState(
             selectedSemester = initialSelectedSemester,
@@ -66,10 +72,8 @@ class DisciplinesViewModel(
             departments = repository.listDepartmentsForSemester(initialSelectedSemester),
             allDepartments = repository.listDepartments(),
             ufopBuildings = repository.listUfopBuildings(),
-            disciplines = repository.listDisciplines(
-                semester = initialSelectedSemester,
-                departmentId = null
-            )
+            disciplines = initialDisciplines,
+            slotsByCourseId = buildSlotsByCourseId(initialDisciplines)
         )
     )
     val uiState: StateFlow<DisciplinesUiState> = _uiState.asStateFlow()
@@ -114,7 +118,8 @@ class DisciplinesViewModel(
                 .ifEmpty { listOf(DisciplinesUiState.DEFAULT_SEMESTER) },
             departments = semesterDepartments,
             allDepartments = repository.listDepartments(),
-            disciplines = updatedList
+            disciplines = updatedList,
+            slotsByCourseId = buildSlotsByCourseId(updatedList)
         )
     }
 
@@ -134,7 +139,8 @@ class DisciplinesViewModel(
                 .ifEmpty { listOf(DisciplinesUiState.DEFAULT_SEMESTER) },
             departments = semesterDepartments,
             allDepartments = repository.listDepartments(),
-            disciplines = updatedList
+            disciplines = updatedList,
+            slotsByCourseId = buildSlotsByCourseId(updatedList)
         )
     }
 
@@ -155,7 +161,8 @@ class DisciplinesViewModel(
                 .ifEmpty { listOf(DisciplinesUiState.DEFAULT_SEMESTER) },
             departments = semesterDepartments,
             allDepartments = repository.listDepartments(),
-            disciplines = updatedList
+            disciplines = updatedList,
+            slotsByCourseId = buildSlotsByCourseId(updatedList)
         )
     }
 
@@ -441,6 +448,11 @@ class DisciplinesViewModel(
         return baseList
     }
 
+    private fun buildSlotsByCourseId(
+        disciplines: List<DisciplineSummaryCard>
+    ): Map<String, List<CourseScheduleSlotItem>> =
+        disciplines.associate { card -> card.courseId to repository.listCourseSlots(card.courseId) }
+
     private fun refreshDisciplinesAndDetail() {
         val current = _uiState.value
         val updatedAllDepartments = repository.listDepartments()
@@ -486,6 +498,7 @@ class DisciplinesViewModel(
             allDepartments = updatedAllDepartments,
             ufopBuildings = updatedBuildings,
             disciplines = updatedList,
+            slotsByCourseId = buildSlotsByCourseId(updatedList),
             activeDetail = updatedDetail,
             activeDetailSlots = updatedSlots,
             activeDetailHistory = updatedHistory

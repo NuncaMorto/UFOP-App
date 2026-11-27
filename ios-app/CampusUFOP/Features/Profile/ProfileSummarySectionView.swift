@@ -53,17 +53,12 @@ internal struct ProfileStudentIdentityCard: View {
                         .lineLimit(2)
                 }
 
-                HStack(spacing: 6) {
-                    if !regLabel.isEmpty {
-                        Text("Mat. \(regLabel)")
-                            .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
-                            .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
-                    }
-                    Text("· \(summary.semester) · \(summary.activeCampus.city)")
+                if !regLabel.isEmpty {
+                    Text(regLabel)
                         .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        .lineLimit(1)
                 }
-                .lineLimit(1)
             }
 
             Spacer(minLength: 4)
@@ -72,16 +67,24 @@ internal struct ProfileStudentIdentityCard: View {
                 Button {
                     onEditProfile()
                 } label: {
-                    Label("Editar", systemImage: "pencil")
-                        .font(CampusTheme.font(size: 12, weight: .bold))
-                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 36)
-                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
+                    Image(systemName: "pencil")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                        .frame(width: minTouch, height: minTouch)
+                        .background(
+                            Circle()
+                                .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: highContrast))
+                        )
+                        .overlay {
+                            if highContrast {
+                                Circle()
+                                    .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 1.5)
+                            }
+                        }
                 }
                 .buttonStyle(.plain)
                 .minimumTouchTarget(minTouch)
-                .accessibilityLabel("Editar perfil acadêmico")
+                .accessibilityLabel("Editar perfil")
             }
         }
         .padding(16)
@@ -753,15 +756,47 @@ internal struct ProfileEditSheetView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Campus")
+                            Text("Campus universitário")
                                 .font(CampusTheme.font(size: 13, weight: .semibold))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
-                            Picker("Campus", selection: $selectedCampus) {
-                                Text("Ouro Preto").tag("Ouro Preto")
-                                Text("Mariana").tag("Mariana")
-                                Text("João Monlevade").tag("João Monlevade")
+
+                            let campusOptions = ["Ouro Preto", "Mariana", "João Monlevade"]
+                            Menu {
+                                ForEach(campusOptions, id: \.self) { campus in
+                                    Button {
+                                        selectedCampus = campus
+                                    } label: {
+                                        if selectedCampus == campus {
+                                            Label(campus, systemImage: "checkmark")
+                                        } else {
+                                            Text(campus)
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(selectedCampus.isEmpty ? "Ouro Preto" : selectedCampus)
+                                        .font(CampusTheme.font(size: 15, weight: .medium))
+                                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance.accentColor))
+                                }
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity, minHeight: minTouch)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc, accent: appearance.accentColor))
+                                )
+                                .overlay {
+                                    if hc {
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 1.5)
+                                    }
+                                }
                             }
-                            .pickerStyle(.segmented)
+                            .accessibilityLabel("Campus universitário: \(selectedCampus)")
                         }
 
                         LiquidGlassPrimaryButton(

@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.20"
+    public static let currentVersionString = "1.9.21"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.20",
-            title: "Widgets Renovados, Novo Site & Fluxos Inteligentes",
+            version: "v1.9.21",
+            title: "Navegação Fluida, Persistência & Otimização de Performance",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Indicador configurável de presença na Agenda (Badge no card ou Borda colorida contínua) em Personalização, sincronizado no backup .ufopbackup, com cor âmbar alinhada para aulas canceladas e badge de clima tematizado pelas 9 paletas.",
+                "Cabeçalhos de modais mais limpos mostrando apenas a sigla do departamento (ex.: DECOM), botão circular de edição no Perfil, matrícula tabular sem prefixo e dropdown tonal de campus no Editar Perfil.",
+                "Matriz Curricular com cabeçalho limpo, seletor dropdown tonal de versão persistido por curso (sem reset automático) e botões alinhados; Grade Horária compacta com controles icon-only; Mapa 2D com rótulo \"Ouro Preto\"; card unificado de Independência & GitHub no topo do FAQ.",
+                "Barra de abas com ícones SF Symbols arredondados harmônicos com Onest e animação deslizante refinada, além de cache thread-safe de contraste WCAG, LazyVStack nas listas e formatadores de data estáticos."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.20",
+            title: "Widgets Renovados, Novo Site & Fluxos Inteligentes",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Widgets 4×2 e 2×2 redesenhados para leitura rápida no corredor, com contagem regressiva tabular, sala em destaque, próximo prazo no rodapé, estado \"Dia livre\", toque contextual (Agenda/Atividades) e sincronismo com as 9 paletas e Claro/Escuro.",
                 "Página de download reconstruída em Onest + JetBrains Mono com seletor interativo das 9 paletas sincronizado ao mockup do app e verificação recolhível de SHA-256.",

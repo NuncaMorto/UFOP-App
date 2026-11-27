@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +26,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -95,78 +97,49 @@ private val PROFILE_FAQ_ITEMS = listOf(
         answer = "O catálogo integrado traz a matriz vigente da UFOP (2026/2). Quem entrou na UFOP antes de 2026/1 pode ter equivalências ou cargas horárias específicas — o app sinaliza essa condição na Matriz Curricular e permite importar seu próprio Histórico Escolar (PDF) para calcular o CRE e acompanhar horas cursadas com precisão."
     )
 )
-@Composable
-internal fun ProfileAboutOpenSourceCard() {
-    val context = LocalContext.current
-    val minTouchTarget = campusMinTouchTarget()
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(CampusCardRadius),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shadowElevation = campusCardElevation(2.dp),
-        border = campusCardBorder()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Code,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "Sobre o Vida Acadêmica & Código Aberto",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.semantics { heading() }
-                )
-            }
-            Text(
-                text = "Aplicativo open source desenvolvido para estudantes da UFOP, com foco em privacidade local, rapidez offline e acessibilidade.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            FilledTonalButton(
-                onClick = {
-                    val intent = Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/NuncaMorto/Vida-Academica")
-                    )
-                    runCatching { context.startActivity(intent) }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = minTouchTarget),
-                shape = RoundedCornerShape(CampusPillRadius)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Acessar repositório no GitHub",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+private val GitHubOctocatIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "GitHubOctocat",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(12f, 0.3f)
+            curveTo(5.37f, 0.3f, 0f, 5.67f, 0f, 12.3f)
+            curveTo(0f, 17.6f, 3.44f, 22.1f, 8.21f, 23.69f)
+            curveTo(8.81f, 23.8f, 9.03f, 23.43f, 9.03f, 23.11f)
+            curveTo(9.03f, 22.82f, 9.02f, 22.06f, 9.01f, 21.05f)
+            curveTo(5.67f, 21.78f, 4.97f, 19.44f, 4.97f, 19.44f)
+            curveTo(4.42f, 18.05f, 3.64f, 17.68f, 3.64f, 17.68f)
+            curveTo(2.55f, 16.93f, 3.72f, 16.95f, 3.72f, 16.95f)
+            curveTo(4.92f, 17.03f, 5.56f, 18.19f, 5.56f, 18.19f)
+            curveTo(6.63f, 20.02f, 8.37f, 19.49f, 9.05f, 19.19f)
+            curveTo(9.16f, 18.41f, 9.47f, 17.89f, 9.81f, 17.59f)
+            curveTo(7.14f, 17.29f, 4.34f, 16.26f, 4.34f, 11.66f)
+            curveTo(4.34f, 10.35f, 4.81f, 9.28f, 5.58f, 8.44f)
+            curveTo(5.46f, 8.14f, 5.04f, 6.92f, 5.70f, 5.26f)
+            curveTo(5.70f, 5.26f, 6.71f, 4.94f, 9.00f, 6.49f)
+            curveTo(9.96f, 6.22f, 10.98f, 6.09f, 12f, 6.09f)
+            curveTo(13.02f, 6.09f, 14.04f, 6.23f, 15.0f, 6.49f)
+            curveTo(17.29f, 4.94f, 18.30f, 5.26f, 18.30f, 5.26f)
+            curveTo(18.95f, 6.91f, 18.54f, 8.13f, 18.42f, 8.44f)
+            curveTo(19.19f, 9.28f, 19.66f, 10.35f, 19.66f, 11.66f)
+            curveTo(19.66f, 16.27f, 16.85f, 17.28f, 14.18f, 17.58f)
+            curveTo(14.61f, 17.95f, 14.99f, 18.68f, 14.99f, 19.80f)
+            curveTo(14.99f, 21.40f, 14.98f, 22.70f, 14.98f, 23.09f)
+            curveTo(14.98f, 23.41f, 15.20f, 23.79f, 15.81f, 23.67f)
+            curveTo(20.56f, 22.1f, 24f, 17.6f, 24f, 12.3f)
+            curveTo(24f, 5.67f, 18.63f, 0.3f, 12f, 0.3f)
+            close()
         }
-    }
+    }.build()
 }
 
 @Composable
 internal fun ProfileFaqSubView() {
+    val context = LocalContext.current
     val minTouchTarget = campusMinTouchTarget()
     val expandedIds = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -184,26 +157,63 @@ internal fun ProfileFaqSubView() {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = GitHubOctocatIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "AVISO DE INDEPENDÊNCIA",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.semantics { heading() }
+                    )
+                }
                 Text(
-                    text = "AVISO DE INDEPENDÊNCIA",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Projeto estudantil sem vínculo institucional",
+                    text = "Projeto estudantil independente e de código aberto",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Este é um aplicativo independente, desenvolvido por estudantes e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).",
+                    text = "Este é um aplicativo independente, desenvolvido por estudantes sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP). O código-fonte é aberto, auditável e focado em privacidade local, rapidez offline e acessibilidade.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                FilledTonalButton(
+                    onClick = {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/NuncaMorto/Vida-Academica")
+                        )
+                        runCatching { context.startActivity(intent) }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minTouchTarget),
+                    shape = RoundedCornerShape(CampusPillRadius)
+                ) {
+                    Icon(
+                        imageVector = GitHubOctocatIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Acessar repositório no GitHub",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

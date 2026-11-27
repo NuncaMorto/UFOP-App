@@ -23,7 +23,7 @@ internal struct CampusMapSearchAndFiltersView: View {
 
     private var compactCampusLabel: String {
         switch bridge.activeCampusId {
-        case "OP_MC": return "Morro"
+        case "OP_MC": return "Ouro Preto"
         case "JM_ICEA": return "ICEA"
         case "MA_ICHS": return "ICHS"
         case "MA_ICSA": return "ICSA"
@@ -153,7 +153,7 @@ internal struct CampusMapSearchAndFiltersView: View {
             .accessibilityLabel("Selecionar campus: \(activeCampusDisplayName)")
         }
         .padding(.leading, 14)
-        .padding(.trailing, 8)
+        .padding(.trailing, 10)
         .frame(minHeight: max(48, minTouch))
         .liquidGlassCapsule(selected: false, accent: accentColor, interactive: false, highContrast: highContrast)
     }

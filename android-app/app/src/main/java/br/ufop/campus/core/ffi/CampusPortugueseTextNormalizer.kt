@@ -559,6 +559,22 @@ internal fun deriveCourseCodeFallback(
     return courseId.uppercase().filter { it.isLetterOrDigit() }.take(6).ifBlank { "UFOP" }
 }
 
+private val DEPARTMENT_ACRONYM_SPLIT_REGEX = Regex("""[·\-–—/]""")
+
+/**
+ * Extrai apenas a sigla do departamento antes de separadores como `·`, `-` ou `/`.
+ * Exemplo: `"DECOM · Ciência da Computação"` -> `"DECOM"`.
+ */
+fun extractDepartmentAcronym(raw: String): String {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return ""
+    return trimmed
+        .split(DEPARTMENT_ACRONYM_SPLIT_REGEX)
+        .firstOrNull { it.isNotBlank() }
+        ?.trim()
+        ?: trimmed
+}
+
 /**
  * Formata títulos de avaliações (provas, trabalhos, listas) para exibição visual amigável.
  * Converte CAIXA ALTA importada de PDFs (ex.: "TRABALHO CIRCUITOS DIGITAIS" ->

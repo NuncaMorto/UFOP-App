@@ -72,7 +72,7 @@ public struct AgendaView: View {
                         .padding(.bottom, 32)
                         .campusReadableWidth(1160)
                     } else {
-                        VStack(alignment: .leading, spacing: 18) {
+                        LazyVStack(alignment: .leading, spacing: 18) {
                             headerSection(activeCampus: activeCampus, overview: overview)
 
                             weekStripCard(overview: overview)
@@ -197,19 +197,29 @@ public struct AgendaView: View {
                         }
                     }
                 } label: {
+                    let accentObj = appearance?.accentColor ?? .red
                     HStack(spacing: 5) {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(accent)
+                            .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme, accent: accentObj))
 
                         Text("\(activeCampus.city) · \(activeCampus.weatherTempC)°C")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .font(CampusTheme.tabularFont(size: 11, weight: .semibold))
+                            .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme, accent: accentObj))
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(CampusTheme.weatherBadgeBackground(for: colorScheme, accent: accentObj))
+                    )
+                    .overlay {
+                        if hc {
+                            Capsule(style: .continuous)
+                                .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 1.5)
+                        }
+                    }
                 }
                 .accessibilityLabel("Campus ativo: \(activeCampus.fullLabel)")
             }
@@ -238,24 +248,8 @@ public struct AgendaView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 8) {
                 Text(overview.monthLabel)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 15, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-
-                Spacer()
-
-                Button {
-                    withAnimation(.snappy) {
-                        viewModel.store.jumpAgendaToToday()
-                    }
-                } label: {
-                    Text("Hoje")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
-                }
-                .buttonStyle(.plain)
 
                 LiquidGlassGroup(spacing: 4) {
                     HStack(spacing: 4) {
@@ -284,6 +278,23 @@ public struct AgendaView: View {
                         .accessibilityLabel("Próxima semana")
                     }
                 }
+
+                Spacer()
+
+                Button {
+                    withAnimation(.snappy) {
+                        viewModel.store.jumpAgendaToToday()
+                    }
+                } label: {
+                    Text("Hoje")
+                        .font(CampusTheme.font(size: 11, weight: .bold))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance?.accentColor ?? .red))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ir para o dia de hoje")
             }
 
             HStack(spacing: 4) {
@@ -479,7 +490,7 @@ public struct AgendaView: View {
             .padding(.horizontal, 18)
             .liquidGlassCard(highContrast: hc)
         } else {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 12) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     let previousItem = index > 0 ? items[index - 1] : nil
                     if let freeGap = Self.freeWindowMinutesBetween(previous: previousItem, current: item) {
@@ -528,6 +539,23 @@ public struct AgendaView: View {
             || item.location.lowercased().contains("ead")
             || item.location.lowercased().contains("distância")
 
+        let indicatorStyle = appearance?.attendanceIndicatorStyle ?? viewModel.store.attendanceIndicatorStyle
+        let useBorderIndicator = !item.isCustomCommitment && indicatorStyle == "CARD_BORDER"
+        let cardBorderColor: Color? = useBorderIndicator ? attendanceSemanticColor(for: item.attendanceStatus) : nil
+        let a11yDescription: String = {
+            var parts = [
+                item.isCustomCommitment ? "Compromisso: \(item.title)" : "Aula: \(item.title)",
+                "Horário: \(item.timeRangeLabel)"
+            ]
+            if !item.isCustomCommitment {
+                parts.append("Status: \(item.attendanceStatus.buttonTitle)")
+            }
+            if !item.location.isEmpty {
+                parts.append("Local: \(isEad ? "A distância (EAD)" : item.location)")
+            }
+            return parts.joined(separator: ". ")
+        }()
+
         return HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .trailing, spacing: 3) {
                 Text(item.startTime)
@@ -548,7 +576,8 @@ public struct AgendaView: View {
                 AccentBarCardContainer(
                     accentColor: CampusTheme.departmentColor(for: item.colorKey),
                     highContrast: hc,
-                    useSurface2: isHighlightedClass
+                    useSurface2: isHighlightedClass,
+                    borderOverrideColor: cardBorderColor
                 ) {
                     VStack(alignment: .leading, spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -629,7 +658,7 @@ public struct AgendaView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Excluir compromisso \(item.title)")
-                            } else {
+                            } else if !useBorderIndicator {
                                 statusBadge(for: item.attendanceStatus)
                             }
                         }
@@ -637,6 +666,8 @@ public struct AgendaView: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(a11yDescription)
             .campusHoverLift()
         }
     }
@@ -708,14 +739,19 @@ public struct AgendaView: View {
         return "PRÓXIMA"
     }
 
+    private func attendanceSemanticColor(for status: AttendanceStatus) -> Color {
+        switch status {
+        case .attending:
+            return colorScheme == .dark ? Color(hex: 0x81C784) : Color(hex: 0x2E7D32)
+        case .absent:
+            return colorScheme == .dark ? Color(hex: 0xEF4444) : Color(hex: 0xC62828)
+        case .cancelled:
+            return colorScheme == .dark ? Color(hex: 0xF59E0B) : Color(hex: 0xD97706)
+        }
+    }
+
     private func statusBadge(for status: AttendanceStatus) -> some View {
-        let color: Color = {
-            switch status {
-            case .attending: return accent
-            case .absent: return Color(hex: 0xEF4444)
-            case .cancelled: return CampusTheme.secondaryText(for: colorScheme, highContrast: hc)
-            }
-        }()
+        let color = attendanceSemanticColor(for: status)
 
         return HStack(spacing: 4) {
             Image(systemName: status.systemImage)
@@ -756,6 +792,13 @@ public struct AgendaView: View {
 // MARK: - Add Commitment Sheet (Native Date/Time Pickers + Liquid Glass)
 
 public struct AddCommitmentSheetView: View {
+    private static let timeFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "HH:mm"
+        return fmt
+    }()
+
     public let selectedDateLabel: String
     public let activeCampus: UfopCampusInfo
     public let onSave: (String, String, String, String, String) -> Void
@@ -884,9 +927,13 @@ public struct AddCommitmentSheetView: View {
                         foreground: accentObj.onPrimary(for: colorScheme),
                         minHeight: appearance?.accessibility.minTouchHeight ?? 48
                     ) {
-                        let fmt = DateFormatter()
-                        fmt.dateFormat = "HH:mm"
-                        onSave(title, descriptionText, fmt.string(from: startDate), fmt.string(from: endDate), location)
+                        onSave(
+                            title,
+                            descriptionText,
+                            Self.timeFormatter.string(from: startDate),
+                            Self.timeFormatter.string(from: endDate),
+                            location
+                        )
                     } label: {
                         Text("Salvar compromisso")
                             .font(.system(size: 15, weight: .bold, design: .rounded))

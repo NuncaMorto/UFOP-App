@@ -436,6 +436,7 @@ public struct ProfileView: View {
             do {
                 let text = try String(contentsOf: url, encoding: .utf8)
                 _ = try store.importEncryptedBackup(text, password: backupPassword)
+                appearance.attendanceIndicatorStyle = store.attendanceIndicatorStyle
                 backupFeedback = "Backup restaurado com sucesso!"
                 backupError = nil
             } catch {

@@ -232,6 +232,57 @@ internal fun InMemoryCampusRepository.saveDynamicGridCompletedCodesImpl(
     onMutation?.invoke()
 }
 
+internal fun normalizeAttendanceIndicatorStyle(raw: String?): String = when (raw?.trim()?.uppercase()) {
+    "CARD_BORDER" -> "CARD_BORDER"
+    else -> "BADGE"
+}
+
+internal fun InMemoryCampusRepository.getAttendanceIndicatorStyleImpl(): String =
+    synchronized(lock) { attendanceIndicatorStyle }
+
+internal fun InMemoryCampusRepository.setAttendanceIndicatorStyleImpl(style: String) {
+    synchronized(lock) {
+        val normalized = normalizeAttendanceIndicatorStyle(style)
+        if (attendanceIndicatorStyle == normalized) return@synchronized
+        attendanceIndicatorStyle = normalized
+        persistStateLocked()
+        _mutationVersion.value += 1L
+        onMutation?.invoke()
+    }
+}
+
+internal fun InMemoryCampusRepository.getSelectedCurriculumVersionImpl(courseCode: String): String? =
+    synchronized(lock) {
+        val key = courseCode.trim().uppercase()
+        if (key.isEmpty()) return@synchronized null
+        selectedCurriculumVersionsByCourse[key]
+    }
+
+internal fun InMemoryCampusRepository.setSelectedCurriculumVersionImpl(
+    courseCode: String,
+    version: String
+) = synchronized(lock) {
+    val key = courseCode.trim().uppercase()
+    val cleanVersion = version.trim()
+    if (key.isEmpty()) return@synchronized
+    val previous = selectedCurriculumVersionsByCourse[key]
+    if (cleanVersion.isEmpty()) {
+        if (previous == null) return@synchronized
+        selectedCurriculumVersionsByCourse.remove(key)
+    } else {
+        if (previous == cleanVersion) return@synchronized
+        selectedCurriculumVersionsByCourse[key] = cleanVersion
+    }
+    persistStateLocked()
+    _mutationVersion.value += 1L
+    onMutation?.invoke()
+}
+
+internal fun InMemoryCampusRepository.getAllSelectedCurriculumVersionsImpl(): Map<String, String> =
+    synchronized(lock) {
+        LinkedHashMap(selectedCurriculumVersionsByCourse)
+    }
+
 internal fun InMemoryCampusRepository.getDynamicGridAllCompletedImpl(): Map<String, Set<String>> =
     synchronized(lock) {
         val snapshot = linkedMapOf<String, Set<String>>()

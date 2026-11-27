@@ -52,10 +52,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.AcademicCalendarEvent
 import br.ufop.campus.ui.theme.CampusCardRadius
-import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
-import br.ufop.campus.ui.theme.DarkWeatherBadgeText
-import br.ufop.campus.ui.theme.LightWeatherBadgeBg
-import br.ufop.campus.ui.theme.LightWeatherBadgeText
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
@@ -110,13 +106,14 @@ internal fun WeatherPillBadge(
     isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (isDark) DarkWeatherBadgeBg else LightWeatherBadgeBg
-    val textColor = if (isDark) DarkWeatherBadgeText else LightWeatherBadgeText
+    val bgColor = MaterialTheme.colorScheme.primaryContainer
+    val textColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = bgColor
+        color = bgColor,
+        border = campusCardBorder()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

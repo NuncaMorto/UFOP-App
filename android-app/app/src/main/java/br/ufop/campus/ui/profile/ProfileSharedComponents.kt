@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -165,6 +166,13 @@ internal fun syncThemeAndA11yAfterBackupRestore(
     CampusRepositoryHolder.saveAccentColor(context, repository, restoredAccent.storageKey)
     themeController.selectAccentColor(restoredAccent)
 
+    val restoredAttendanceStyle = CampusRepositoryHolder.saveAttendanceIndicatorStyle(
+        context = context,
+        repository = repository,
+        style = repository.getAttendanceIndicatorStyle()
+    )
+    themeController.selectAttendanceIndicatorStyle(restoredAttendanceStyle)
+
     val restoredA11y = repository.getAccessibilitySettings()
     CampusRepositoryHolder.saveAccessibilitySettings(context, repository, restoredA11y)
     accessibilityController.updateSettings(restoredA11y)
@@ -265,7 +273,7 @@ internal fun AcademicIdentityCard(
     val displayCourseName = studentProfile.courseName.trim().let {
         if (it.isBlank()) "Curso não informado" else normalizeUfopPortugueseText(it)
     }
-    val regLabel = studentProfile.registrationNumber.ifBlank { "Não informada" }
+    val regLabel = studentProfile.registrationNumber.trim()
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -339,35 +347,35 @@ internal fun AcademicIdentityCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Text(
-                    text = "Mat. $regLabel · $activeSemester · ${activeCampus.city} ${activeCampus.weatherTempC} °C",
-                    style = MaterialTheme.typography.labelSmall.tabularNums(),
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (regLabel.isNotEmpty()) {
+                    Text(
+                        text = regLabel,
+                        style = MaterialTheme.typography.labelSmall.tabularNums(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            FilledTonalButton(
+            Surface(
                 onClick = onEditProfile,
-                modifier = Modifier.heightIn(min = minTouchTarget),
-                shape = RoundedCornerShape(CampusPillRadius),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                modifier = Modifier
+                    .size(minTouchTarget)
+                    .semantics { contentDescription = "Editar perfil" },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder()
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "Editar",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

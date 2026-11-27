@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.AssessmentWithCourse
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
+import br.ufop.campus.core.ffi.extractDepartmentAcronym
 import br.ufop.campus.core.ffi.formatAcademicAssessmentTitle
 import br.ufop.campus.ui.components.CampusDatePickerField
 import br.ufop.campus.ui.components.CampusTimePickerField
@@ -140,10 +141,14 @@ fun AssessmentDetailBottomSheet(
     val accessibleHeaderAccent = remember(headerAccentColor, isDark) {
         accessibleTextColor(headerAccentColor, isDark)
     }
-    val headerCourseLabel = if (isEditing && selectedCourse != null) {
-        "${selectedCourse.name} · ${selectedCourse.departmentName}"
+    val rawCourseName = if (isEditing && selectedCourse != null) selectedCourse.name else entry.courseName
+    val rawDeptAcronym = extractDepartmentAcronym(
+        if (isEditing && selectedCourse != null) selectedCourse.departmentName else entry.departmentName
+    )
+    val headerCourseLabel = if (rawDeptAcronym.isNotEmpty()) {
+        "$rawCourseName · $rawDeptAcronym"
     } else {
-        "${entry.courseName} · ${entry.departmentName}"
+        rawCourseName
     }
 
     if (showDeleteConfirmDialog) {
