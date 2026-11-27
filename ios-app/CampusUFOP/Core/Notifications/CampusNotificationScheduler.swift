@@ -612,7 +612,8 @@ public final class CampusNotificationScheduler {
                         self.pendingTargetTab = .agenda
                         self.pendingTargetTabNonce += 1
                     }
-                } else if userInfo["agendaItemId"] != .none {
+                } else if let agendaItemId = userInfo["agendaItemId"] as? String, !agendaItemId.isEmpty {
+                    _ = agendaItemId
                     self.pendingTargetTab = .agenda
                     self.pendingTargetTabNonce += 1
                 }
