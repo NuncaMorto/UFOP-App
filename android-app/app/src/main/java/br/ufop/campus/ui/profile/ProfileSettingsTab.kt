@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Refresh
@@ -71,8 +72,10 @@ import br.ufop.campus.core.curriculum.UfopCurriculumCatalog
 import br.ufop.campus.core.ffi.AcademicCalendarUpdatePackage
 import br.ufop.campus.core.ffi.AcademicProfileSummary
 import br.ufop.campus.core.ffi.CampusCoreRepository
+import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.ffi.StudentProfile
 import br.ufop.campus.core.ffi.normalizeUfopPortugueseText
+import br.ufop.campus.core.notifications.CampusNotificationChannels
 import br.ufop.campus.core.security.AppLockManager
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.ui.theme.CampusAccentColor
@@ -286,6 +289,27 @@ internal fun ProfileSettingsTab(
         if (s.reduceMotion) parts.add("Movimento reduzido")
         parts.joinToString(" · ")
     }
+    val notificationPrefs = remember(repository, mutationVersion, activeSection) {
+        CampusRepositoryHolder.loadNotificationPreferences(context, repository)
+    }
+    val hasNotifPermission = remember(mutationVersion, activeSection) {
+        CampusNotificationChannels.hasRuntimeNotificationPermission(context)
+    }
+    val notificationsSubtitle = remember(notificationPrefs, hasNotifPermission) {
+        val activeCount = listOf(
+            notificationPrefs.classReminderEnabled,
+            notificationPrefs.liveActivityEnabled,
+            notificationPrefs.deadlineReminderEnabled,
+            notificationPrefs.absenceAlertEnabled,
+            notificationPrefs.morningSummaryEnabled
+        ).count { it }
+        when {
+            !hasNotifPermission -> "Permissão pendente no sistema"
+            activeCount == 0 -> "Lembretes desativados"
+            notificationPrefs.classReminderEnabled -> "Aulas ${notificationPrefs.classLeadMinutes} min antes · $activeCount/5 ativos"
+            else -> "$activeCount/5 alertas ativos · 100% offline"
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -299,6 +323,17 @@ internal fun ProfileSettingsTab(
                     title = "Personalização",
                     subtitle = "${if (themeController.isDark) "Modo escuro" else "Modo claro"} · Cor ${themeController.accentColor.displayName}",
                     onClick = { onSelectSection(SettingsSection.PERSONALIZATION) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+                )
+                SettingsMenuRow(
+                    icon = Icons.Outlined.NotificationsActive,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    title = "Notificações",
+                    subtitle = notificationsSubtitle,
+                    onClick = { onSelectSection(SettingsSection.NOTIFICATIONS) }
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -410,6 +445,13 @@ internal fun ProfileSettingsTab(
                         onSelectAccent = { themeController.selectAccentColor(it) },
                         attendanceIndicatorStyle = themeController.attendanceIndicatorStyle,
                         onSelectAttendanceIndicatorStyle = { themeController.selectAttendanceIndicatorStyle(it) }
+                    )
+                }
+
+                SettingsSection.NOTIFICATIONS -> {
+                    ProfileNotificationsSubView(
+                        repository = repository,
+                        mutationVersion = mutationVersion
                     )
                 }
 

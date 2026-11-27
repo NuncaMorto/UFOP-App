@@ -256,5 +256,17 @@ internal fun InMemoryCampusRepository.buildPersistedJsonLocked(): JSONObject {
     }
     root.put("selectedCurriculumVersionsByCourse", curriculumVersionsJson)
 
+    root.put(
+        "notificationPreferences",
+        JSONObject().apply {
+            put("classReminderEnabled", notificationPreferences.classReminderEnabled)
+            put("classLeadMinutes", notificationPreferences.classLeadMinutes)
+            put("liveActivityEnabled", notificationPreferences.liveActivityEnabled)
+            put("deadlineReminderEnabled", notificationPreferences.deadlineReminderEnabled)
+            put("absenceAlertEnabled", notificationPreferences.absenceAlertEnabled)
+            put("morningSummaryEnabled", notificationPreferences.morningSummaryEnabled)
+        }
+    )
+
     return root
 }

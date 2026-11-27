@@ -283,6 +283,20 @@ internal fun InMemoryCampusRepository.getAllSelectedCurriculumVersionsImpl(): Ma
         LinkedHashMap(selectedCurriculumVersionsByCourse)
     }
 
+internal fun InMemoryCampusRepository.getNotificationPreferencesImpl(): NotificationPreferences =
+    synchronized(lock) { notificationPreferences }
+
+internal fun InMemoryCampusRepository.setNotificationPreferencesImpl(prefs: NotificationPreferences) {
+    synchronized(lock) {
+        val normalized = prefs.normalized()
+        if (notificationPreferences == normalized) return@synchronized
+        notificationPreferences = normalized
+        persistStateLocked()
+        _mutationVersion.value += 1L
+        onMutation?.invoke()
+    }
+}
+
 internal fun InMemoryCampusRepository.getDynamicGridAllCompletedImpl(): Map<String, Set<String>> =
     synchronized(lock) {
         val snapshot = linkedMapOf<String, Set<String>>()

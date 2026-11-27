@@ -118,6 +118,7 @@ class InMemoryCampusRepository(
     // v1.9.21: Indicador de presença nos cards da Agenda ("BADGE" | "CARD_BORDER") e versão de currículo por curso
     internal var attendanceIndicatorStyle: String = "BADGE"
     internal val selectedCurriculumVersionsByCourse: MutableMap<String, String> = linkedMapOf()
+    internal var notificationPreferences: NotificationPreferences = NotificationPreferences()
 
     private val defaultCoursesSnapshot = LinkedHashMap(courses)
     private val defaultSlotsSnapshot = slots.toList()
@@ -170,6 +171,7 @@ class InMemoryCampusRepository(
         dynamicGridCompletedByMatrix.clear()
         attendanceIndicatorStyle = "BADGE"
         selectedCurriculumVersionsByCourse.clear()
+        notificationPreferences = NotificationPreferences()
         departmentSwatches.forEach { swatch ->
             departmentColorOverrides[swatch.id] = swatch.colorHex
         }
@@ -609,6 +611,12 @@ class InMemoryCampusRepository(
 
     override fun getAllSelectedCurriculumVersions(): Map<String, String> =
         getAllSelectedCurriculumVersionsImpl()
+
+    override fun getNotificationPreferences(): NotificationPreferences =
+        getNotificationPreferencesImpl()
+
+    override fun setNotificationPreferences(prefs: NotificationPreferences) =
+        setNotificationPreferencesImpl(prefs)
 
     override fun getExportFolderConfig(): ExportFolderConfig = getExportFolderConfigImpl()
 

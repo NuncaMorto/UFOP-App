@@ -1,9 +1,12 @@
 import Foundation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 // MARK: - Persistent Encrypted State & Agenda Intelligence Models
 
 private struct PersistedCampusState: Codable {
-    var schemaVersion: Int = 5
+    var schemaVersion: Int = 7
     var studentProfile: StudentProfile
     var selectedSemesterFilter: String
     var activeCampusId: String
@@ -22,6 +25,7 @@ private struct PersistedCampusState: Codable {
     var friendSchedules: [FriendSchedule]?
     var attendanceIndicatorStyle: String?
     var selectedCurriculumVersionsByCourse: [String: String]?
+    var notificationPreferences: NotificationPreferences?
 
     enum CodingKeys: String, CodingKey {
         case schemaVersion
@@ -43,10 +47,11 @@ private struct PersistedCampusState: Codable {
         case friendSchedules
         case attendanceIndicatorStyle
         case selectedCurriculumVersionsByCourse
+        case notificationPreferences
     }
 
     init(
-        schemaVersion: Int = 6,
+        schemaVersion: Int = 7,
         studentProfile: StudentProfile,
         selectedSemesterFilter: String,
         activeCampusId: String,
@@ -64,7 +69,8 @@ private struct PersistedCampusState: Codable {
         dynamicGridCompletedByMatrix: [String: [String]]?,
         friendSchedules: [FriendSchedule]?,
         attendanceIndicatorStyle: String? = "BADGE",
-        selectedCurriculumVersionsByCourse: [String: String]? = nil
+        selectedCurriculumVersionsByCourse: [String: String]? = nil,
+        notificationPreferences: NotificationPreferences? = NotificationPreferences()
     ) {
         self.schemaVersion = schemaVersion
         self.studentProfile = studentProfile
@@ -85,6 +91,7 @@ private struct PersistedCampusState: Codable {
         self.friendSchedules = friendSchedules
         self.attendanceIndicatorStyle = attendanceIndicatorStyle
         self.selectedCurriculumVersionsByCourse = selectedCurriculumVersionsByCourse
+        self.notificationPreferences = notificationPreferences
     }
 
     init(from decoder: Decoder) throws {
@@ -108,6 +115,7 @@ private struct PersistedCampusState: Codable {
         self.friendSchedules = try container.decodeIfPresent([FriendSchedule].self, forKey: .friendSchedules)
         self.attendanceIndicatorStyle = try container.decodeIfPresent(String.self, forKey: .attendanceIndicatorStyle)
         self.selectedCurriculumVersionsByCourse = try container.decodeIfPresent([String: String].self, forKey: .selectedCurriculumVersionsByCourse)
+        self.notificationPreferences = try container.decodeIfPresent(NotificationPreferences.self, forKey: .notificationPreferences)
     }
 }
 
@@ -166,7 +174,8 @@ public extension CampusStore {
             dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix,
             friendSchedules: friendSchedules,
             attendanceIndicatorStyle: attendanceIndicatorStyle,
-            selectedCurriculumVersionsByCourse: selectedCurriculumVersionsByCourse
+            selectedCurriculumVersionsByCourse: selectedCurriculumVersionsByCourse,
+            notificationPreferences: notificationPreferences
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -199,6 +208,108 @@ public extension CampusStore {
             URLFileProtection.completeUntilFirstUserAuthentication,
             forKey: .fileProtectionKey
         )
+        #endif
+        syncSharedWidgetSnapshot()
+        CampusNotificationScheduler.shared.scheduleDebouncedReschedule(for: self)
+    }
+
+    func syncSharedWidgetSnapshot() {
+        let activeSem = selectedSemesterFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "2026.2"
+            : selectedSemesterFilter
+        let semDisciplines = disciplines.filter { $0.semester == activeSem }
+        let discById = Dictionary(semDisciplines.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let semCourseIds = Set(discById.keys)
+
+        let sharedSlots: [WidgetSharedCourseSlot] = courseScheduleSlots.compactMap { slot in
+            guard semCourseIds.contains(slot.courseId), let disc = discById[slot.courseId] else { return nil }
+            return WidgetSharedCourseSlot(
+                slotId: slot.slotId,
+                courseId: slot.courseId,
+                courseName: disc.name,
+                dayOfWeek: slot.dayOfWeek,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                building: slot.building,
+                room: slot.room,
+                shortLocation: slot.shortLocation,
+                fallbackLocation: disc.location,
+                isEad: isCourseEad(disc.id)
+            )
+        }
+
+        var statuses: [WidgetSharedSessionStatus] = []
+        var seenStatusKeys = Set<String>()
+        for (dateIso, items) in agendaItemsByDate {
+            for item in items where item.kind == .lecture {
+                let status = recordedStatusByAgendaItem[item.id] ?? item.attendanceStatus
+                let cid = item.disciplineId ?? ""
+                let key = "\(dateIso)|\(item.id)|\(cid)|\(item.startTime)"
+                if !seenStatusKeys.contains(key) {
+                    seenStatusKeys.insert(key)
+                    statuses.append(
+                        WidgetSharedSessionStatus(
+                            dateIso: dateIso,
+                            slotId: item.id,
+                            courseId: cid,
+                            startTime: item.startTime,
+                            statusRaw: status.rawValue
+                        )
+                    )
+                }
+            }
+        }
+        for (agendaKey, status) in recordedStatusByAgendaItem where agendaKey.hasPrefix("lecture-") {
+            let trimmed = String(agendaKey.dropFirst("lecture-".count))
+            let parts = trimmed.components(separatedBy: "@")
+            guard parts.count == 2 else { continue }
+            let slotId = parts[0]
+            let dateIso = parts[1]
+            let matchedSlot = courseScheduleSlots.first { $0.slotId == slotId }
+            let cid = matchedSlot?.courseId ?? ""
+            let start = matchedSlot?.startTime ?? ""
+            let dedupKey = "\(dateIso)|\(slotId)|\(cid)|\(start)"
+            if !seenStatusKeys.contains(dedupKey) {
+                seenStatusKeys.insert(dedupKey)
+                statuses.append(
+                    WidgetSharedSessionStatus(
+                        dateIso: dateIso,
+                        slotId: slotId,
+                        courseId: cid,
+                        startTime: start,
+                        statusRaw: status.rawValue
+                    )
+                )
+            }
+        }
+
+        let allDiscById = Dictionary(disciplines.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let sharedAssessments: [WidgetSharedAssessment] = assessmentsByDiscipline.values
+            .flatMap { $0 }
+            .map { item in
+                let disc = allDiscById[item.courseId]
+                return WidgetSharedAssessment(
+                    id: item.id,
+                    courseId: item.courseId,
+                    courseCode: disc?.code ?? "",
+                    courseName: disc?.name ?? "",
+                    title: item.title,
+                    kind: item.kind,
+                    dueDate: item.dueDate,
+                    dueTime: item.dueTime,
+                    completed: item.completed
+                )
+            }
+
+        let payload = WidgetSharedSnapshotPayload(
+            activeSemester: activeSem,
+            slots: sharedSlots,
+            sessionStatuses: statuses,
+            assessments: sharedAssessments
+        )
+        CampusWidgetSnapshotStore.save(payload)
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
         #endif
     }
 
@@ -291,8 +402,12 @@ public extension CampusStore {
         dynamicGridCompletedByMatrix = [:]
         selectedCurriculumVersionsByCourse = [:]
         attendanceIndicatorStyle = "BADGE"
+        notificationPreferences = NotificationPreferences()
         UserDefaults.standard.removeObject(forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
         UserDefaults.standard.removeObject(forKey: "campus.ufop.attendanceIndicatorStyle")
+        UserDefaults.standard.removeObject(forKey: "campus.ufop.notificationPreferences")
+        CampusWidgetSnapshotStore.clear()
+        CampusNotificationScheduler.shared.cancelAllAndClearTracking()
         friendSchedules = []
         selectedFriendScheduleId = nil
         requestedTimetablePresentation = false
@@ -300,6 +415,7 @@ public extension CampusStore {
         seedUFOP2026_2Data()
         ensureOfficialCalendarEventsLoaded()
         _ = applyRoomAllocationCatalog()
+        syncSharedWidgetSnapshot()
     }
 
     private static func createCorruptQuarantineCopies(for urls: [URL]) -> [String] {
@@ -338,7 +454,8 @@ public extension CampusStore {
             dynamicGridCompletedByMatrix: dynamicGridCompletedByMatrix,
             friendSchedules: friendSchedules,
             attendanceIndicatorStyle: attendanceIndicatorStyle,
-            selectedCurriculumVersionsByCourse: selectedCurriculumVersionsByCourse
+            selectedCurriculumVersionsByCourse: selectedCurriculumVersionsByCourse,
+            notificationPreferences: notificationPreferences
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -383,8 +500,12 @@ public extension CampusStore {
         dynamicGridCompletedByMatrix = [:]
         selectedCurriculumVersionsByCourse = [:]
         attendanceIndicatorStyle = "BADGE"
+        notificationPreferences = NotificationPreferences()
         UserDefaults.standard.removeObject(forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
         UserDefaults.standard.removeObject(forKey: "campus.ufop.attendanceIndicatorStyle")
+        UserDefaults.standard.removeObject(forKey: "campus.ufop.notificationPreferences")
+        CampusWidgetSnapshotStore.clear()
+        CampusNotificationScheduler.shared.cancelAllAndClearTracking()
         friendSchedules = []
         selectedFriendScheduleId = nil
         requestedTimetablePresentation = false
@@ -392,6 +513,7 @@ public extension CampusStore {
         seedUFOP2026_2Data()
         ensureOfficialCalendarEventsLoaded()
         _ = applyRoomAllocationCatalog()
+        syncSharedWidgetSnapshot()
     }
 
     private func applySnapshot(_ snapshot: PersistedCampusState, resetMissingOptionalFields: Bool = false) {
@@ -433,6 +555,15 @@ public extension CampusStore {
         } else if resetMissingOptionalFields {
             self.selectedCurriculumVersionsByCourse = [:]
             UserDefaults.standard.removeObject(forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
+        }
+        if let restoredNotif = snapshot.notificationPreferences?.normalized() {
+            self.notificationPreferences = restoredNotif
+            if let encoded = try? JSONEncoder().encode(restoredNotif) {
+                UserDefaults.standard.set(encoded, forKey: "campus.ufop.notificationPreferences")
+            }
+        } else if resetMissingOptionalFields {
+            self.notificationPreferences = NotificationPreferences()
+            UserDefaults.standard.removeObject(forKey: "campus.ufop.notificationPreferences")
         }
         if let activeFriendId = selectedFriendScheduleId,
            !self.friendSchedules.contains(where: { $0.id == activeFriendId }) {

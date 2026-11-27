@@ -128,6 +128,7 @@ internal fun CampusAnimatedVisibility(
 }
 internal enum class SettingsSection(val title: String) {
     PERSONALIZATION("Personalização"),
+    NOTIFICATIONS("Notificações"),
     SECURITY("Segurança & Privacidade"),
     ACCESSIBILITY("Acessibilidade"),
     CAMPUS_WEATHER("Campus & Clima Online"),
@@ -177,6 +178,9 @@ internal fun syncThemeAndA11yAfterBackupRestore(
     val restoredA11y = repository.getAccessibilitySettings()
     CampusRepositoryHolder.saveAccessibilitySettings(context, repository, restoredA11y)
     accessibilityController.updateSettings(restoredA11y)
+
+    val restoredNotifications = repository.getNotificationPreferences()
+    CampusRepositoryHolder.saveNotificationPreferences(context, repository, restoredNotifications)
 
     CampusRepositoryHolder.setGuidedTourCompleted(context, repository, repository.isGuidedTourCompleted())
     val seenRelease = repository.getLastSeenReleaseVersion()

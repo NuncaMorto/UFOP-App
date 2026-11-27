@@ -63,10 +63,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.21",
-            title = "Navegação Fluida, Persistência & Otimização de Performance",
+            version = "v1.9.22",
+            title = "Widgets Corrigidos & Notificações Locais Offline",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Widgets 4×2 e 2×2 corrigidos na Tela Inicial: remoção de componentes incompatíveis que impediam o carregamento no Android, pré-visualização real no seletor do Android 12–15 e atualização mais resiliente.",
+                "Sistema completo de notificações 100% local e offline no aparelho (sem servidor, sem push externo e sem rastreamento), com preferências salvas localmente e em backups .ufopbackup.",
+                "5 tipos de alertas inteligentes: Cartão ao vivo na tela de bloqueio (Live Update) com progresso da aula; Aviso pré-aula (10, 15 ou 30 min) com Vou à aula, Vou faltar e Ver no mapa; Prazos 3d e 1d às 09:00 (Marcar concluída / Lembrar à noite); Alerta de faltas em 65% e 85%; e Resumo matinal às 07:30 em dias letivos.",
+                "Nova tela Configurações → Notificações com chaves independentes, seletor de antecedência (10/15/30 min), status de permissão e resumo de funcionamento offline."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.21",
+            title = "Navegação Fluida, Persistência & Otimização de Performance",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Indicador configurável de presença na Agenda (Badge no card ou Borda colorida contínua) em Personalização, sincronizado no backup .ufopbackup, junto à remoção do indicador de semana e badge de clima tematizado pelas 9 paletas.",
                 "Cabeçalhos de modais mais limpos mostrando apenas a sigla do departamento (ex.: DECOM), botão circular de edição na aula e no Perfil, matrícula tabular sem prefixo e dropdown tonal de campus no Editar Perfil.",

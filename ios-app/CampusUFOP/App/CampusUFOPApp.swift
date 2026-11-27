@@ -105,6 +105,8 @@ private struct CampusRootCoordinatorView: View {
             if appearance.attendanceIndicatorStyle != store.attendanceIndicatorStyle {
                 appearance.attendanceIndicatorStyle = store.attendanceIndicatorStyle
             }
+            CampusNotificationScheduler.shared.attach(store: store)
+            CampusNotificationScheduler.shared.rescheduleAll(from: store)
         }
         .task {
             Task.detached(priority: .utility) {
@@ -171,6 +173,25 @@ private struct CampusRootCoordinatorView: View {
                 selectedTab = .disciplines
                 return
             case "map", "mapa":
+                if let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                   let items = comps.queryItems {
+                    let courseCode = items.first(where: { $0.name == "courseCode" })?.value ?? ""
+                    let section = items.first(where: { $0.name == "section" })?.value ?? ""
+                    let weekday = UInt32(Int(items.first(where: { $0.name == "weekday" })?.value ?? "1") ?? 1)
+                    let startTime = items.first(where: { $0.name == "startTime" })?.value ?? ""
+                    let building = items.first(where: { $0.name == "building" })?.value ?? ""
+                    if !courseCode.isEmpty || !building.isEmpty {
+                        CampusNotificationScheduler.shared.pendingMapFocusRequest = CampusMapMeetingRequest(
+                            courseCode: courseCode,
+                            section: section,
+                            weekday: weekday,
+                            startTime: startTime,
+                            fallbackBuildingRaw: building
+                        )
+                        CampusNotificationScheduler.shared.pendingMapFocusNonce += 1
+                        return
+                    }
+                }
                 selectedTab = .map
                 return
             case "profile", "perfil":

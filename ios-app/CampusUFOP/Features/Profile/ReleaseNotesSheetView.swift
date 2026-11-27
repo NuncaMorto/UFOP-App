@@ -10,14 +10,26 @@ public struct ReleaseNoteEntry: Identifiable, Sendable {
 }
 
 public enum CampusReleaseNotesData {
-    public static let currentVersionString = "1.9.21"
+    public static let currentVersionString = "1.9.22"
 
     public static let versions: [ReleaseNoteEntry] = [
         ReleaseNoteEntry(
-            version: "v1.9.21",
-            title: "Navegação Fluida, Persistência & Otimização de Performance",
+            version: "v1.9.22",
+            title: "Widgets Corrigidos & Notificações Locais Offline",
             badge: "ATUAL",
             isLatest: true,
+            items: [
+                "Widgets 4×2 e 2×2 na Tela Inicial com extensão WidgetKit dedicada e leitura local compartilhada, garantindo atualização confiável e suporte às paletas do app.",
+                "Sistema completo de notificações 100% local e offline no iPhone/iPad (sem servidor, sem push externo e sem rastreamento), com preferências persistidas localmente e no backup .ufopbackup.",
+                "5 tipos de alertas inteligentes: Cartão ao vivo (Live Activity) na tela de bloqueio com contagem regressiva e progresso; Aviso pré-aula (10, 15 ou 30 min) com Vou à aula, Vou faltar e Ver no mapa; Prazos 3d e 1d às 09:00 (Marcar concluída / Lembrar à noite); Alerta de faltas em 65% e 85%; e Resumo matinal às 07:30 em dias letivos.",
+                "Nova seção Configurações → Notificações com controles independentes, seletor de antecedência (10/15/30 min), status de permissão e card informativo offline."
+            ]
+        ),
+        ReleaseNoteEntry(
+            version: "v1.9.21",
+            title: "Navegação Fluida, Persistência & Otimização de Performance",
+            badge: "ANTERIOR",
+            isLatest: false,
             items: [
                 "Indicador configurável de presença na Agenda (Badge no card ou Borda colorida contínua) em Personalização, sincronizado no backup .ufopbackup, com cor âmbar alinhada para aulas canceladas e badge de clima tematizado pelas 9 paletas.",
                 "Cabeçalhos de modais mais limpos mostrando apenas a sigla do departamento (ex.: DECOM), botão circular de edição no Perfil, matrícula tabular sem prefixo e dropdown tonal de campus no Editar Perfil.",

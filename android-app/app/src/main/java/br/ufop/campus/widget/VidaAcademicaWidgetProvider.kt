@@ -29,7 +29,6 @@ open class VidaAcademicaWidgetProvider : AppWidgetProvider() {
 
         private val AUTO_REFRESH_ACTIONS = setOf(
             ACTION_UPDATE_WIDGET,
-            AppWidgetManager.ACTION_APPWIDGET_UPDATE,
             Intent.ACTION_DATE_CHANGED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
@@ -42,30 +41,38 @@ open class VidaAcademicaWidgetProvider : AppWidgetProvider() {
         @JvmStatic
         fun requestWidgetUpdate(context: Context) {
             val appContext = context.applicationContext ?: context
-            val appWidgetManager = AppWidgetManager.getInstance(appContext)
+            val appWidgetManager = runCatching { AppWidgetManager.getInstance(appContext) }.getOrNull() ?: return
 
-            val standardIds = appWidgetManager.getAppWidgetIds(
-                ComponentName(appContext, VidaAcademicaWidgetProvider::class.java)
-            )
-            for (appWidgetId in standardIds) {
-                updateAppWidget(
-                    context = appContext,
-                    appWidgetManager = appWidgetManager,
-                    appWidgetId = appWidgetId,
-                    forceCompact = false
+            val standardIds = runCatching {
+                appWidgetManager.getAppWidgetIds(
+                    ComponentName(appContext, VidaAcademicaWidgetProvider::class.java)
                 )
+            }.getOrDefault(intArrayOf())
+            for (appWidgetId in standardIds) {
+                runCatching {
+                    updateAppWidget(
+                        context = appContext,
+                        appWidgetManager = appWidgetManager,
+                        appWidgetId = appWidgetId,
+                        forceCompact = false
+                    )
+                }
             }
 
-            val compactIds = appWidgetManager.getAppWidgetIds(
-                ComponentName(appContext, VidaAcademicaCompactWidgetProvider::class.java)
-            )
-            for (appWidgetId in compactIds) {
-                updateAppWidget(
-                    context = appContext,
-                    appWidgetManager = appWidgetManager,
-                    appWidgetId = appWidgetId,
-                    forceCompact = true
+            val compactIds = runCatching {
+                appWidgetManager.getAppWidgetIds(
+                    ComponentName(appContext, VidaAcademicaCompactWidgetProvider::class.java)
                 )
+            }.getOrDefault(intArrayOf())
+            for (appWidgetId in compactIds) {
+                runCatching {
+                    updateAppWidget(
+                        context = appContext,
+                        appWidgetManager = appWidgetManager,
+                        appWidgetId = appWidgetId,
+                        forceCompact = true
+                    )
+                }
             }
         }
 
@@ -424,13 +431,16 @@ open class VidaAcademicaWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
+        val appContext = context.applicationContext ?: context
         for (appWidgetId in appWidgetIds) {
-            updateAppWidget(
-                context = context,
-                appWidgetManager = appWidgetManager,
-                appWidgetId = appWidgetId,
-                forceCompact = forceCompactLayout
-            )
+            runCatching {
+                updateAppWidget(
+                    context = appContext,
+                    appWidgetManager = appWidgetManager,
+                    appWidgetId = appWidgetId,
+                    forceCompact = forceCompactLayout
+                )
+            }
         }
         super.onUpdate(context, appWidgetManager, appWidgetIds)
     }
@@ -441,16 +451,23 @@ open class VidaAcademicaWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int,
         newOptions: Bundle
     ) {
-        updateAppWidget(
-            context = context,
-            appWidgetManager = appWidgetManager,
-            appWidgetId = appWidgetId,
-            forceCompact = forceCompactLayout
-        )
+        val appContext = context.applicationContext ?: context
+        runCatching {
+            updateAppWidget(
+                context = appContext,
+                appWidgetManager = appWidgetManager,
+                appWidgetId = appWidgetId,
+                forceCompact = forceCompactLayout
+            )
+        }
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            super.onReceive(context, intent)
+            return
+        }
         if (intent.action in AUTO_REFRESH_ACTIONS) {
             requestWidgetUpdate(context)
             return

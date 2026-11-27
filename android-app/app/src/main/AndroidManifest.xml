@@ -4,6 +4,7 @@
     <!-- Usado exclusivamente para atualização leve opcional de clima (Open-Meteo); o app é 100% offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Usado exclusivamente pelo atualizador interno via GitHub Releases (sem notificações de sistema). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -162,6 +163,26 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notificações 100% locais e offline (AlarmManager + BroadcastReceiver + NotificationCompat) -->
+        <receiver
+            android:name=".core.notifications.CampusNotificationAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".core.notifications.CampusNotificationActionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".core.notifications.CampusNotificationBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

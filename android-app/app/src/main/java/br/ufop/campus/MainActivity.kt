@@ -33,6 +33,9 @@ import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.ffi.IncomingGradePreview
 import br.ufop.campus.core.ffi.UfopGradeCodec
+import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.core.notifications.CampusNotificationChannels
+import br.ufop.campus.core.notifications.CampusNotificationScheduler
 import br.ufop.campus.core.security.AppLockManager
 import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.core.storage.GradeExportStorage
@@ -57,6 +60,8 @@ class MainActivity : ComponentActivity() {
     private var incomingGradeError by mutableStateOf<String?>(null)
     private var pendingWidgetTargetTab by mutableStateOf<CampusTab?>(null)
     private var pendingWidgetNavNonce by mutableIntStateOf(0)
+    private var pendingMapFocusRequest by mutableStateOf<MapMeetingFocusRequest?>(null)
+    private var pendingMapFocusNonce by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,6 +100,10 @@ class MainActivity : ComponentActivity() {
             runCatching {
                 AppUpdateManager.purgeCachedApks(applicationContext)
                 AppUpdateManager.checkForUpdates(applicationContext, force = false)
+            }
+            runCatching {
+                CampusNotificationChannels.ensureChannels(applicationContext)
+                CampusNotificationScheduler.rescheduleAll(applicationContext)
             }
         }
 
@@ -272,7 +281,10 @@ class MainActivity : ComponentActivity() {
                                 incomingGradeError = if (isAppLockedState) null else incomingGradeError,
                                 pendingTargetTab = if (isAppLockedState) null else pendingWidgetTargetTab,
                                 pendingTargetTabNonce = pendingWidgetNavNonce,
+                                pendingMapFocus = if (isAppLockedState) null else pendingMapFocusRequest,
+                                pendingMapFocusNonce = pendingMapFocusNonce,
                                 onConsumeTargetTab = { pendingWidgetTargetTab = null },
+                                onConsumeMapFocus = { pendingMapFocusRequest = null },
                                 onConsumeIncomingGrade = { pendingIncomingGrade = null },
                                 onDismissIncomingGradeError = { incomingGradeError = null },
                                 onAppSecurityChanged = {
@@ -357,12 +369,40 @@ class MainActivity : ComponentActivity() {
         val widgetTarget = incomingIntent.getStringExtra(EXTRA_WIDGET_TARGET_TAB)
         if (!widgetTarget.isNullOrBlank()) {
             incomingIntent.removeExtra(EXTRA_WIDGET_TARGET_TAB)
-            pendingWidgetTargetTab = when (widgetTarget.trim().uppercase()) {
-                WIDGET_TARGET_ACTIVITIES -> CampusTab.ACTIVITIES
-                WIDGET_TARGET_AGENDA -> CampusTab.AGENDA
-                else -> CampusTab.AGENDA
+            val normalizedTarget = widgetTarget.trim().uppercase()
+            if (normalizedTarget == WIDGET_TARGET_MAP) {
+                val courseCode = incomingIntent.getStringExtra(EXTRA_MAP_COURSE_CODE).orEmpty()
+                val section = incomingIntent.getStringExtra(EXTRA_MAP_SECTION).orEmpty()
+                val weekday = incomingIntent.getIntExtra(EXTRA_MAP_WEEKDAY, 1)
+                val startTime = incomingIntent.getStringExtra(EXTRA_MAP_START_TIME).orEmpty()
+                val fallbackBuilding = incomingIntent.getStringExtra(EXTRA_MAP_FALLBACK_BUILDING).orEmpty()
+                incomingIntent.removeExtra(EXTRA_MAP_COURSE_CODE)
+                incomingIntent.removeExtra(EXTRA_MAP_SECTION)
+                incomingIntent.removeExtra(EXTRA_MAP_WEEKDAY)
+                incomingIntent.removeExtra(EXTRA_MAP_START_TIME)
+                incomingIntent.removeExtra(EXTRA_MAP_FALLBACK_BUILDING)
+                if (courseCode.isNotBlank() || fallbackBuilding.isNotBlank()) {
+                    pendingMapFocusRequest = MapMeetingFocusRequest(
+                        courseCode = courseCode,
+                        section = section,
+                        weekday = weekday,
+                        startTime = startTime,
+                        fallbackBuildingRaw = fallbackBuilding
+                    )
+                    pendingMapFocusNonce += 1
+                } else {
+                    pendingWidgetTargetTab = CampusTab.MAP
+                    pendingWidgetNavNonce += 1
+                }
+            } else {
+                pendingWidgetTargetTab = when (normalizedTarget) {
+                    WIDGET_TARGET_ACTIVITIES -> CampusTab.ACTIVITIES
+                    WIDGET_TARGET_DISCIPLINES -> CampusTab.DISCIPLINES
+                    WIDGET_TARGET_AGENDA -> CampusTab.AGENDA
+                    else -> CampusTab.AGENDA
+                }
+                pendingWidgetNavNonce += 1
             }
-            pendingWidgetNavNonce += 1
         }
 
         when (incomingIntent.action) {
@@ -448,5 +488,12 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_WIDGET_TARGET_TAB = "br.ufop.campus.EXTRA_WIDGET_TARGET_TAB"
         const val WIDGET_TARGET_AGENDA = "AGENDA"
         const val WIDGET_TARGET_ACTIVITIES = "ACTIVITIES"
+        const val WIDGET_TARGET_DISCIPLINES = "DISCIPLINES"
+        const val WIDGET_TARGET_MAP = "MAP"
+        const val EXTRA_MAP_COURSE_CODE = "br.ufop.campus.EXTRA_MAP_COURSE_CODE"
+        const val EXTRA_MAP_SECTION = "br.ufop.campus.EXTRA_MAP_SECTION"
+        const val EXTRA_MAP_WEEKDAY = "br.ufop.campus.EXTRA_MAP_WEEKDAY"
+        const val EXTRA_MAP_START_TIME = "br.ufop.campus.EXTRA_MAP_START_TIME"
+        const val EXTRA_MAP_FALLBACK_BUILDING = "br.ufop.campus.EXTRA_MAP_FALLBACK_BUILDING"
     }
 }

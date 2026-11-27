@@ -24,6 +24,8 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Usado para desbloquear o Vida Acadêmica com Face ID ou Touch ID.</string>
 	<key>NSCameraUsageDescription</key>

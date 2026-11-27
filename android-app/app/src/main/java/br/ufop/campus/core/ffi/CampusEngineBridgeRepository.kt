@@ -855,6 +855,15 @@ class CampusEngineBridgeRepository(
         fallback.getAllSelectedCurriculumVersions()
     }
 
+    override fun getNotificationPreferences(): NotificationPreferences = synchronized(lock) {
+        fallback.getNotificationPreferences()
+    }
+
+    override fun setNotificationPreferences(prefs: NotificationPreferences): Unit = synchronized(lock) {
+        fallback.setNotificationPreferences(prefs)
+        _mutationVersion.value += 1L
+    }
+
     private fun mapCampusException(
         err: br.ufop.campus.core.uniffi.CampusException
     ): RuntimeException = when (err) {

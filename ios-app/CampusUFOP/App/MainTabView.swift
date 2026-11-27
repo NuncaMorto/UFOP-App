@@ -53,6 +53,7 @@ public struct MainTabView: View {
     @State private var agendaViewModel: AgendaViewModel?
     @State private var disciplinesViewModel: DisciplinesViewModel?
     @State private var mapBridge: CampusMapBridge?
+    @State private var notificationScheduler = CampusNotificationScheduler.shared
 
     public init() {
         self._externalSelectedTab = .constant(.agenda)
@@ -157,10 +158,26 @@ public struct MainTabView: View {
             if activeTabBinding.wrappedValue == .map {
                 _ = ensureMapBridge()
             }
+            if let pendingMap = notificationScheduler.pendingMapFocusRequest {
+                openMeetingInMap(pendingMap)
+                notificationScheduler.pendingMapFocusRequest = .none
+            }
         }
         .onChange(of: activeTabBinding.wrappedValue) { _, newTab in
             if newTab == .map {
                 _ = ensureMapBridge()
+            }
+        }
+        .onChange(of: notificationScheduler.pendingMapFocusNonce) { _, _ in
+            if let pendingMap = notificationScheduler.pendingMapFocusRequest {
+                openMeetingInMap(pendingMap)
+                notificationScheduler.pendingMapFocusRequest = .none
+            }
+        }
+        .onChange(of: notificationScheduler.pendingTargetTabNonce) { _, _ in
+            if let tab = notificationScheduler.pendingTargetTab {
+                activeTabBinding.wrappedValue = tab
+                notificationScheduler.pendingTargetTab = .none
             }
         }
     }

@@ -157,10 +157,11 @@
                             android:textSize="12sp"
                             android:textStyle="bold" />
 
-                        <Space
+                        <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="1dp"
-                            android:layout_weight="1" />
+                            android:layout_weight="1"
+                            android:orientation="horizontal" />
 
                         <FrameLayout
                             android:id="@+id/widget_spotlight_room_container"
@@ -268,10 +269,11 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <Space
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                android:orientation="vertical" />
         </LinearLayout>
 
         <!-- Estado Dia Livre (sem aulas hoje) -->
@@ -368,10 +370,11 @@
                 </LinearLayout>
             </FrameLayout>
 
-            <Space
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                android:orientation="vertical" />
         </LinearLayout>
 
         <!-- Rodapé inteligente (próximo prazo ou 3ª aula do dia) -->

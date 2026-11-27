@@ -112,6 +112,7 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
     val loadedAccessibilitySettings = restoreAccessibilitySettingsFromJson(root)
     val loadedDynamicGrid = restoreDynamicGridFromJson(root)
     val loadedCurriculumVersions = restoreSelectedCurriculumVersionsFromJson(root)
+    val loadedNotificationPreferences = restoreNotificationPreferencesFromJson(root)
 
     courses.clear()
     loadedCourses.forEach { (id, seed) ->
@@ -159,6 +160,7 @@ internal fun InMemoryCampusRepository.restoreStateFromJsonLocked(root: JSONObjec
     dynamicGridCompletedByMatrix.putAll(loadedDynamicGrid)
     selectedCurriculumVersionsByCourse.clear()
     selectedCurriculumVersionsByCourse.putAll(loadedCurriculumVersions)
+    notificationPreferences = loadedNotificationPreferences
     roomAllocationIndex?.let { index ->
         enrichExistingRoomAllocationsLocked(index)
     }
@@ -616,3 +618,16 @@ private fun restoreSelectedCurriculumVersionsFromJson(root: JSONObject): LinkedH
     }
     return loaded
 }
+
+private fun restoreNotificationPreferencesFromJson(root: JSONObject): NotificationPreferences =
+    runCatching {
+        val obj = root.optJSONObject("notificationPreferences") ?: return@runCatching NotificationPreferences()
+        NotificationPreferences(
+            classReminderEnabled = obj.optBoolean("classReminderEnabled", true),
+            classLeadMinutes = obj.optInt("classLeadMinutes", NotificationPreferences.DEFAULT_CLASS_LEAD_MINUTES),
+            liveActivityEnabled = obj.optBoolean("liveActivityEnabled", true),
+            deadlineReminderEnabled = obj.optBoolean("deadlineReminderEnabled", true),
+            absenceAlertEnabled = obj.optBoolean("absenceAlertEnabled", true),
+            morningSummaryEnabled = obj.optBoolean("morningSummaryEnabled", true)
+        ).normalized()
+    }.getOrDefault(NotificationPreferences())

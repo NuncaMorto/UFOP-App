@@ -17,6 +17,7 @@ public final class CampusStore {
     public var dynamicGridCompletedByMatrix: [String: [String]] = [:]
     public var selectedCurriculumVersionsByCourse: [String: String] = [:]
     public var attendanceIndicatorStyle: String = "BADGE"
+    public var notificationPreferences: NotificationPreferences = NotificationPreferences()
 
     public var disciplinesLayoutMode: String {
         didSet { UserDefaults.standard.set(disciplinesLayoutMode, forKey: "campus.ufop.disciplinesLayoutMode") }
@@ -76,6 +77,12 @@ public final class CampusStore {
         self.attendanceIndicatorStyle = Self.normalizeAttendanceIndicatorStyle(
             defaults.string(forKey: "campus.ufop.attendanceIndicatorStyle")
         )
+        if let notifData = defaults.data(forKey: "campus.ufop.notificationPreferences"),
+           let decodedNotif = try? JSONDecoder().decode(NotificationPreferences.self, from: notifData) {
+            self.notificationPreferences = decodedNotif.normalized()
+        } else {
+            self.notificationPreferences = NotificationPreferences()
+        }
         if let savedVersions = defaults.dictionary(forKey: "campus.ufop.selectedCurriculumVersionsByCourse") as? [String: String] {
             var normalized: [String: String] = [:]
             for (k, v) in savedVersions {
@@ -94,6 +101,7 @@ public final class CampusStore {
         _ = applyRoomAllocationCatalog()
         self.selectedDateIso = Self.todayIsoDateString()
         self.hasCompletedInit = true
+        syncSharedWidgetSnapshot()
     }
 
 
@@ -148,6 +156,17 @@ public final class CampusStore {
         attendanceIndicatorStyle = normalized
         UserDefaults.standard.set(normalized, forKey: "campus.ufop.attendanceIndicatorStyle")
         persistEncryptedState()
+    }
+
+    public func setNotificationPreferences(_ prefs: NotificationPreferences) {
+        let normalized = prefs.normalized()
+        guard notificationPreferences != normalized else { return }
+        notificationPreferences = normalized
+        if let encoded = try? JSONEncoder().encode(normalized) {
+            UserDefaults.standard.set(encoded, forKey: "campus.ufop.notificationPreferences")
+        }
+        persistEncryptedState()
+        CampusNotificationScheduler.shared.rescheduleAll(from: self)
     }
 
     public func selectedCurriculumVersion(for courseCode: String) -> String? {

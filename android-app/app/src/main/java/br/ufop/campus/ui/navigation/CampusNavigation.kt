@@ -157,7 +157,10 @@ fun CampusNavigation(
     incomingGradeError: String? = null,
     pendingTargetTab: CampusTab? = null,
     pendingTargetTabNonce: Int = 0,
+    pendingMapFocus: MapMeetingFocusRequest? = null,
+    pendingMapFocusNonce: Int = 0,
     onConsumeTargetTab: () -> Unit = {},
+    onConsumeMapFocus: () -> Unit = {},
     onConsumeIncomingGrade: () -> Unit = {},
     onDismissIncomingGradeError: () -> Unit = {},
     onAppSecurityChanged: () -> Unit = {},
@@ -315,6 +318,13 @@ fun CampusNavigation(
         if (pendingTargetTab != null) {
             handleSelectTab(pendingTargetTab)
             onConsumeTargetTab()
+        }
+    }
+
+    LaunchedEffect(pendingMapFocus, pendingMapFocusNonce) {
+        if (pendingMapFocus != null) {
+            openMeetingInMap(pendingMapFocus)
+            onConsumeMapFocus()
         }
     }
 

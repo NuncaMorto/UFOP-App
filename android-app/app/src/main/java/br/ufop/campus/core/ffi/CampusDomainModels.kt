@@ -305,6 +305,30 @@ data class SyllabusImportReport(
     val errorMessage: String? = null
 )
 
+// Notificações offline locais (Android, iOS & .ufopbackup)
+data class NotificationPreferences(
+    val classReminderEnabled: Boolean = true,
+    val classLeadMinutes: Int = DEFAULT_CLASS_LEAD_MINUTES,
+    val liveActivityEnabled: Boolean = true,
+    val deadlineReminderEnabled: Boolean = true,
+    val absenceAlertEnabled: Boolean = true,
+    val morningSummaryEnabled: Boolean = true
+) {
+    fun normalized(): NotificationPreferences {
+        val validLead = if (classLeadMinutes in ALLOWED_LEAD_MINUTES) {
+            classLeadMinutes
+        } else {
+            DEFAULT_CLASS_LEAD_MINUTES
+        }
+        return if (validLead == classLeadMinutes) this else copy(classLeadMinutes = validLead)
+    }
+
+    companion object {
+        const val DEFAULT_CLASS_LEAD_MINUTES = 15
+        val ALLOWED_LEAD_MINUTES: Set<Int> = setOf(10, 15, 30)
+    }
+}
+
 
 /**
  * Datas oficiais de início e término de aulas por semestre letivo da UFOP

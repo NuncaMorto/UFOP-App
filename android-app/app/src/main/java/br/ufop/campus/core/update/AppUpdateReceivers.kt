@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import br.ufop.campus.MainActivity
+import br.ufop.campus.core.notifications.CampusNotificationScheduler
+import br.ufop.campus.widget.VidaAcademicaWidgetProvider
 
 /**
  * Recebe o resultado da sessão de instalação do [PackageInstaller].
@@ -56,6 +58,8 @@ class AppPackageReplacedReceiver : BroadcastReceiver() {
         val shouldRelaunch = AppUpdateManager.consumePendingAutoRelaunch(appContext)
         AppUpdateManager.onPackageReplacedCleanup(appContext)
         AppUpdateManager.purgeCachedApks(appContext)
+        runCatching { CampusNotificationScheduler.rescheduleAll(appContext) }
+        runCatching { VidaAcademicaWidgetProvider.requestWidgetUpdate(appContext) }
         if (shouldRelaunch) {
             launchMainActivityCleanly(appContext)
         }

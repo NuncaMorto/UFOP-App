@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.22 — Widgets Corrigidos & Notificações Locais Offline
+
+- **Android (`1.9.22` · Beta) & iOS (`1.9.22`):**
+  - **Widgets de Tela Inicial `4×2` e `2×2` corrigidos:** correção definitiva no carregamento dos widgets Android (remoção de componentes incompatíveis no layout, pré-visualização real no seletor de widgets do Android 12–15 e atualização mais resiliente) e separação em extensão `WidgetKit` dedicada no iOS com leitura local compartilhada.
+  - **Notificações 100% locais e offline:** novo motor local direto no aparelho (sem servidor, sem push externo e sem rastreamento), com persistência de preferências no dispositivo e restauração automática em backups `.ufopbackup`.
+  - **5 tipos de lembretes inteligentes:** Cartão ao vivo na tela de bloqueio (Live Update no Android / Live Activity no iOS) com contagem regressiva e progresso da aula; Aviso antes da aula (`10`, `15` ou `30 min`) com ações rápidas (*Vou à aula*, *Vou faltar* e *Ver no mapa*); Provas e entregas (`3 dias` e `1 dia` antes às `09:00` com *Marcar concluída* e *Lembrar à noite* às `20:00`); Alerta inteligente de faltas ao cruzar `65%` ou `85%` (sem repetição); e Resumo matinal às `07:30` apenas em dias úteis com aulas ativas.
+  - **Nova tela `Configurações → Notificações`:** controles granulares para lembretes de aula e prazos, seletor de antecedência (`10`, `15` e `30 min`), verificação de permissão do sistema e card informativo de funcionamento 100% offline.
+
+<!-- versionCode: 39 -->
+
+---
+
 ## v1.9.21 — Refinamento de UI/UX, Navegação Fluida, Persistência & Performance
 
 - **Android (`1.9.21` · Beta) & iOS (`1.9.21`):**

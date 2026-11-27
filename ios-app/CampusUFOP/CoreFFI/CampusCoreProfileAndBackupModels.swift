@@ -257,3 +257,71 @@ public struct FriendSchedule: Identifiable, Codable, Equatable, Sendable {
         self.slots = slots
     }
 }
+
+// MARK: - Local Offline Notification Preferences
+
+public struct NotificationPreferences: Equatable, Codable, Sendable {
+    public static let allowedLeadMinutes: [Int] = [10, 15, 30]
+    public static let defaultLeadMinutes: Int = 15
+
+    public var classReminderEnabled: Bool
+    public var classLeadMinutes: Int
+    public var liveActivityEnabled: Bool
+    public var deadlineReminderEnabled: Bool
+    public var absenceAlertEnabled: Bool
+    public var morningSummaryEnabled: Bool
+
+    public init(
+        classReminderEnabled: Bool = true,
+        classLeadMinutes: Int = defaultLeadMinutes,
+        liveActivityEnabled: Bool = true,
+        deadlineReminderEnabled: Bool = true,
+        absenceAlertEnabled: Bool = true,
+        morningSummaryEnabled: Bool = true
+    ) {
+        self.classReminderEnabled = classReminderEnabled
+        self.classLeadMinutes = Self.allowedLeadMinutes.contains(classLeadMinutes)
+            ? classLeadMinutes
+            : Self.defaultLeadMinutes
+        self.liveActivityEnabled = liveActivityEnabled
+        self.deadlineReminderEnabled = deadlineReminderEnabled
+        self.absenceAlertEnabled = absenceAlertEnabled
+        self.morningSummaryEnabled = morningSummaryEnabled
+    }
+
+    public func normalized() -> NotificationPreferences {
+        let validLead = Self.allowedLeadMinutes.contains(classLeadMinutes)
+            ? classLeadMinutes
+            : Self.defaultLeadMinutes
+        var copy = self
+        copy.classLeadMinutes = validLead
+        return copy
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case classReminderEnabled
+        case classLeadMinutes
+        case liveActivityEnabled
+        case deadlineReminderEnabled
+        case absenceAlertEnabled
+        case morningSummaryEnabled
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let classReminder = try container.decodeIfPresent(Bool.self, forKey: .classReminderEnabled) ?? true
+        let lead = try container.decodeIfPresent(Int.self, forKey: .classLeadMinutes) ?? Self.defaultLeadMinutes
+        let liveActivity = try container.decodeIfPresent(Bool.self, forKey: .liveActivityEnabled) ?? true
+        let deadlineReminder = try container.decodeIfPresent(Bool.self, forKey: .deadlineReminderEnabled) ?? true
+        let absenceAlert = try container.decodeIfPresent(Bool.self, forKey: .absenceAlertEnabled) ?? true
+        let morningSummary = try container.decodeIfPresent(Bool.self, forKey: .morningSummaryEnabled) ?? true
+        self.init(
+            classReminderEnabled: classReminder,
+            classLeadMinutes: lead,
+            liveActivityEnabled: liveActivity,
+            deadlineReminderEnabled: deadlineReminder,
+            absenceAlertEnabled: absenceAlert,
+            morningSummaryEnabled: morningSummary
+        )
+    }
+}

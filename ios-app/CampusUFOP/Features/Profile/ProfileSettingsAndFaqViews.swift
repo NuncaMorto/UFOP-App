@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 // MARK: - 3. Ajustes (Personalização, Segurança, Acessibilidade, Manutenção)
 
@@ -27,6 +28,7 @@ internal struct ProfileSettingsSectionView: View {
 
     var body: some View {
         appearanceCustomizationCard
+        notificationsSettingsSection
         securityAndLockCard
         encryptedBackupCard
         AccessibilityControlsSection(appearance: appearance)
@@ -120,6 +122,17 @@ internal struct ProfileSettingsSectionView: View {
         }
         .padding(16)
         .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
+    }
+
+    private var notificationsSettingsSection: some View {
+        ProfileNotificationsSettingsCard(
+            store: store,
+            appearance: appearance,
+            primaryAccent: primaryAccent,
+            onPrimaryAccent: onPrimaryAccent,
+            highContrast: highContrast,
+            minTouch: minTouch
+        )
     }
 
     private var securityAndLockCard: some View {
@@ -503,5 +516,264 @@ private struct GitHubOctocatShape: Shape {
         path.addCurve(to: pt(12.0, 0.3), control1: pt(24.0, 5.67), control2: pt(18.63, 0.3))
         path.closeSubpath()
         return path
+    }
+}
+
+// MARK: - 4. Notificações 100% Offline
+
+private struct ProfileNotificationsSettingsCard: View {
+    @Bindable var store: CampusStore
+    @Bindable var appearance: CampusAppearanceController
+    let primaryAccent: Color
+    let onPrimaryAccent: Color
+    let highContrast: Bool
+    let minTouch: CGFloat
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
+    @State private var scheduler = CampusNotificationScheduler.shared
+
+    private var boldBoost: Bool {
+        appearance.accessibility.boldTextBoost
+    }
+
+    private var prefs: NotificationPreferences {
+        store.notificationPreferences
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                Text("Notificações")
+                    .font(CampusTheme.font(size: 16, weight: .bold, boldBoost: boldBoost))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+            }
+            .accessibilityAddTraits(.isHeader)
+
+            if scheduler.authorizationStatus == .notDetermined || scheduler.authorizationStatus == .denied {
+                permissionBannerCard
+            }
+
+            // Grupo 1 — Lembretes de aula
+            VStack(alignment: .leading, spacing: 12) {
+                Text("LEMBRETES DE AULA")
+                    .font(CampusTheme.font(size: 11, weight: .bold, boldBoost: boldBoost))
+                    .tracking(0.8)
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    .accessibilityAddTraits(.isHeader)
+
+                notificationToggleRow(
+                    title: "Aviso antes da aula",
+                    subtitle: "Com sala e botões rápidos de presença",
+                    isOn: Binding(
+                        get: { prefs.classReminderEnabled },
+                        set: { next in
+                            var updated = prefs
+                            updated.classReminderEnabled = next
+                            store.setNotificationPreferences(updated)
+                        }
+                    )
+                )
+
+                Divider().opacity(0.35)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Antecedência")
+                        .font(CampusTheme.font(size: 13, weight: .semibold, boldBoost: boldBoost))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+
+                    HStack(spacing: 8) {
+                        ForEach(NotificationPreferences.allowedLeadMinutes, id: \.self) { minutes in
+                            let isSelected = prefs.classLeadMinutes == minutes
+                            Button {
+                                withAnimation(.snappy) {
+                                    var updated = prefs
+                                    updated.classLeadMinutes = minutes
+                                    store.setNotificationPreferences(updated)
+                                }
+                            } label: {
+                                Text("\(minutes) min")
+                                    .font(CampusTheme.tabularFont(size: 13, weight: .bold, boldBoost: boldBoost))
+                                    .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                                    .frame(maxWidth: .infinity, minHeight: max(40, minTouch - 4))
+                                    .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: highContrast)
+                            }
+                            .buttonStyle(.plain)
+                            .minimumTouchTarget(minTouch)
+                            .accessibilityLabel("Avisar \(minutes) minutos antes da aula")
+                            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                        }
+                    }
+                }
+
+                Divider().opacity(0.35)
+
+                notificationToggleRow(
+                    title: "Cartão ao vivo (Live Activity)",
+                    subtitle: "Contagem regressiva na tela de bloqueio",
+                    isOn: Binding(
+                        get: { prefs.liveActivityEnabled },
+                        set: { next in
+                            var updated = prefs
+                            updated.liveActivityEnabled = next
+                            store.setNotificationPreferences(updated)
+                        }
+                    )
+                )
+            }
+            .padding(16)
+            .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
+
+            // Grupo 2 — Prazos e acompanhamento
+            VStack(alignment: .leading, spacing: 12) {
+                Text("PRAZOS E ACOMPANHAMENTO")
+                    .font(CampusTheme.font(size: 11, weight: .bold, boldBoost: boldBoost))
+                    .tracking(0.8)
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    .accessibilityAddTraits(.isHeader)
+
+                notificationToggleRow(
+                    title: "Provas e entregas",
+                    subtitle: "Avisar 3 dias e 1 dia antes às 09:00",
+                    isOn: Binding(
+                        get: { prefs.deadlineReminderEnabled },
+                        set: { next in
+                            var updated = prefs
+                            updated.deadlineReminderEnabled = next
+                            store.setNotificationPreferences(updated)
+                        }
+                    )
+                )
+
+                Divider().opacity(0.35)
+
+                notificationToggleRow(
+                    title: "Alerta de limite de faltas",
+                    subtitle: "Somente ao passar de 65% ou 85%",
+                    isOn: Binding(
+                        get: { prefs.absenceAlertEnabled },
+                        set: { next in
+                            var updated = prefs
+                            updated.absenceAlertEnabled = next
+                            store.setNotificationPreferences(updated)
+                        }
+                    )
+                )
+
+                Divider().opacity(0.35)
+
+                notificationToggleRow(
+                    title: "Resumo matinal",
+                    subtitle: "Dias com aula às 07:30 · silêncio no fim de semana",
+                    isOn: Binding(
+                        get: { prefs.morningSummaryEnabled },
+                        set: { next in
+                            var updated = prefs
+                            updated.morningSummaryEnabled = next
+                            store.setNotificationPreferences(updated)
+                        }
+                    )
+                )
+            }
+            .padding(16)
+            .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
+
+            // Card informativo offline (Surface 2, 20pt)
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "icloud.slash.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color(hex: 0x2E7D32))
+                    .accessibilityHidden(true)
+
+                Text("100% offline no aparelho: todos os lembretes são agendados localmente a partir do seu SQLite — sem servidor, sem push externo e sem rastreamento.")
+                    .font(CampusTheme.font(size: 12))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .liquidGlassCard(cornerRadius: 20, highContrast: highContrast, useSurface2: true)
+        }
+        .onAppear {
+            scheduler.refreshAuthorizationStatus()
+        }
+    }
+
+    @ViewBuilder
+    private var permissionBannerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(
+                scheduler.authorizationStatus == .denied
+                    ? "Permissão de notificações bloqueada"
+                    : "Ativar notificações no iOS"
+            )
+            .font(CampusTheme.font(size: 14, weight: .bold, boldBoost: boldBoost))
+            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+
+            Text("Permita notificações para receber lembretes antes das aulas, prazos e alertas de falta.")
+                .font(CampusTheme.font(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if scheduler.authorizationStatus == .notDetermined {
+                Button {
+                    scheduler.requestPermissionIfNeeded()
+                } label: {
+                    Label("Permitir notificações", systemImage: "bell.badge.fill")
+                        .font(CampusTheme.font(size: 13, weight: .bold, boldBoost: boldBoost))
+                        .foregroundStyle(onPrimaryAccent)
+                        .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
+                        .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: highContrast)
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Permitir notificações")
+            } else {
+                #if os(iOS)
+                Button {
+                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(settingsUrl)
+                    }
+                } label: {
+                    Label("Abrir ajustes do sistema", systemImage: "gearshape.fill")
+                        .font(CampusTheme.font(size: 13, weight: .bold, boldBoost: boldBoost))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                        .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
+                        .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
+                }
+                .buttonStyle(.plain)
+                .minimumTouchTarget(minTouch)
+                .accessibilityLabel("Abrir ajustes do sistema")
+                #endif
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .liquidGlassCard(cornerRadius: 20, tint: Color(hex: 0xD97706), highContrast: highContrast)
+    }
+
+    private func notificationToggleRow(
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(CampusTheme.font(size: 14, weight: .semibold, boldBoost: boldBoost))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                Text(subtitle)
+                    .font(CampusTheme.font(size: 12))
+                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(primaryAccent)
+        .minimumTouchTarget(minTouch)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
     }
 }

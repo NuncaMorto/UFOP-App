@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import br.ufop.campus.BuildConfig
 import br.ufop.campus.core.curriculum.UfopRoomAllocationCatalog
+import br.ufop.campus.core.notifications.CampusNotificationScheduler
 import br.ufop.campus.core.security.AppLockManager
 import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.ui.theme.CampusAccentColor
@@ -36,6 +37,12 @@ object CampusRepositoryHolder {
     const val KEY_TIMETABLE_ORIENTATION = "timetable_orientation_pref"
     const val KEY_DISCIPLINES_LAYOUT_MODE = "disciplines_layout_mode"
     const val KEY_DYNAMIC_GRID_ORIENTATION = "dynamic_grid_orientation_pref"
+    const val KEY_NOTIF_CLASS_REMINDER = "notif_class_reminder_enabled"
+    const val KEY_NOTIF_CLASS_LEAD_MINUTES = "notif_class_lead_minutes"
+    const val KEY_NOTIF_LIVE_ACTIVITY = "notif_live_activity_enabled"
+    const val KEY_NOTIF_DEADLINE_REMINDER = "notif_deadline_reminder_enabled"
+    const val KEY_NOTIF_ABSENCE_ALERT = "notif_absence_alert_enabled"
+    const val KEY_NOTIF_MORNING_SUMMARY = "notif_morning_summary_enabled"
 
     @Volatile
     private var instance: CampusCoreRepository? = null
@@ -56,6 +63,9 @@ object CampusRepositoryHolder {
                     onStatePersisted = {
                         runCatching {
                             VidaAcademicaWidgetProvider.requestWidgetUpdate(appContext)
+                        }
+                        runCatching {
+                            CampusNotificationScheduler.onRepositoryStateChanged(appContext)
                         }
                     }
                 )
@@ -650,6 +660,101 @@ object CampusRepositoryHolder {
         saveDynamicGridIsHorizontalToPrefs(prefs, isHorizontal)
     }
 
+    internal fun loadNotificationPreferencesFromPrefs(
+        prefs: SharedPreferences?,
+        repository: CampusCoreRepository
+    ): NotificationPreferences {
+        val repoPrefs = runCatching { repository.getNotificationPreferences() }
+            .getOrElse { NotificationPreferences() }
+            .normalized()
+        if (prefs == null) return repoPrefs
+
+        val hasAnyKey = runCatching {
+            prefs.contains(KEY_NOTIF_CLASS_REMINDER) ||
+                prefs.contains(KEY_NOTIF_CLASS_LEAD_MINUTES) ||
+                prefs.contains(KEY_NOTIF_LIVE_ACTIVITY) ||
+                prefs.contains(KEY_NOTIF_DEADLINE_REMINDER) ||
+                prefs.contains(KEY_NOTIF_ABSENCE_ALERT) ||
+                prefs.contains(KEY_NOTIF_MORNING_SUMMARY)
+        }.getOrDefault(false)
+        if (!hasAnyKey) return repoPrefs
+
+        return NotificationPreferences(
+            classReminderEnabled = runCatching {
+                prefs.getBoolean(KEY_NOTIF_CLASS_REMINDER, repoPrefs.classReminderEnabled)
+            }.getOrDefault(repoPrefs.classReminderEnabled),
+            classLeadMinutes = runCatching {
+                prefs.getInt(KEY_NOTIF_CLASS_LEAD_MINUTES, repoPrefs.classLeadMinutes)
+            }.getOrDefault(repoPrefs.classLeadMinutes),
+            liveActivityEnabled = runCatching {
+                prefs.getBoolean(KEY_NOTIF_LIVE_ACTIVITY, repoPrefs.liveActivityEnabled)
+            }.getOrDefault(repoPrefs.liveActivityEnabled),
+            deadlineReminderEnabled = runCatching {
+                prefs.getBoolean(KEY_NOTIF_DEADLINE_REMINDER, repoPrefs.deadlineReminderEnabled)
+            }.getOrDefault(repoPrefs.deadlineReminderEnabled),
+            absenceAlertEnabled = runCatching {
+                prefs.getBoolean(KEY_NOTIF_ABSENCE_ALERT, repoPrefs.absenceAlertEnabled)
+            }.getOrDefault(repoPrefs.absenceAlertEnabled),
+            morningSummaryEnabled = runCatching {
+                prefs.getBoolean(KEY_NOTIF_MORNING_SUMMARY, repoPrefs.morningSummaryEnabled)
+            }.getOrDefault(repoPrefs.morningSummaryEnabled)
+        ).normalized()
+    }
+
+    fun loadNotificationPreferences(
+        context: Context,
+        repository: CampusCoreRepository = getOrCreate(context)
+    ): NotificationPreferences {
+        val prefs = runCatching {
+            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull()
+        return loadNotificationPreferencesFromPrefs(prefs, repository)
+    }
+
+    internal fun saveNotificationPreferencesToPrefs(
+        prefs: SharedPreferences?,
+        repository: CampusCoreRepository,
+        settings: NotificationPreferences,
+        onReschedule: () -> Unit = {}
+    ): NotificationPreferences {
+        val normalized = settings.normalized()
+        runCatching {
+            prefs?.edit()
+                ?.putBoolean(KEY_NOTIF_CLASS_REMINDER, normalized.classReminderEnabled)
+                ?.putInt(KEY_NOTIF_CLASS_LEAD_MINUTES, normalized.classLeadMinutes)
+                ?.putBoolean(KEY_NOTIF_LIVE_ACTIVITY, normalized.liveActivityEnabled)
+                ?.putBoolean(KEY_NOTIF_DEADLINE_REMINDER, normalized.deadlineReminderEnabled)
+                ?.putBoolean(KEY_NOTIF_ABSENCE_ALERT, normalized.absenceAlertEnabled)
+                ?.putBoolean(KEY_NOTIF_MORNING_SUMMARY, normalized.morningSummaryEnabled)
+                ?.commit()
+        }
+        repository.setNotificationPreferences(normalized)
+        runCatching { onReschedule() }
+        return normalized
+    }
+
+    fun saveNotificationPreferences(
+        context: Context,
+        repository: CampusCoreRepository,
+        settings: NotificationPreferences
+    ): NotificationPreferences {
+        val appContext = context.applicationContext
+        val prefs = runCatching {
+            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }.getOrNull()
+        return saveNotificationPreferencesToPrefs(
+            prefs = prefs,
+            repository = repository,
+            settings = settings,
+            onReschedule = {
+                CampusNotificationScheduler.rescheduleAll(appContext, repository)
+            }
+        )
+    }
+
+    fun saveNotificationPreferences(context: Context, settings: NotificationPreferences): NotificationPreferences =
+        saveNotificationPreferences(context, getOrCreate(context), settings)
+
     internal fun clearAllLocalPreferencesFromPrefs(prefs: SharedPreferences?) {
         runCatching {
             prefs?.edit()
@@ -667,6 +772,12 @@ object CampusRepositoryHolder {
                 ?.remove(KEY_TIMETABLE_ORIENTATION)
                 ?.remove(KEY_DISCIPLINES_LAYOUT_MODE)
                 ?.remove(KEY_DYNAMIC_GRID_ORIENTATION)
+                ?.remove(KEY_NOTIF_CLASS_REMINDER)
+                ?.remove(KEY_NOTIF_CLASS_LEAD_MINUTES)
+                ?.remove(KEY_NOTIF_LIVE_ACTIVITY)
+                ?.remove(KEY_NOTIF_DEADLINE_REMINDER)
+                ?.remove(KEY_NOTIF_ABSENCE_ALERT)
+                ?.remove(KEY_NOTIF_MORNING_SUMMARY)
                 ?.clear()
                 ?.commit()
         }
@@ -695,6 +806,7 @@ object CampusRepositoryHolder {
         runCatching { File(appContext.cacheDir, "shared_backups").deleteRecursively() }
         runCatching { File(appContext.filesDir, "shared_backups").deleteRecursively() }
         runCatching { SecurePdfProcessor.purgeResidualPdfFiles(appContext) }
+        runCatching { CampusNotificationScheduler.cancelAllAndClearTracking(appContext) }
         runCatching { VidaAcademicaWidgetProvider.requestWidgetUpdate(appContext) }
     }
 

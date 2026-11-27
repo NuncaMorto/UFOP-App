@@ -1,5 +1,8 @@
 import SwiftUI
 import WidgetKit
+#if canImport(ActivityKit) && os(iOS)
+import ActivityKit
+#endif
 
 // MARK: - Corridor Snapshot Models (Paridade 100% Android ↔ iOS)
 
@@ -144,19 +147,44 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
         return fallback
     }
 
+    private static let isoDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     private func loadCorridorEntry(now: Date) -> CampusClassEntry {
-        let store = CampusStore()
+        let snapshot = CampusWidgetSnapshotStore.load()
         let cal = Calendar(identifier: .gregorian)
-        let todayIso = CampusStore.isoString(from: now)
-        let weekdayIdx = CampusStore.isoWeekdayIndex(from: now)
+        let todayIso = Self.isoString(from: now)
+        let weekdayIdx = Self.isoWeekdayIndex(from: now)
         let dayNum = cal.component(.day, from: now)
         let dayPillText = "\(Self.weekdayShorts[min(max(weekdayIdx, 1), 7)]) \(dayNum)"
+
+        guard let snapshot else {
+            return CampusClassEntry(
+                date: now,
+                dayPillText: dayPillText,
+                headerSummary: "Dia livre",
+                freeDayMessage: "Sem aulas hoje",
+                countdownLabel: "",
+                compactCountdownBadge: dayPillText,
+                isOngoing: false,
+                remainingAfterSpotlightCount: 0,
+                spotlightClass: nil,
+                followingClass: nil,
+                thirdClass: nil,
+                nextDeadline: nil,
+                nextSchoolDayClass: nil
+            )
+        }
 
         let comps = cal.dateComponents([.hour, .minute], from: now)
         let nowMin = (comps.hour ?? 8) * 60 + (comps.minute ?? 0)
 
         let todayCandidates = collectClasses(
-            store: store,
+            snapshot: snapshot,
             dateIso: todayIso,
             weekdayIndex: weekdayIdx
         )
@@ -195,8 +223,8 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
 
         let freeDayMessage = todayCandidates.isEmpty ? "Sem aulas hoje" : "Aulas de hoje concluídas"
 
-        let nextDeadline = findNextPendingDeadline(store: store, today: now, todayIso: todayIso)
-        let nextSchoolDay = spotlightCand == nil ? findNextSchoolDayClass(store: store, today: now) : nil
+        let nextDeadline = findNextPendingDeadline(snapshot: snapshot, today: now, todayIso: todayIso)
+        let nextSchoolDay = spotlightCand == nil ? findNextSchoolDayClass(snapshot: snapshot, today: now) : nil
 
         return CampusClassEntry(
             date: now,
@@ -254,35 +282,39 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
         let isEad: Bool
     }
 
-    private func collectClasses(store: CampusStore, dateIso: String, weekdayIndex: Int) -> [CandidateClass] {
-        let items = store.timelineItems(for: dateIso, weekdayIndex: weekdayIndex)
-            .filter { $0.kind == .lecture && $0.attendanceStatus != .cancelled }
+    private func collectClasses(
+        snapshot: WidgetSharedSnapshotPayload,
+        dateIso: String,
+        weekdayIndex: Int
+    ) -> [CandidateClass] {
+        let statusesForDay = snapshot.sessionStatuses.filter { $0.dateIso == dateIso }
+        let daySlots = snapshot.slots
+            .filter { $0.dayOfWeek == weekdayIndex }
             .sorted { $0.startTime < $1.startTime }
 
-        let activeSem = store.selectedSemesterFilter
-        let semCourseIds = Set(store.disciplines.filter { $0.semester == activeSem }.map(\.id))
-        let slotsForDay = store.courseScheduleSlots.filter {
-            $0.dayOfWeek == weekdayIndex && semCourseIds.contains($0.courseId)
-        }
-
-        return items.compactMap { item in
-            guard let startMin = Self.minutesFromHHMM(item.startTime) else { return nil }
-            let endMin = Self.minutesFromHHMM(item.endTime) ?? (startMin + 50)
-            let courseId = item.disciplineId ?? ""
-            let matchedSlot = slotsForDay.first { $0.courseId == courseId && $0.startTime == item.startTime }
-            let isEad = (!courseId.isEmpty && store.isCourseEad(courseId)) || Self.isEadLocation(item.location)
+        return daySlots.compactMap { slot in
+            let matchedStatus = statusesForDay.first { status in
+                status.slotId == slot.slotId ||
+                    (status.courseId == slot.courseId && status.startTime == slot.startTime)
+            }
+            if matchedStatus?.statusRaw.uppercased() == "CANCELLED" {
+                return nil
+            }
+            guard let startMin = Self.minutesFromHHMM(slot.startTime) else { return nil }
+            let endMin = Self.minutesFromHHMM(slot.endTime) ?? (startMin + 50)
+            let isEad = slot.isEad || Self.isEadLocation(slot.building) || Self.isEadLocation(slot.fallbackLocation)
             let badges = Self.formatRoomBadges(
-                building: matchedSlot?.building ?? "",
-                room: matchedSlot?.room ?? "",
-                shortLocation: matchedSlot?.shortLocation ?? "",
-                fallbackLocation: item.location,
+                building: slot.building,
+                room: slot.room,
+                shortLocation: slot.shortLocation,
+                fallbackLocation: slot.fallbackLocation,
                 isEad: isEad
             )
             return CandidateClass(
-                courseId: courseId,
-                title: item.title,
-                startTime: item.startTime,
-                endTime: item.endTime,
+                courseId: slot.courseId,
+                title: slot.courseName,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
                 startMinutes: startMin,
                 endMinutes: endMin,
                 roomPill: badges.spotlight,
@@ -293,13 +325,13 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
         }
     }
 
-    private func findNextSchoolDayClass(store: CampusStore, today: Date) -> WidgetNextDayClass? {
+    private func findNextSchoolDayClass(snapshot: WidgetSharedSnapshotPayload, today: Date) -> WidgetNextDayClass? {
         let cal = Calendar(identifier: .gregorian)
         for offset in 1...7 {
             guard let candidateDate = cal.date(byAdding: .day, value: offset, to: today) else { continue }
-            let iso = CampusStore.isoString(from: candidateDate)
-            let weekdayIdx = CampusStore.isoWeekdayIndex(from: candidateDate)
-            let classes = collectClasses(store: store, dateIso: iso, weekdayIndex: weekdayIdx)
+            let iso = Self.isoString(from: candidateDate)
+            let weekdayIdx = Self.isoWeekdayIndex(from: candidateDate)
+            let classes = collectClasses(snapshot: snapshot, dateIso: iso, weekdayIndex: weekdayIdx)
             guard let first = classes.first else { continue }
             return WidgetNextDayClass(
                 dayBanner: Self.formatRelativeDayBanner(date: candidateDate, today: today),
@@ -311,26 +343,12 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
         return nil
     }
 
-    private func findNextPendingDeadline(store: CampusStore, today: Date, todayIso: String) -> WidgetDeadlineHighlight? {
-        var candidates: [AssessmentItem] = store.assessmentsByDiscipline.values.flatMap { $0 }
-        if candidates.isEmpty {
-            candidates = store.academicActivities.map {
-                AssessmentItem(
-                    id: $0.id,
-                    courseId: $0.disciplineId,
-                    dayNumber: $0.dueDay,
-                    monthShort: $0.dueMonth,
-                    title: $0.title,
-                    subtitle: $0.disciplineName,
-                    kind: $0.kind,
-                    dueDate: $0.dueDate,
-                    dueTime: $0.dueTime,
-                    completed: $0.isCompleted
-                )
-            }
-        }
-
-        let pending = candidates.filter { item in
+    private func findNextPendingDeadline(
+        snapshot: WidgetSharedSnapshotPayload,
+        today: Date,
+        todayIso: String
+    ) -> WidgetDeadlineHighlight? {
+        let pending = snapshot.assessments.filter { item in
             let dateTrimmed = item.dueDate.trimmingCharacters(in: .whitespacesAndNewlines)
             return !item.completed && !dateTrimmed.isEmpty && dateTrimmed >= todayIso && !item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
@@ -349,7 +367,7 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
 
         guard let earliest else { return nil }
         let formattedTitle = formatAcademicAssessmentTitle(earliest.title)
-        let parsedDate = CampusStore.parseIsoDate(earliest.dueDate)
+        let parsedDate = Self.parseIsoDate(earliest.dueDate)
         let cal = Calendar(identifier: .gregorian)
         let shortDate: String = {
             guard let parsedDate else { return earliest.dueDate }
@@ -372,6 +390,19 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
         )
     }
 
+    private static func isoString(from date: Date) -> String {
+        isoDateFormatter.string(from: date)
+    }
+
+    private static func parseIsoDate(_ iso: String) -> Date? {
+        isoDateFormatter.date(from: iso.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func isoWeekdayIndex(from date: Date) -> Int {
+        let weekday = Calendar(identifier: .gregorian).component(.weekday, from: date)
+        return weekday == 1 ? 7 : (weekday - 1)
+    }
+
     private static func formatRelativeDayBanner(date: Date, today: Date) -> String {
         let cal = Calendar(identifier: .gregorian)
         let day = cal.component(.day, from: date)
@@ -384,7 +415,7 @@ public struct VidaAcademicaTimelineProvider: TimelineProvider {
            cal.isDate(date, inSameDayAs: tomorrow) {
             return "AMANHÃ · \(day) \(monthUpper)"
         }
-        let wIdx = CampusStore.isoWeekdayIndex(from: date)
+        let wIdx = isoWeekdayIndex(from: date)
         return "\(weekdayShorts[min(max(wIdx, 1), 7)]) · \(day) \(monthUpper)"
     }
 
@@ -989,6 +1020,106 @@ public struct VidaAcademicaLiquidGlassWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline, .accessoryCircular])
         #else
         .supportedFamilies([.systemSmall, .systemMedium])
+        #endif
+    }
+}
+
+// MARK: - Live Activity Widget (iOS 16.2+ ActivityKit)
+
+#if canImport(ActivityKit) && os(iOS)
+@available(iOS 16.2, *)
+public struct CampusClassLiveActivityWidget: Widget {
+    public init() {}
+
+    public var body: some WidgetConfiguration {
+        ActivityConfiguration(for: CampusClassLiveActivityAttributes.self) { context in
+            let config = CampusAppearanceController.loadWidgetAppearance()
+            let accent = config.accentColor
+            let scheme = config.resolvedScheme ?? .light
+            let primary = accent.primary(for: scheme)
+            let surface2 = accent.surface2(for: scheme)
+            let ink = accent.ink(for: scheme)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text(context.state.countdownLabel)
+                        .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                        .foregroundStyle(accent.onPrimary(for: scheme))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(primary))
+
+                    Text(context.state.timeRange)
+                        .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
+                        .foregroundStyle(ink)
+
+                    Spacer(minLength: 4)
+
+                    Text(context.state.roomPill)
+                        .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                        .foregroundStyle(ink)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(surface2))
+                }
+
+                Text(context.attributes.courseName)
+                    .font(CampusTheme.font(size: 15, weight: .bold))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+
+                ProgressView(value: min(1.0, max(0.0, context.state.progress)))
+                    .tint(primary)
+            }
+            .padding(14)
+            .activityBackgroundTint(accent.surface1(for: scheme))
+            .activitySystemActionForegroundColor(primary)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    Text(context.state.countdownLabel)
+                        .font(CampusTheme.tabularFont(size: 12, weight: .bold))
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    Text(context.state.roomPill)
+                        .font(CampusTheme.tabularFont(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(context.attributes.courseName)
+                            .font(CampusTheme.font(size: 13, weight: .bold))
+                            .lineLimit(1)
+                        ProgressView(value: min(1.0, max(0.0, context.state.progress)))
+                    }
+                }
+            } compactLeading: {
+                Text(context.state.isOngoing ? "AGORA" : context.state.countdownLabel)
+                    .font(CampusTheme.tabularFont(size: 10, weight: .bold))
+            } compactTrailing: {
+                Text(context.state.roomPill)
+                    .font(CampusTheme.tabularFont(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            } minimal: {
+                Text(context.state.isOngoing ? "AGORA" : context.attributes.startTime)
+                    .font(CampusTheme.tabularFont(size: 10, weight: .bold))
+            }
+            .widgetURL(URL(string: "vidaacademica://agenda"))
+        }
+    }
+}
+#endif
+
+// MARK: - Widget Extension Entrypoint
+
+@main
+public struct VidaAcademicaWidgetBundle: WidgetBundle {
+    public init() {}
+
+    public var body: some Widget {
+        VidaAcademicaLiquidGlassWidget()
+        #if canImport(ActivityKit) && os(iOS)
+        CampusClassLiveActivityWidget()
         #endif
     }
 }

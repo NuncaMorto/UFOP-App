@@ -396,6 +396,22 @@ public extension CampusStore {
         return nil
     }
 
+    /// Define explicitamente o estado `completed` de uma avaliação (idempotente para ações inline de notificação).
+    @discardableResult
+    public func setAssessmentCompleted(assessmentId: String, completed: Bool) -> AssessmentItem? {
+        for (courseId, var items) in assessmentsByDiscipline {
+            if let idx = items.firstIndex(where: { $0.id == assessmentId }) {
+                items[idx].completed = completed
+                let updated = items[idx]
+                assessmentsByDiscipline[courseId] = items
+                rebuildAcademicActivitiesFromAssessments()
+                persistEncryptedState()
+                return updated
+            }
+        }
+        return nil
+    }
+
     /// Remove uma avaliação de uma disciplina e sincroniza `ActivitiesView`.
     public func deleteAssessment(assessmentId: String) {
         for (courseId, var items) in assessmentsByDiscipline {

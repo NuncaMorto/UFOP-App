@@ -323,6 +323,10 @@ interface CampusCoreRepository {
     fun getSelectedCurriculumVersion(courseCode: String): String?
     fun setSelectedCurriculumVersion(courseCode: String, version: String)
     fun getAllSelectedCurriculumVersions(): Map<String, String>
+
+    // Notificações 100% locais e offline
+    fun getNotificationPreferences(): NotificationPreferences
+    fun setNotificationPreferences(prefs: NotificationPreferences)
 }
 
 typealias InMemoryCampusCoreRepository = InMemoryCampusRepository
