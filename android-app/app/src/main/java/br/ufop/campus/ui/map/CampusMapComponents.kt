@@ -38,14 +38,18 @@ import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.uniffi.FeatureInfo
 import br.ufop.campus.core.uniffi.FloorLabel
 import br.ufop.campus.core.uniffi.OccupancyStatus
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.DarkStatusAbsentRed
 import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
 import br.ufop.campus.ui.theme.DarkWeatherBadgeText
 import br.ufop.campus.ui.theme.LightWeatherBadgeBg
 import br.ufop.campus.ui.theme.LightWeatherBadgeText
+import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 internal data class MapCanvasPalette(
     val background: Color,
@@ -132,9 +136,9 @@ internal fun FloorSelectorBar(
     onSelectFloor: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
     Row(
         modifier = modifier
-            .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -151,19 +155,16 @@ internal fun FloorSelectorBar(
                     },
                 shape = CircleShape,
                 color = if (isSelected) {
-                    MaterialTheme.colorScheme.primaryContainer
+                    MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                 },
-                border = BorderStroke(
-                    width = if (isSelected) 1.5.dp else 1.dp,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    }
-                ),
-                shadowElevation = 0.dp
+                border = if (isSelected && highContrast) {
+                    BorderStroke(2.dp, MaterialTheme.colorScheme.outline)
+                } else {
+                    campusCardBorder()
+                },
+                shadowElevation = campusCardElevation(1.dp)
             ) {
                 Text(
                     text = item.label,
@@ -172,7 +173,7 @@ internal fun FloorSelectorBar(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     ),
                     color = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        MaterialTheme.colorScheme.onPrimary
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
@@ -198,10 +199,10 @@ internal fun SelectedFeatureSheetCard(
         modifier = modifier
             .widthIn(max = 460.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(

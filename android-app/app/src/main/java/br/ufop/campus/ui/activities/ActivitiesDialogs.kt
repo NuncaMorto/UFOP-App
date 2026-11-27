@@ -132,8 +132,6 @@ internal fun CreateAssessmentBottomSheet(
     var syllabusFeedbackMessage by remember { mutableStateOf<String?>(null) }
     var syllabusFeedbackIsError by remember { mutableStateOf(false) }
 
-    val selectedCourseName = disciplines.find { it.courseId == selectedCourseId }?.name ?: "disciplina selecionada"
-
     val syllabusPdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -141,15 +139,13 @@ internal fun CreateAssessmentBottomSheet(
         isImportingSyllabus = true
         syllabusFeedbackMessage = null
         syllabusFeedbackIsError = false
-        val targetCourseId = selectedCourseId
-        val targetCourseName = selectedCourseName
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     try {
                         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                             ?: throw IllegalStateException("Não foi possível ler o PDF selecionado.")
-                        repository.importCourseSyllabusDetailedPdf(targetCourseId, bytes)
+                        repository.importSyllabusPdfAutoDetectCourse(semester, bytes)
                     } finally {
                         runCatching { SecurePdfProcessor.purgeResidualPdfFiles(context) }
                     }
@@ -160,9 +156,15 @@ internal fun CreateAssessmentBottomSheet(
                 if (!report.matchedCourse) {
                     syllabusFeedbackIsError = true
                     syllabusFeedbackMessage = report.errorMessage
-                        ?: "Este PDF parece ser de outra disciplina e não de $targetCourseName. Nenhuma alteração foi feita."
+                        ?: "Não foi possível vincular este PDF a nenhuma disciplina matriculada em $semester. Selecione manualmente abaixo."
                 } else {
-                    val (msg, isWarning) = formatSyllabusImportBanner(targetCourseName, report)
+                    report.matchedCourseId?.let { detectedId ->
+                        selectedCourseId = detectedId
+                    }
+                    val detectedName = report.matchedCourseTitle
+                        ?: disciplines.find { it.courseId == report.matchedCourseId }?.name
+                        ?: "disciplina identificada"
+                    val (msg, isWarning) = formatSyllabusImportBanner(detectedName, report)
                     if (report.importedCount > 0) {
                         onSyllabusImported(msg, isWarning)
                     } else {
@@ -230,6 +232,36 @@ internal fun CreateAssessmentBottomSheet(
                 }
             }
 
+            SyllabusPdfImportCard(
+                semester = semester,
+                isImportingSyllabus = isImportingSyllabus,
+                syllabusFeedbackMessage = syllabusFeedbackMessage,
+                syllabusFeedbackIsError = syllabusFeedbackIsError,
+                isDark = isDark,
+                minTouchTarget = minTouchTarget,
+                onPickPdfClick = { syllabusPdfLauncher.launch(arrayOf("application/pdf")) }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                Text(
+                    text = "ou cadastre manualmente",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+
             Text(
                 text = "Disciplina",
                 style = MaterialTheme.typography.labelLarge,
@@ -291,36 +323,6 @@ internal fun CreateAssessmentBottomSheet(
                         }
                     }
                 }
-            }
-
-            SyllabusPdfImportCard(
-                selectedCourseName = selectedCourseName,
-                isImportingSyllabus = isImportingSyllabus,
-                syllabusFeedbackMessage = syllabusFeedbackMessage,
-                syllabusFeedbackIsError = syllabusFeedbackIsError,
-                isDark = isDark,
-                minTouchTarget = minTouchTarget,
-                onPickPdfClick = { syllabusPdfLauncher.launch(arrayOf("application/pdf")) }
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                Text(
-                    text = "ou cadastre manualmente",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
             }
 
             OutlinedTextField(
@@ -431,7 +433,7 @@ internal fun CreateAssessmentBottomSheet(
 
 @Composable
 private fun SyllabusPdfImportCard(
-    selectedCourseName: String,
+    semester: String,
     isImportingSyllabus: Boolean,
     syllabusFeedbackMessage: String?,
     syllabusFeedbackIsError: Boolean,
@@ -464,16 +466,16 @@ private fun SyllabusPdfImportCard(
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Plano de Ensino (PDF)",
+                        text = "Importar Plano de Ensino (PDF)",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Importar datas de $selectedCourseName",
+                        text = "Identificação automática entre suas disciplinas de $semester",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }

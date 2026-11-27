@@ -1,18 +1,24 @@
 package br.ufop.campus.ui.profile
 
-import androidx.compose.foundation.BorderStroke
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -22,10 +28,15 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 private data class FaqAccordionItem(
     val id: String,
@@ -85,6 +96,76 @@ private val PROFILE_FAQ_ITEMS = listOf(
     )
 )
 @Composable
+internal fun ProfileAboutOpenSourceCard() {
+    val context = LocalContext.current
+    val minTouchTarget = campusMinTouchTarget()
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = campusCardElevation(2.dp),
+        border = campusCardBorder()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Code,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "Sobre o Vida Acadêmica & Código Aberto",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() }
+                )
+            }
+            Text(
+                text = "Aplicativo open source desenvolvido para estudantes da UFOP, com foco em privacidade local, rapidez offline e acessibilidade.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FilledTonalButton(
+                onClick = {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/NuncaMorto/Vida-Academica")
+                    )
+                    runCatching { context.startActivity(intent) }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minTouchTarget),
+                shape = RoundedCornerShape(CampusPillRadius)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Acessar repositório no GitHub",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun ProfileFaqSubView() {
     val minTouchTarget = campusMinTouchTarget()
     val expandedIds = remember { mutableStateMapOf<String, Boolean>() }
@@ -95,9 +176,10 @@ internal fun ProfileFaqSubView() {
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(CampusCardRadius),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            shadowElevation = campusCardElevation(2.dp),
+            border = campusCardBorder()
         ) {
             Column(
                 modifier = Modifier
@@ -139,9 +221,9 @@ internal fun ProfileFaqSubView() {
             val isExpanded = expandedIds[item.id] == true
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = campusCardBorder()
             ) {
                 Column(
                     modifier = Modifier

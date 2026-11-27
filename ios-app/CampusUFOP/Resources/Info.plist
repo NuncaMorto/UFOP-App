@@ -36,6 +36,17 @@
 		<string>Onest-Bold.ttf</string>
 		<string>Onest-ExtraBold.ttf</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.nuncamorto.vidaacademica.deeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vidaacademica</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

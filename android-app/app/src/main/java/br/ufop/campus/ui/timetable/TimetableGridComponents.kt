@@ -50,8 +50,10 @@ import br.ufop.campus.core.ffi.DepartmentColorOption
 import br.ufop.campus.core.ffi.TimetableCell
 import br.ufop.campus.core.ffi.TimetableRow
 import br.ufop.campus.core.map.MapMeetingFocusRequest
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.parseHexColor
 
 @Composable
@@ -79,9 +81,10 @@ internal fun TimetableWeeklyGrid(
     // Matriz da Grade: em Paisagem distribui SEG..SÁB em weight(1f); em Retrato permite rolagem horizontal confortável
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(if (isReducedMode) 16.dp else 22.dp),
+        shape = RoundedCornerShape(if (isReducedMode) 18.dp else CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Row(
             modifier = Modifier

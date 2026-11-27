@@ -1,147 +1,343 @@
-(function () {
-  "use strict";
-  var API = "https://api.github.com/repos/NuncaMorto/Vida-Academica/releases?per_page=10";
-  var FALLBACK = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.19";
-  var $ = function (id) { return document.getElementById(id); };
+const REPO = "NuncaMorto/Vida-Academica";
+const API_RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=8`;
+const FALLBACK_TAG = "v1.9.19";
+const FALLBACK_URL = "https://github.com/NuncaMorto/Vida-Academica/releases/tag/v1.9.20";
 
-  // Theme toggle
-  $("theme").addEventListener("click", function () {
-    var next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem("theme", next); } catch (e) {}
+const ACCENT_STORAGE_KEY = "vida_academica_site_accent";
+const THEME_STORAGE_KEY = "vida_academica_site_theme";
+const VALID_ACCENTS = new Set(["RED", "GREEN", "ORANGE", "PURPLE", "YELLOW", "CYAN", "BROWN", "PINK", "BLUE"]);
+
+const $ = (id) => document.getElementById(id);
+
+function applyAccent(accentKey) {
+  const key = VALID_ACCENTS.has(accentKey) ? accentKey : "RED";
+  document.documentElement.setAttribute("data-accent", key);
+  try {
+    localStorage.setItem(ACCENT_STORAGE_KEY, key);
+  } catch {
+    // Ignore storage restrictions
+  }
+  document.querySelectorAll(".swatch-btn").forEach((btn) => {
+    const active = btn.getAttribute("data-accent") === key;
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function applyTheme(mode) {
+  const theme = mode === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", theme);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Ignore storage restrictions
+  }
+  const toggleBtn = $("theme-toggle");
+  const toggleLabel = $("theme-toggle-label");
+  if (toggleBtn && toggleLabel) {
+    toggleBtn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+    toggleLabel.textContent = theme === "dark" ? "Claro" : "Escuro";
+  }
+}
+
+function initThemeAndPreviewControls() {
+  let savedAccent = "RED";
+  let savedTheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  try {
+    savedAccent = localStorage.getItem(ACCENT_STORAGE_KEY) || savedAccent;
+    savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || savedTheme;
+  } catch {
+    // Ignore storage restrictions
+  }
+
+  applyAccent(savedAccent);
+  applyTheme(savedTheme);
+
+  document.querySelectorAll(".swatch-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyAccent(btn.getAttribute("data-accent") || "RED");
+    });
   });
 
-  function pickAsset(rel) {
-    var apks = (rel.assets || []).filter(function (a) { return /\.apk$/i.test(a.name || ""); });
-    if (!apks.length) return null;
-    var rel1 = apks.filter(function (a) { return !/-debug\.apk$/i.test(a.name); });
-    return rel1[0] || apks[0];
+  const themeBtn = $("theme-toggle");
+  if (themeBtn) {
+    themeBtn.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      applyTheme(current === "dark" ? "light" : "dark");
+    });
   }
 
-  function clean(md) {
-    return String(md || "").replace(/<!--[\s\S]*?-->/g, "").replace(/\r/g, "").trim();
-  }
+  const phoneTabs = document.querySelectorAll(".phone-tab");
+  const panels = {
+    agenda: $("preview-agenda"),
+    disciplinas: $("preview-disciplinas"),
+    mapa: $("preview-mapa"),
+  };
 
-  // Safe markdown-lite renderer: builds DOM with textContent only.
-  function renderNotes(md, target) {
-    target.textContent = "";
-    var text = clean(md);
-    if (!text) {
-      var p0 = document.createElement("p");
-      p0.className = "muted";
-      p0.textContent = "Sem notas para esta versão.";
-      target.appendChild(p0);
+  phoneTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const key = tab.getAttribute("data-preview") || "agenda";
+      phoneTabs.forEach((item) => {
+        item.setAttribute("aria-selected", item === tab ? "true" : "false");
+      });
+      Object.entries(panels).forEach(([panelKey, el]) => {
+        if (el) el.hidden = panelKey !== key;
+      });
+    });
+  });
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes < 1024) return "";
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}
+
+function formatDateBr(isoString) {
+  if (!isoString) return "";
+  const dt = new Date(isoString);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function setStatus(text) {
+  const el = $("dl-status");
+  if (el) el.textContent = text || "";
+}
+
+function appendInlineMarkdown(parent, text) {
+  const parts = String(text || "").split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  parts.forEach((part) => {
+    if (!part) return;
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      const strong = document.createElement("strong");
+      strong.textContent = part.slice(2, -2);
+      parent.appendChild(strong);
+    } else if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      const code = document.createElement("code");
+      code.textContent = part.slice(1, -1);
+      parent.appendChild(code);
+    } else {
+      parent.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
+function renderReleaseNotesSafely(container, markdownBody) {
+  if (!container) return;
+  container.textContent = "";
+  const lines = String(markdownBody || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .filter((line) => !line.includes("versionCode:") && !line.trim().startsWith("<!--"));
+
+  let currentList = null;
+
+  const flushList = () => {
+    if (currentList) {
+      container.appendChild(currentList);
+      currentList = null;
+    }
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) {
+      flushList();
       return;
     }
-    var list = null;
-    text.split("\n").forEach(function (raw) {
-      var line = raw.trim();
-      if (!line) { list = null; return; }
-      var m = line.match(/^[-*+]\s+(.*)$/);
-      if (m) {
-        if (!list) { list = document.createElement("ul"); target.appendChild(list); }
-        var li = document.createElement("li");
-        li.textContent = inline(m[1]);
-        list.appendChild(li);
-        return;
+    if (line.startsWith("### ") || line.startsWith("## ")) {
+      flushList();
+      const heading = document.createElement("h4");
+      appendInlineMarkdown(heading, line.replace(/^#{2,4}\s+/, ""));
+      container.appendChild(heading);
+      return;
+    }
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      if (!currentList) {
+        currentList = document.createElement("ul");
       }
-      list = null;
-      var h = line.match(/^#{1,6}\s+(.*)$/);
-      var el = document.createElement(h ? "h4" : "p");
-      el.textContent = inline(h ? h[1] : line);
-      target.appendChild(el);
-    });
+      const li = document.createElement("li");
+      appendInlineMarkdown(li, line.slice(2));
+      currentList.appendChild(li);
+      return;
+    }
+    flushList();
+    const p = document.createElement("p");
+    p.style.margin = "6px 0";
+    appendInlineMarkdown(p, line);
+    container.appendChild(p);
+  });
+  flushList();
+
+  if (!container.childNodes.length) {
+    const p = document.createElement("p");
+    p.textContent = "Consulte os detalhes completos desta compilação na página do lançamento no GitHub.";
+    container.appendChild(p);
   }
-  function inline(s) {
-    return s.replace(/\*\*(.+?)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+}
+
+async function resolveSha256(assets, apkName) {
+  const shaEl = $("sha-value");
+  const capEl = $("sha-caption");
+  const copyBtn = $("btn-copy-sha");
+  if (!shaEl) return;
+
+  const sumsAsset = (assets || []).find((a) => /sha256/i.test(a.name));
+  if (!sumsAsset || !sumsAsset.browser_download_url) {
+    shaEl.textContent = "Arquivo SHA256SUMS.txt indisponível neste lançamento — verifique na página do GitHub.";
+    return;
   }
 
-  function fmtDate(iso) {
-    var d = new Date(iso);
-    return isNaN(d) ? "" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  try {
+    const res = await fetch(sumsAsset.browser_download_url, { cache: "no-store" });
+    if (!res.ok) throw new Error("fetch");
+    const text = await res.text();
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const matchedLine = (apkName ? lines.find((l) => l.includes(apkName)) : null) || lines.find((l) => /\.apk/i.test(l)) || lines[0];
+    if (!matchedLine) throw new Error("empty");
+    const hashToken = matchedLine.split(/\s+/)[0];
+    shaEl.textContent = hashToken;
+    if (capEl && apkName) {
+      capEl.textContent = `SHA-256 referente ao arquivo ${apkName}`;
+    }
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(hashToken);
+          copyBtn.textContent = "Hash copiado";
+          setTimeout(() => {
+            copyBtn.textContent = "Copiar hash";
+          }, 2200);
+        } catch {
+          setStatus("Selecione e copie o código SHA-256 exibido.");
+        }
+      });
+    }
+  } catch {
+    shaEl.textContent = "Confira o arquivo SHA256SUMS.txt diretamente na página do lançamento no GitHub.";
   }
-  function fmtSize(b) { return (b / 1048576).toFixed(1).replace(".", ",") + " MB"; }
+}
 
-  function setHash(hex, relUrl) {
-    var val = $("hash-val"), btn = $("hash-copy");
-    if (hex) {
-      val.textContent = hex;
-      btn.hidden = false;
-      btn.onclick = function () {
-        var done = function () { btn.setAttribute("aria-label", "SHA-256 copiado"); setTimeout(function () { btn.setAttribute("aria-label", "Copiar SHA-256"); }, 2000); };
-        if (navigator.clipboard) navigator.clipboard.writeText(hex).then(done, function () {});
-      };
-    } else {
-      val.textContent = "";
-      var a = document.createElement("a");
-      a.href = relUrl; a.rel = "noopener"; a.textContent = "Ver SHA-256 na página da versão";
-      val.appendChild(a);
-      btn.hidden = true;
+function triggerFallback(btn, message) {
+  btn.removeAttribute("aria-busy");
+  if (message) setStatus(message);
+  window.location.href = FALLBACK_URL;
+}
+
+async function hydrateReleases() {
+  const btn = $("btn-dl");
+  const dlLabel = $("btn-dl-label");
+  const ipaBtn = $("btn-ipa");
+  const ghBtn = $("btn-gh");
+  const metaEl = $("apk-meta");
+  const latestTitle = $("latest-release-title");
+  const latestTag = $("latest-release-tag");
+  const latestDate = $("latest-release-date");
+  const latestNotes = $("latest-release-notes");
+  const historyDetails = $("history-details");
+  const historyList = $("history-list");
+
+  $("ver-badge").textContent = "v1.9.20 · Beta";
+
+  try {
+    const res = await fetch(API_RELEASES, { headers: { Accept: "application/vnd.github+json" } });
+    if (!res.ok) throw new Error("GitHub API");
+    const releases = await res.json();
+    if (!Array.isArray(releases) || releases.length === 0) throw new Error("Empty releases");
+
+    const latest = releases.find((r) => (r.assets || []).some((a) => /\.apk$/i.test(a.name))) || releases[0];
+    const tag = latest.tag_name || FALLBACK_TAG;
+    const isPre = Boolean(latest.prerelease);
+    $("ver-badge").textContent = `${tag}${isPre ? " · Beta" : ""}`;
+
+    const releaseUrl = latest.html_url || FALLBACK_URL;
+    if (ghBtn) ghBtn.href = releaseUrl;
+
+    const assets = latest.assets || [];
+    const apk = assets.find((a) => /\.apk$/i.test(a.name) && !/debug/i.test(a.name))
+      || assets.find((a) => /\.apk$/i.test(a.name));
+    const ipa = assets.find((a) => /\.ipa$/i.test(a.name));
+
+    if (ipa && ipa.browser_download_url && ipaBtn) {
+      ipaBtn.href = ipa.browser_download_url;
+      ipaBtn.hidden = false;
+    }
+
+    const published = formatDateBr(latest.published_at);
+    if (apk && apk.browser_download_url && btn) {
+      btn.href = apk.browser_download_url;
+      btn.setAttribute("download", apk.name);
+      if (dlLabel) dlLabel.textContent = `Baixar APK (${tag})`;
+
+      const metaParts = [apk.name, formatBytes(apk.size), published, "Android 8.0+"].filter(Boolean);
+      if (metaEl) metaEl.textContent = metaParts.join(" · ");
+
+      btn.addEventListener("click", () => {
+        setStatus(`Iniciando download de ${apk.name}...`);
+      });
+
+      resolveSha256(assets, apk.name);
+    } else if (btn) {
+      btn.href = releaseUrl;
+      resolveSha256(assets, "");
+    }
+
+    if (latestTitle) latestTitle.textContent = latest.name || `Vida Acadêmica ${tag}`;
+    if (latestTag) latestTag.textContent = `${tag}${isPre ? " · Pre-release" : ""}`;
+    if (latestDate) latestDate.textContent = published ? `Publicado em ${published}` : "";
+    renderReleaseNotesSafely(latestNotes, latest.body);
+
+    const older = releases.filter((r) => r.id !== latest.id).slice(0, 5);
+    if (older.length > 0 && historyDetails && historyList) {
+      historyList.textContent = "";
+      older.forEach((rel) => {
+        const card = document.createElement("div");
+        card.className = "history-item";
+
+        const head = document.createElement("div");
+        head.className = "history-item-head";
+
+        const title = document.createElement("strong");
+        title.textContent = rel.name || rel.tag_name;
+
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "release-date tabular";
+        dateSpan.textContent = formatDateBr(rel.published_at);
+
+        head.appendChild(title);
+        head.appendChild(dateSpan);
+
+        const body = document.createElement("div");
+        body.className = "release-notes";
+        renderReleaseNotesSafely(body, rel.body);
+
+        card.appendChild(head);
+        card.appendChild(body);
+        historyList.appendChild(card);
+      });
+      historyDetails.hidden = false;
+    }
+  } catch {
+    if (latestTitle) latestTitle.textContent = `Vida Acadêmica ${FALLBACK_TAG}`;
+    if (latestTag) latestTag.textContent = FALLBACK_TAG;
+    if (latestNotes) {
+      latestNotes.textContent = "Não foi possível carregar as notas automaticamente agora. Abrindo a página da versão v1.9.20 no GitHub para consulta completa.";
+    }
+    const shaEl = $("sha-value");
+    if (shaEl) {
+      shaEl.textContent = "Confira o arquivo SHA256SUMS.txt na página oficial do lançamento no GitHub.";
+    }
+    if (btn) {
+      btn.addEventListener("click", (e) => {
+        if (!btn.hasAttribute("download")) {
+          e.preventDefault();
+          triggerFallback(btn, "Abrindo a página da versão v1.9.20 no GitHub.");
+        }
+      });
     }
   }
+}
 
-  function fallback(reason) {
-    $("apk-btn").href = FALLBACK;
-    $("ver-badge").textContent = "v1.9.19 · Beta";
-    $("ver-meta").textContent = "";
-    var s = $("dl-status");
-    s.textContent = reason + " Abrindo a página da versão v1.9.19 no GitHub.";
-    s.classList.add("warn");
-    setHash(null, FALLBACK);
-    $("notes").textContent = "";
-    var p = document.createElement("p");
-    p.className = "muted";
-    p.textContent = "Não foi possível carregar as notas agora. Veja-as na página da versão no GitHub.";
-    $("notes").appendChild(p);
-  }
-
-  function renderHistory(rels) {
-    var box = $("history-list");
-    box.textContent = "";
-    rels.forEach(function (r) {
-      var d = document.createElement("details");
-      d.className = "hist-item";
-      var s = document.createElement("summary");
-      s.textContent = (r.tag_name || r.name || "versão") + (r.published_at ? " · " + fmtDate(r.published_at) : "");
-      var body = document.createElement("div");
-      body.className = "notes-body";
-      renderNotes(r.body, body);
-      d.appendChild(s); d.appendChild(body);
-      box.appendChild(d);
-    });
-    $("history").hidden = !rels.length;
-  }
-
-  function load() {
-    fetch(API, { headers: { Accept: "application/vnd.github+json" } })
-      .then(function (r) {
-        if (!r.ok) throw new Error(r.status === 403 || r.status === 429 ? "Limite do GitHub atingido." : "GitHub indisponível.");
-        return r.json();
-      })
-      .then(function (all) {
-        var rels = (all || []).filter(function (r) { return !r.draft; });
-        var latest = null, asset = null;
-        for (var i = 0; i < rels.length; i++) {
-          var a = pickAsset(rels[i]);
-          if (a) { latest = rels[i]; asset = a; break; }
-        }
-        if (!latest) throw new Error("Nenhum APK encontrado.");
-        var tag = latest.tag_name || "";
-        $("apk-btn").href = asset.browser_download_url;
-        $("ver-badge").textContent = tag + (latest.prerelease || /beta/i.test(latest.name || "") ? " · Beta" : "");
-        $("ver-meta").textContent = [fmtSize(asset.size), fmtDate(latest.published_at)].filter(Boolean).join(" · ");
-        var s = $("dl-status");
-        s.textContent = "Versão mais recente, direto do GitHub.";
-        s.classList.remove("warn");
-        var hex = asset.digest ? String(asset.digest).replace(/^sha256:/i, "") : "";
-        setHash(/^[0-9a-f]{64}$/i.test(hex) ? hex : null, latest.html_url || FALLBACK);
-        $("notes-title").textContent = (latest.name || tag) + (latest.published_at ? " · " + fmtDate(latest.published_at) : "");
-        renderNotes(latest.body, $("notes"));
-        renderHistory(rels.filter(function (r) { return r !== latest; }));
-      })
-      .catch(function (e) {
-        fallback((e && e.message && e.message.indexOf("GitHub") > -1 || /APK/.test(e && e.message)) ? e.message : "Você parece estar offline.");
-      });
-  }
-  load();
-})();
+document.addEventListener("DOMContentLoaded", () => {
+  initThemeAndPreviewControls();
+  hydrateReleases();
+});

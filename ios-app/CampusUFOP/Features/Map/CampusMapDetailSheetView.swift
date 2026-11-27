@@ -14,7 +14,12 @@ internal struct CampusMapDetailSheetView: View {
     let onSelectFloor: (Int32) -> Void
     let onDismiss: () -> Void
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+
+    private var onPrimaryColor: Color {
+        (appearance?.accentColor ?? .red).onPrimary(for: colorScheme)
+    }
 
     private var freeBuildingRooms: [CampusRoomOccupancyItem] {
         buildingOccupancy.filter { $0.status.isFree }
@@ -72,7 +77,7 @@ internal struct CampusMapDetailSheetView: View {
             }
         }
         .padding(14)
-        .liquidGlassCard(cornerRadius: 20, tint: accentColor, interactive: false, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: accentColor, interactive: false, highContrast: highContrast)
     }
 
     private var headerSection: some View {
@@ -80,7 +85,7 @@ internal struct CampusMapDetailSheetView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(layerTitle)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 11, weight: .bold))
                         .foregroundStyle(accentColor)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -88,7 +93,7 @@ internal struct CampusMapDetailSheetView: View {
 
                     if let code = feature.code, !code.isEmpty, code != feature.name {
                         Text(code)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
@@ -103,7 +108,7 @@ internal struct CampusMapDetailSheetView: View {
                 }
 
                 Text(feature.name)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 16, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 if let subtitle = subtitleText, !subtitle.isEmpty {
@@ -152,16 +157,16 @@ internal struct CampusMapDetailSheetView: View {
                 HStack(spacing: 6) {
                     Circle().fill(tint).frame(width: 8, height: 8)
                     Text("Ocupada agora")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 12, weight: .bold))
                         .foregroundStyle(tint)
                     Spacer()
                     Text("\(slot.startTime)–\(slot.endTime)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 }
 
                 Text(slot.label)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 14, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 if let title = slot.title, !title.isEmpty, title != slot.label {
@@ -184,7 +189,7 @@ internal struct CampusMapDetailSheetView: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(freeColor)
                 Text("Sem aula regular agora")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
                     .foregroundStyle(freeColor)
             }
             .padding(10)
@@ -213,14 +218,14 @@ internal struct CampusMapDetailSheetView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text("\(freeBuildingRooms.count) livre(s)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                     .foregroundStyle(freeColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Capsule().fill(freeColor.opacity(colorScheme == .dark ? 0.20 : 0.12)))
 
                 Text("\(occupiedBuildingRooms.count) ocupada(s)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                     .foregroundStyle(occColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -253,10 +258,10 @@ internal struct CampusMapDetailSheetView: View {
                                     .fill(chipColor)
                                     .frame(width: 6, height: 6)
                                 Text(item.roomCode)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                                 Text(item.floor == 0 ? "T" : "\(item.floor + 1)º")
-                                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                    .font(CampusTheme.tabularFont(size: 10, weight: .semibold))
                                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
                             }
                             .padding(.horizontal, 10)
@@ -285,8 +290,8 @@ internal struct CampusMapDetailSheetView: View {
                         onSelectFloor(floor)
                     } label: {
                         Text(text)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(isSelected ? accentColor : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                            .font(CampusTheme.font(size: 11, weight: .bold))
+                            .foregroundStyle(isSelected ? onPrimaryColor : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .liquidGlassCapsule(selected: isSelected, accent: accentColor, interactive: true, highContrast: highContrast)
@@ -311,7 +316,12 @@ internal struct CampusMapFreeRoomsSummaryView: View {
     let onSelectRoom: (String) -> Void
     let onDismiss: () -> Void
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+
+    private var onPrimaryColor: Color {
+        (appearance?.accentColor ?? .red).onPrimary(for: colorScheme)
+    }
 
     var body: some View {
         let freeColor = colorScheme == .dark ? Color(hex: 0x4ADE80) : Color(hex: 0x15803D)
@@ -324,7 +334,7 @@ internal struct CampusMapFreeRoomsSummaryView: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Salas livres · \(floorLabel)")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 14, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                     Text("\(summary.freeCount) livre(s) · \(summary.occupiedCount) ocupada(s)")
@@ -369,7 +379,7 @@ internal struct CampusMapFreeRoomsSummaryView: View {
                                 HStack(spacing: 4) {
                                     Circle().fill(freeColor).frame(width: 6, height: 6)
                                     Text(room.primaryLabel)
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .font(CampusTheme.font(size: 12, weight: .bold))
                                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                                 }
                                 .padding(.horizontal, 10)
@@ -387,6 +397,6 @@ internal struct CampusMapFreeRoomsSummaryView: View {
             }
         }
         .padding(14)
-        .liquidGlassCard(cornerRadius: 20, tint: accentColor, interactive: false, highContrast: highContrast)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: accentColor, interactive: false, highContrast: highContrast)
     }
 }

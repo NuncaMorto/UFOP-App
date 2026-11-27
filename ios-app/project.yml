@@ -30,8 +30,8 @@ targets:
       base:
         PRODUCT_NAME: VidaAcademica
         PRODUCT_BUNDLE_IDENTIFIER: io.github.nuncamorto.vidaacademica
-        MARKETING_VERSION: "1.9.19"
-        CURRENT_PROJECT_VERSION: "36"
+        MARKETING_VERSION: "1.9.20"
+        CURRENT_PROJECT_VERSION: "37"
         SWIFT_VERSION: "5.9"
         SWIFT_STRICT_CONCURRENCY: minimal
         INFOPLIST_FILE: CampusUFOP/Resources/Info.plist

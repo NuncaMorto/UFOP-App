@@ -112,6 +112,7 @@ private struct CampusRootCoordinatorView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 store.persistEncryptedState()
+                appearance.reloadWidgetTimelines()
                 lockManager.lockNowIfEnabled()
             }
         }
@@ -150,6 +151,30 @@ private struct CampusRootCoordinatorView: View {
     }
 
     private func handleIncomingUrl(_ url: URL) {
+        if url.scheme?.lowercased() == "vidaacademica" {
+            let route = (url.host ?? url.path.replacingOccurrences(of: "/", with: ""))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            switch route {
+            case "agenda", "aulas":
+                selectedTab = .agenda
+                return
+            case "activities", "atividades", "prazos":
+                selectedTab = .activities
+                return
+            case "disciplines", "disciplinas":
+                selectedTab = .disciplines
+                return
+            case "map", "mapa":
+                selectedTab = .map
+                return
+            case "profile", "perfil":
+                selectedTab = .profile
+                return
+            default:
+                break
+            }
+        }
         do {
             let rawText: String
             if url.isFileURL {

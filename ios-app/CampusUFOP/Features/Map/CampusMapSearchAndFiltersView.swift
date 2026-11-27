@@ -9,8 +9,27 @@ internal struct CampusMapSearchAndFiltersView: View {
     let highContrast: Bool
     @Binding var isResultsExpanded: Bool
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
     @FocusState private var isSearchFieldFocused: Bool
+
+    private var activePalette: CampusAccentColor {
+        appearance?.accentColor ?? .red
+    }
+
+    private var onPrimaryColor: Color {
+        activePalette.onPrimary(for: colorScheme)
+    }
+
+    private var compactCampusLabel: String {
+        switch bridge.activeCampusId {
+        case "OP_MC": return "Morro"
+        case "JM_ICEA": return "ICEA"
+        case "MA_ICHS": return "ICHS"
+        case "MA_ICSA": return "ICSA"
+        default: return activeCampusDisplayName
+        }
+    }
 
     private var hasActiveQueryOrFilter: Bool {
         !bridge.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -57,53 +76,48 @@ internal struct CampusMapSearchAndFiltersView: View {
 
     private var searchAndCampusRow: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
 
-                TextField(
-                    "Buscar sala, prédio ou serviço...",
-                    text: Binding(
-                        get: { bridge.searchQuery },
-                        set: { newText in
-                            bridge.updateSearchQuery(newText)
-                            isResultsExpanded = !newText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                || bridge.activePoiFilter != nil
-                        }
-                    )
+            TextField(
+                "Buscar local ou sala...",
+                text: Binding(
+                    get: { bridge.searchQuery },
+                    set: { newText in
+                        bridge.updateSearchQuery(newText)
+                        isResultsExpanded = !newText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || bridge.activePoiFilter != nil
+                    }
                 )
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .focused($isSearchFieldFocused)
-                .onSubmit {
-                    if !bridge.searchResults.isEmpty {
-                        isResultsExpanded = true
-                    }
-                }
-
-                if hasActiveQueryOrFilter {
-                    Button {
-                        bridge.clearSearchAndFilters()
-                        isResultsExpanded = false
-                        isSearchFieldFocused = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
-                    }
-                    .buttonStyle(.plain)
-                    .frame(minWidth: 32, minHeight: 32)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("Limpar busca e filtros")
+            )
+            .font(CampusTheme.font(size: 14, weight: .medium))
+            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: activePalette))
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.search)
+            .focused($isSearchFieldFocused)
+            .onSubmit {
+                if !bridge.searchResults.isEmpty {
+                    isResultsExpanded = true
                 }
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: max(46, minTouch))
-            .liquidGlassCapsule(selected: false, accent: accentColor, interactive: false, highContrast: highContrast)
+
+            if hasActiveQueryOrFilter {
+                Button {
+                    bridge.clearSearchAndFilters()
+                    isResultsExpanded = false
+                    isSearchFieldFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+                }
+                .buttonStyle(.plain)
+                .frame(minWidth: 30, minHeight: 30)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Limpar busca e filtros")
+            }
 
             Menu {
                 ForEach(campusOptions, id: \.id) { campus in
@@ -119,27 +133,29 @@ internal struct CampusMapSearchAndFiltersView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "building.columns.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(accentColor)
-
-                    Text(activeCampusDisplayName)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                HStack(spacing: 4) {
+                    Text(compactCampusLabel)
+                        .font(CampusTheme.font(size: 11, weight: .bold))
+                        .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: activePalette))
                         .lineLimit(1)
 
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 }
-                .padding(.horizontal, 12)
-                .frame(minHeight: max(46, minTouch))
-                .liquidGlassCapsule(selected: false, accent: accentColor, interactive: true, highContrast: highContrast)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(activePalette.surface2(for: colorScheme))
+                )
             }
-            .campusHoverLift()
             .accessibilityLabel("Selecionar campus: \(activeCampusDisplayName)")
         }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(minHeight: max(48, minTouch))
+        .liquidGlassCapsule(selected: false, accent: accentColor, interactive: false, highContrast: highContrast)
     }
 
     // MARK: - Chips de POI + Salas Livres
@@ -158,13 +174,13 @@ internal struct CampusMapSearchAndFiltersView: View {
                             Image(systemName: selected ? "checkmark.circle.fill" : "door.left.hand.open")
                                 .font(.system(size: 12, weight: .bold))
                             Text(freeCount > 0 ? "Salas livres (\(freeCount))" : "Salas livres")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                                 .lineLimit(1)
                         }
                         .foregroundStyle(
                             selected
-                                ? accentColor
-                                : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
+                                ? onPrimaryColor
+                                : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: activePalette)
                         )
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -187,13 +203,13 @@ internal struct CampusMapSearchAndFiltersView: View {
                                 Image(systemName: poiType.systemImage)
                                     .font(.system(size: 11, weight: .bold))
                                 Text(poiType.title)
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .font(CampusTheme.font(size: 12, weight: .semibold))
                                     .lineLimit(1)
                             }
                             .foregroundStyle(
                                 selected
-                                    ? accentColor
-                                    : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
+                                    ? onPrimaryColor
+                                    : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: activePalette)
                             )
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -219,7 +235,7 @@ internal struct CampusMapSearchAndFiltersView: View {
                         ? "Nenhum resultado"
                         : "\(bridge.searchResults.count) resultado(s) no mapa"
                 )
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
                 Spacer()
@@ -304,7 +320,7 @@ internal struct CampusMapSearchAndFiltersView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(feat.name)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(CampusTheme.font(size: 14, weight: .semibold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     .lineLimit(1)
 
@@ -320,7 +336,7 @@ internal struct CampusMapSearchAndFiltersView: View {
 
             if feat.isMock {
                 Text("Esquemático")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(CampusTheme.font(size: 10, weight: .semibold))
                     .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)

@@ -138,6 +138,9 @@ fun CampusNavigation(
     modifier: Modifier = Modifier,
     pendingIncomingGrade: IncomingGradePreview? = null,
     incomingGradeError: String? = null,
+    pendingTargetTab: CampusTab? = null,
+    pendingTargetTabNonce: Int = 0,
+    onConsumeTargetTab: () -> Unit = {},
     onConsumeIncomingGrade: () -> Unit = {},
     onDismissIncomingGradeError: () -> Unit = {},
     onAppSecurityChanged: () -> Unit = {},
@@ -246,7 +249,6 @@ fun CampusNavigation(
             CampusTab.PROFILE -> {
                 br.ufop.campus.ui.profile.ProfilePlaceholderScreen(
                     repository = repository,
-                    onOpenReleaseNotes = { showReleaseNotesDialog = true },
                     onOpenDynamicGrid = { showDynamicGridModal = true },
                     onReplayGuidedTour = {
                         CampusRepositoryHolder.setGuidedTourCompleted(context, repository, false)
@@ -267,7 +269,7 @@ fun CampusNavigation(
                 if (activeMapController != null) {
                     CampusMapScreen(
                         controller = activeMapController,
-                        bottomBarClearanceDp = if (adaptive.useNavigationRail) 16.dp else 88.dp,
+                        bottomBarClearanceDp = if (adaptive.useNavigationRail) 16.dp else 82.dp,
                         startBarClearanceDp = adaptive.verticalIslandClearanceDp.dp,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -289,6 +291,13 @@ fun CampusNavigation(
         mapController?.onMapTabActiveChanged(selectedTab == CampusTab.MAP)
         if (selectedTab != CampusTab.DISCIPLINES && showTimetableModal) {
             showTimetableModal = false
+        }
+    }
+
+    LaunchedEffect(pendingTargetTab, pendingTargetTabNonce) {
+        if (pendingTargetTab != null) {
+            handleSelectTab(pendingTargetTab)
+            onConsumeTargetTab()
         }
     }
 

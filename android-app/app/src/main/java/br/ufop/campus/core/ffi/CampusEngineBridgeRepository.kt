@@ -554,6 +554,28 @@ class CampusEngineBridgeRepository(
         report
     }
 
+    override fun importSyllabusPdfAutoDetectCourse(
+        semester: String,
+        pdfBytes: ByteArray
+    ): SyllabusImportReport = synchronized(lock) {
+        val report = fallback.importSyllabusPdfAutoDetectCourse(semester, pdfBytes)
+        if (report.matchedCourse && (report.importedCount > 0 || report.extractedProfessor.isNotBlank())) {
+            _mutationVersion.value += 1L
+        }
+        report
+    }
+
+    override fun importSyllabusTextAutoDetectCourse(
+        semester: String,
+        rawText: String
+    ): SyllabusImportReport = synchronized(lock) {
+        val report = fallback.importSyllabusTextAutoDetectCourse(semester, rawText)
+        if (report.matchedCourse && (report.importedCount > 0 || report.extractedProfessor.isNotBlank())) {
+            _mutationVersion.value += 1L
+        }
+        report
+    }
+
     override fun getAcademicCalendarEvents(semester: String): List<AcademicCalendarEvent> = synchronized(lock) {
         fallback.getAcademicCalendarEvents(semester)
     }

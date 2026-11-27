@@ -10,6 +10,7 @@ private struct SimulatedExtraSubject: Identifiable {
 
 public struct CurriculumMatrixView: View {
     @Bindable public var store: CampusStore
+    public let allowCourseSelection: Bool
     public let onClose: () -> Void
 
     @Environment(CampusAppearanceController.self) private var appearance
@@ -20,6 +21,7 @@ public struct CurriculumMatrixView: View {
     @State private var selectedCourseCode: String = ""
     @State private var selectedCurriculumVersion: String = ""
     @State private var searchQuery: String = ""
+    @State private var isSummaryExpanded: Bool = false
     @State private var showTranscriptPicker: Bool = false
     @State private var showLegacyReferencesExpanded: Bool = false
     @State private var importError: String?
@@ -27,8 +29,9 @@ public struct CurriculumMatrixView: View {
     @State private var newSimCh: Int = 60
     @State private var newSimGrade: Double = 8.0
 
-    public init(store: CampusStore, onClose: @escaping () -> Void) {
+    public init(store: CampusStore, allowCourseSelection: Bool = false, onClose: @escaping () -> Void) {
         self.store = store
+        self.allowCourseSelection = allowCourseSelection
         self.onClose = onClose
     }
 
@@ -161,14 +164,14 @@ public struct CurriculumMatrixView: View {
                                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: 0xEF4444).opacity(0.14)))
                         }
 
-                        courseSelectorCard(course: course, accent: accent, highContrast: hc)
+                        compactHeaderSummaryCard(course: course, report: creReport, accent: accent, highContrast: hc)
 
                         if let course {
                             let status = compatibilityStatus(for: course)
                             if status.isLegacyMatrixMismatch {
                                 legacyCompatibilityBanner(status: status, for: course, highContrast: hc)
                             }
-                            if !course.subjects.isEmpty {
+                            if isSummaryExpanded && !course.subjects.isEmpty {
                                 legacyReferencesSection(
                                     for: course,
                                     isLegacyMismatch: status.isLegacyMatrixMismatch,
@@ -178,7 +181,9 @@ public struct CurriculumMatrixView: View {
                             }
                         }
 
-                        creAndSimulatorCard(report: creReport, accent: accent, highContrast: hc)
+                        if isSummaryExpanded {
+                            creAndSimulatorCard(report: creReport, accent: accent, highContrast: hc)
+                        }
 
                         if let course {
                             subjectsListSection(course: course, accent: accent, highContrast: hc)
@@ -259,75 +264,141 @@ public struct CurriculumMatrixView: View {
         }
     }
 
-    private func courseSelectorCard(course: UfopCourseCurriculum?, accent: Color, highContrast: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Curso selecionado")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
-                Spacer()
-                Text("\(UfopCurriculumCatalog.allCourses.count) cursos no catálogo")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(accent)
-            }
+    private func compactHeaderSummaryCard(
+        course: UfopCourseCurriculum?,
+        report: AcademicCreReport,
+        accent: Color,
+        highContrast: Bool
+    ) -> some View {
+        let hasCre = report.completedHours > 0 || !store.transcriptEntries.isEmpty
+        let reduceMotion = appearance.accessibility.reduceMotion
 
-            Picker("Curso de graduação", selection: $selectedCourseCode) {
-                ForEach(UfopCurriculumCatalog.allCourses) { c in
-                    Text("\(c.name) · \(c.campus)").tag(c.code)
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                if reduceMotion {
+                    isSummaryExpanded.toggle()
+                } else {
+                    withAnimation(.snappy) {
+                        isSummaryExpanded.toggle()
+                    }
                 }
+            } label: {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(course?.name ?? "Matriz Curricular")
+                            .font(CampusTheme.font(size: 15, weight: .bold))
+                            .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: appearance.accentColor))
+                            .lineLimit(1)
+
+                        Text("\(course?.campus ?? "UFOP") · \(course?.chTotal ?? 0)h totais")
+                            .font(CampusTheme.tabularFont(size: 12, weight: .medium))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                    }
+
+                    Spacer(minLength: 4)
+
+                    if hasCre {
+                        Text(String(format: "CRE %.2f", report.overallCre))
+                            .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                            .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance.accentColor))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(appearance.accentColor.surface2(for: colorScheme)))
+                    }
+
+                    HStack(spacing: 3) {
+                        Text(isSummaryExpanded ? "Ocultar" : "Detalhes")
+                            .font(CampusTheme.font(size: 12, weight: .semibold))
+                        Image(systemName: isSummaryExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance.accentColor))
+                }
+                .contentShape(Rectangle())
             }
-            .pickerStyle(.menu)
-            .tint(accent)
+            .buttonStyle(.plain)
+            .minimumTouchTarget(appearance.accessibility.minTouchHeight)
 
-            if availableVersions.count > 1 {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Versão da matriz curricular")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+            if isSummaryExpanded {
+                Divider()
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(availableVersions, id: \.curriculumVersion) { version in
-                                let isSelected = course?.curriculumVersion == version.curriculumVersion
-                                Button {
-                                    withAnimation(.snappy) {
-                                        selectedCurriculumVersion = version.curriculumVersion
+                if allowCourseSelection {
+                    HStack {
+                        Text("Curso selecionado")
+                            .font(CampusTheme.font(size: 13, weight: .semibold))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                        Spacer()
+                        Text("\(UfopCurriculumCatalog.allCourses.count) cursos no catálogo")
+                            .font(CampusTheme.tabularFont(size: 11, weight: .bold))
+                            .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance.accentColor))
+                    }
+
+                    Picker("Curso de graduação", selection: $selectedCourseCode) {
+                        ForEach(UfopCurriculumCatalog.allCourses) { c in
+                            Text("\(c.name) · \(c.campus)").tag(c.code)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(accent)
+                }
+
+                if availableVersions.count > 1 {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Versão da matriz curricular")
+                            .font(CampusTheme.font(size: 11, weight: .semibold))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(availableVersions, id: \.curriculumVersion) { version in
+                                    let isSelected = course?.curriculumVersion == version.curriculumVersion
+                                    Button {
+                                        withAnimation(.snappy) {
+                                            selectedCurriculumVersion = version.curriculumVersion
+                                        }
+                                    } label: {
+                                        let versionLabel = version.curriculumVersion.isEmpty
+                                            ? "\(version.effectiveFromYear)/\(version.effectiveFromSemester)"
+                                            : version.curriculumVersion
+                                        Text(versionLabel)
+                                            .font(CampusTheme.tabularFont(size: 12, weight: .bold))
+                                            .foregroundStyle(
+                                                isSelected
+                                                    ? appearance.accentColor.onPrimary(for: colorScheme)
+                                                    : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
+                                            )
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 7)
+                                            .liquidGlassCapsule(selected: isSelected, accent: accent, interactive: true, highContrast: highContrast)
                                     }
-                                } label: {
-                                    let versionLabel = version.curriculumVersion.isEmpty
-                                        ? "\(version.effectiveFromYear)/\(version.effectiveFromSemester)"
-                                        : version.curriculumVersion
-                                    Text(versionLabel)
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundStyle(
-                                            isSelected
-                                                ? appearance.accentColor.onPrimary(for: colorScheme)
-                                                : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
-                                        )
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 7)
-                                        .liquidGlassCapsule(selected: isSelected, accent: accent, interactive: true, highContrast: highContrast)
+                                    .buttonStyle(.plain)
+                                    .campusHoverLift()
+                                    .minimumTouchTarget(appearance.accessibility.minTouchHeight)
                                 }
-                                .buttonStyle(.plain)
-                                .campusHoverLift()
-                                .minimumTouchTarget(appearance.accessibility.minTouchHeight)
                             }
                         }
                     }
                 }
-            }
 
-            if let course {
-                let versionText = course.curriculumVersion.isEmpty
-                    ? "\(course.effectiveFromYear)/\(course.effectiveFromSemester)"
-                    : course.curriculumVersion
-                Text("\(course.degree) · \(versionText) · \(course.chTotal)h totais")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                if let course {
+                    let versionText = course.curriculumVersion.isEmpty
+                        ? "\(course.effectiveFromYear)/\(course.effectiveFromSemester)"
+                        : course.curriculumVersion
+                    Text("\(course.degree) · \(versionText) · \(course.chTotal)h totais")
+                        .font(CampusTheme.tabularFont(size: 12, weight: .medium))
+                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                }
+
+                if !allowCourseSelection {
+                    Text("Para consultar outro curso do catálogo UFOP, acesse Perfil → Ajustes.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
+                }
             }
         }
-        .padding(16)
-        .liquidGlassCard(tint: accent, highContrast: highContrast)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: accent, highContrast: highContrast)
     }
 
     private func legacyCompatibilityBanner(
@@ -343,7 +414,7 @@ public struct CurriculumMatrixView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Atenção: Matriz Curricular Legada (< \(course.effectiveFromYear)/\(course.effectiveFromSemester))")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 13, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                 Text("Ingresso detectado (\(status.studentEntryLabel ?? "anterior")) pode seguir PPC anterior ao currículo de referência \(status.matrixVersionLabel). Algumas disciplinas e pré-requisitos podem divergir.")
                     .font(.system(size: 12))
@@ -390,7 +461,7 @@ public struct CurriculumMatrixView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Matrizes anteriores e PPCs oficiais")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 14, weight: .bold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                             Text(
                                 entryRefs.isEmpty
@@ -423,7 +494,7 @@ public struct CurriculumMatrixView: View {
                                 openExternalUrl(matrixUrl)
                             } label: {
                                 Label("Portal oficial UFOP", systemImage: "safari")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.font(size: 12, weight: .bold))
                                     .foregroundStyle(accent)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
@@ -448,12 +519,12 @@ public struct CurriculumMatrixView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
                 Text(ref.versionTitle)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                 Spacer(minLength: 6)
                 if !ref.accessType.isEmpty {
                     Text(ref.accessType)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 10, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -471,7 +542,7 @@ public struct CurriculumMatrixView: View {
                 openExternalUrl(ref.url)
             } label: {
                 Label("Abrir oficial", systemImage: "arrow.up.right.square")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 12, weight: .bold))
                     .foregroundStyle(accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
@@ -492,17 +563,17 @@ public struct CurriculumMatrixView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Rendimento (CRE)")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 16, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     Text("\(report.completedHours)h / \(report.totalRequiredHours)h integralizadas · \(report.totalApproved) aprov.")
-                        .font(.system(size: 12))
+                        .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 }
 
                 Spacer()
 
                 Text(String(format: "%.2f", report.overallCre))
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 26, weight: .bold))
                     .foregroundStyle(accent)
             }
 
@@ -511,7 +582,7 @@ public struct CurriculumMatrixView: View {
                     showTranscriptPicker = true
                 } label: {
                     Label("Importar Histórico (PDF)", systemImage: "doc.text.fill")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(accent)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
@@ -528,7 +599,7 @@ public struct CurriculumMatrixView: View {
                     )
                 } label: {
                     Label("+ Simular nota", systemImage: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme))
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
@@ -585,7 +656,7 @@ public struct CurriculumMatrixView: View {
                         Image(systemName: "info.circle.fill")
                             .foregroundStyle(Color(hex: 0xF59E0B))
                         Text("Resumo 2026/2 · Detalhamento PDF pendente na fonte pública")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 14, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     }
 
@@ -598,7 +669,7 @@ public struct CurriculumMatrixView: View {
                             openExternalUrl(matrixUrl)
                         } label: {
                             Label("Abrir matriz oficial no navegador", systemImage: "safari")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 13, weight: .bold))
                                 .foregroundStyle(appearance.accentColor.onPrimary(for: colorScheme))
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .liquidGlassCapsule(selected: true, accent: accent, interactive: true, highContrast: highContrast)
@@ -612,7 +683,7 @@ public struct CurriculumMatrixView: View {
                             openExternalUrl(driveUrl)
                         } label: {
                             Label("Abrir PDF oficial", systemImage: "doc.text")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 13, weight: .bold))
                                 .foregroundStyle(accent)
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .liquidGlassCapsule(selected: false, accent: accent, highContrast: highContrast)
@@ -641,7 +712,7 @@ public struct CurriculumMatrixView: View {
                     let items = filtered.filter { $0.period == period }
                     VStack(alignment: .leading, spacing: 8) {
                         Text(period == 0 ? "Atividades Complementares / Estágio / TCC" : "\(period)º Período")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 14, weight: .bold))
                             .foregroundStyle(accent)
 
                         ForEach(items) { subject in
@@ -667,7 +738,7 @@ public struct CurriculumMatrixView: View {
                                 Spacer()
 
                                 Text(statusBadge.0)
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                                     .foregroundStyle(statusBadge.1)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)

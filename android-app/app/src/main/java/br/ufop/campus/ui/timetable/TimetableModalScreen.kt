@@ -48,9 +48,12 @@ import br.ufop.campus.core.ffi.IncomingGradePreview
 import br.ufop.campus.core.ffi.UfopGradeCodec
 import br.ufop.campus.core.map.MapMeetingFocusRequest
 import br.ufop.campus.core.storage.GradeExportStorage
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusAdaptiveLayout
 import br.ufop.campus.ui.theme.LocalCampusThemeController
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -475,9 +478,10 @@ private fun TimetableFeedbackBanner(
             .defaultMinSize(minHeight = 48.dp)
             .padding(bottom = 8.dp)
             .clickable(onClick = onDismiss),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+        shape = RoundedCornerShape(CampusCardRadius),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Row(
             modifier = Modifier

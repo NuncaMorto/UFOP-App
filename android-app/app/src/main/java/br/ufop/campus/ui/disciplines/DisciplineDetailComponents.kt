@@ -280,14 +280,11 @@ internal fun ScheduleSlotRowCard(
         } else {
             MaterialTheme.colorScheme.surface
         },
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isEditing) {
-                accentColor.copy(alpha = 0.45f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        border = if (isEditing) {
+            BorderStroke(1.5.dp, accentColor.copy(alpha = 0.65f))
+        } else {
+            br.ufop.campus.ui.theme.campusCardBorder()
+        }
     ) {
         Row(
             modifier = Modifier
@@ -382,9 +379,9 @@ internal fun AbsenceHistoryRowCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {},
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = br.ufop.campus.ui.theme.campusCardBorder()
     ) {
         Row(
             modifier = Modifier
@@ -450,14 +447,11 @@ internal fun AssessmentRowCard(
         } else {
             MaterialTheme.colorScheme.surface
         },
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isCompleted) {
-                StatusAttendingGreen.copy(alpha = 0.35f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        )
+        border = if (isCompleted) {
+            BorderStroke(1.dp, StatusAttendingGreen.copy(alpha = 0.35f))
+        } else {
+            br.ufop.campus.ui.theme.campusCardBorder()
+        }
     ) {
         Row(
             modifier = Modifier

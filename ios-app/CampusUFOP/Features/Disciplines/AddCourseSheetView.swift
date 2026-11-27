@@ -107,7 +107,7 @@ public struct AddCourseSheetView: View {
                     topBar
 
                     Text("Cadastrar disciplina")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 26, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                     if let inlineErrorMessage {
@@ -138,13 +138,13 @@ public struct AddCourseSheetView: View {
 
                     LiquidGlassPrimaryButton(
                         tint: accentColor,
-                        foreground: .white,
+                        foreground: (appearance?.accentColor ?? .red).onPrimary(for: colorScheme),
                         minHeight: appearance?.accessibility.minTouchHeight ?? 48
                     ) {
                         submitCourse()
                     } label: {
                         Text("Salvar disciplina")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                     }
                 }
                 .padding(20)
@@ -155,7 +155,7 @@ public struct AddCourseSheetView: View {
     private var topBar: some View {
         HStack {
             Text("NOVA DISCIPLINA · \(semester)")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                 .tracking(1.4)
                 .foregroundStyle(accentColor)
 
@@ -187,7 +187,7 @@ public struct AddCourseSheetView: View {
                         if !hasCustomColorSelection { selectedColorKey = option.defaultColor }
                     } label: {
                         Text(option.label)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 13, weight: .bold))
                             .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -235,8 +235,8 @@ public struct AddCourseSheetView: View {
                         workloadHours = hours
                     } label: {
                         Text("\(hours)h")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .font(CampusTheme.tabularFont(size: 14, weight: .bold))
+                            .foregroundStyle(isSelected ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .liquidGlassCapsule(selected: isSelected, accent: accentColor, highContrast: hc)
@@ -266,8 +266,8 @@ public struct AddCourseSheetView: View {
                                 inlineErrorMessage = nil
                             } label: {
                                 Text(item.label)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isSelected ? .white : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                    .font(CampusTheme.font(size: 12, weight: .bold))
+                                    .foregroundStyle(isSelected ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 8)
                                     .liquidGlassCapsule(selected: isSelected, accent: accentColor, highContrast: hc)
@@ -285,8 +285,8 @@ public struct AddCourseSheetView: View {
                                     endTime = preset.end
                                 } label: {
                                     Text("\(preset.start)–\(preset.end)")
-                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(isSelected ? .white : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                                        .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
+                                        .foregroundStyle(isSelected ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
                                         .liquidGlassCapsule(selected: isSelected, accent: accentColor, highContrast: hc)

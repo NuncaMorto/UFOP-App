@@ -37,8 +37,8 @@ public struct ProfileView: View {
     // Sheets & Importers
     @State private var isEditProfilePresented: Bool = false
     @State private var isMatrixPresented: Bool = false
+    @State private var matrixAllowsCourseSelection: Bool = false
     @State private var isSharePresented: Bool = false
-    @State private var isReleaseNotesPresented: Bool = false
     @State private var showTranscriptPicker: Bool = false
     @State private var transcriptMessage: String?
     @State private var transcriptError: String?
@@ -161,7 +161,7 @@ public struct ProfileView: View {
             .presentationCornerRadius(30)
         }
         .sheet(isPresented: $isMatrixPresented) {
-            CurriculumMatrixView(store: store) {
+            CurriculumMatrixView(store: store, allowCourseSelection: matrixAllowsCourseSelection) {
                 isMatrixPresented = false
             }
             .presentationCornerRadius(30)
@@ -169,12 +169,6 @@ public struct ProfileView: View {
         .sheet(isPresented: $isSharePresented) {
             ScheduleShareImportSheetView(store: store) {
                 isSharePresented = false
-            }
-            .presentationCornerRadius(30)
-        }
-        .sheet(isPresented: $isReleaseNotesPresented) {
-            ReleaseNotesSheetView {
-                isReleaseNotesPresented = false
             }
             .presentationCornerRadius(30)
         }
@@ -247,12 +241,12 @@ public struct ProfileView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("MEU PERFIL")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 11, weight: .bold))
                 .tracking(1.0)
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
             Text("Perfil Acadêmico")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 30, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
         }
     }
@@ -269,7 +263,7 @@ public struct ProfileView: View {
                             }
                         } label: {
                             Text(tab.rawValue)
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 13, weight: .bold))
                                 .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                                 .padding(.horizontal, 16)
                                 .frame(minHeight: 40)
@@ -303,6 +297,7 @@ public struct ProfileView: View {
                     showTranscriptPicker = true
                 },
                 onOpenMatrix: {
+                    matrixAllowsCourseSelection = false
                     isMatrixPresented = true
                 },
                 onOpenDynamicGrid: {
@@ -352,17 +347,18 @@ public struct ProfileView: View {
                 showBackupImporter: $showBackupImporter,
                 backupFeedback: $backupFeedback,
                 backupError: $backupError,
-                showResetSeedConfirmation: $showResetSeedConfirmation
+                showResetSeedConfirmation: $showResetSeedConfirmation,
+                onOpenMatrix: {
+                    matrixAllowsCourseSelection = true
+                    isMatrixPresented = true
+                }
             )
         case .updates:
             ProfileUpdatesSectionView(
                 primaryAccent: primaryAccent,
                 onPrimaryAccent: onPrimaryAccent,
                 highContrast: hc,
-                minTouch: minTouch,
-                onOpenReleaseNotes: {
-                    isReleaseNotesPresented = true
-                }
+                minTouch: minTouch
             )
         case .faq:
             ProfileFaqSectionView(
@@ -391,7 +387,7 @@ public struct ProfileView: View {
                             .font(.system(size: 14, weight: .bold))
                             .frame(width: 22)
                         Text(tab.rawValue)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 14, weight: .bold))
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .bold))

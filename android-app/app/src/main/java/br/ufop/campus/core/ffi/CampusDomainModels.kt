@@ -295,6 +295,7 @@ data class ExportFolderConfig(
 data class SyllabusImportReport(
     val importedCount: Int,
     val matchedCourse: Boolean,
+    val matchedCourseId: String? = null,
     val matchedCourseCode: String? = null,
     val matchedCourseTitle: String? = null,
     val extractedProfessor: String = "",

@@ -57,7 +57,10 @@ import br.ufop.campus.core.ffi.CampusCoreRepository
 import br.ufop.campus.core.ffi.FriendScheduleInfo
 import br.ufop.campus.core.ffi.UfopGradeCodec
 import br.ufop.campus.core.storage.GradeExportStorage
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.StatusAbsentRed
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleTextColor
 import kotlinx.coroutines.CoroutineScope
@@ -88,11 +91,12 @@ internal fun ShareGradeDialog(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
                 .widthIn(max = 620.dp),
-            shape = RoundedCornerShape(26.dp),
+            shape = RoundedCornerShape(CampusCardRadius),
             color = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            tonalElevation = 0.dp,
+            shadowElevation = campusCardElevation(4.dp),
+            border = campusCardBorder()
         ) {
             Column(
                 modifier = Modifier
@@ -363,11 +367,12 @@ internal fun ImportFriendGradeDialog(
                 .widthIn(max = 620.dp)
                 .heightIn(max = 520.dp)
                 .imePadding(),
-            shape = RoundedCornerShape(26.dp),
+            shape = RoundedCornerShape(CampusCardRadius),
             color = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 6.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            tonalElevation = 0.dp,
+            shadowElevation = campusCardElevation(4.dp),
+            border = campusCardBorder()
         ) {
             Column(
                 modifier = Modifier

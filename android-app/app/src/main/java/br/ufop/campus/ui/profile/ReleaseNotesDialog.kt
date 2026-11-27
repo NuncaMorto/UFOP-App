@@ -63,10 +63,22 @@ data class ReleaseNoteEntry(
 object CampusReleaseNotes {
     val versions: List<ReleaseNoteEntry> = listOf(
         ReleaseNoteEntry(
-            version = "v1.9.19",
-            title = "Redesign Completo de UI/UX, Onest & 9 Escadas Tonais",
+            version = "v1.9.20",
+            title = "Widgets Renovados, Novo Site & Fluxos Inteligentes",
             badge = "ATUAL",
             isLatest = true,
+            items = listOf(
+                "Widgets 4×2 e 2×2 redesenhados para leitura rápida no corredor, com contagem regressiva tabular, sala em destaque, próximo prazo no rodapé, estado \"Dia livre\", toque contextual (Agenda/Atividades) e sincronismo com as 9 paletas e Claro/Escuro.",
+                "Página de download reconstruída em Onest + JetBrains Mono com seletor interativo das 9 paletas sincronizado ao mockup do app e verificação recolhível de SHA-256.",
+                "Mapa 2D com seletor de campus integrado à busca e barra inferior alinhada acima da navegação; Grade Horária e modais de disciplina com superfícies tonais limpas sem bordas cinzas.",
+                "Matriz Curricular com resumo colapsável e troca de curso restrita às Configurações; Nova Avaliação com importação de Plano de Ensino (PDF) no topo detectando a disciplina automaticamente; novo card \"Sobre o Vida Acadêmica & Código Aberto\" no FAQ."
+            )
+        ),
+        ReleaseNoteEntry(
+            version = "v1.9.19",
+            title = "Redesign Completo de UI/UX, Onest & 9 Escadas Tonais",
+            badge = "ANTERIOR",
+            isLatest = false,
             items = listOf(
                 "Tipografia Onest offline (400–800) com numerais tabulares em horários, faltas, cargas horárias, porcentagens e CRE no Android e iOS.",
                 "9 escadas tonais WCAG 2.1 AA (Mata, Vinho padrão, Terracota, Ametista, Ouro Velho, Mineral, Cacau, Rubi e Cobalto) com degraus Canvas -> Surface 1 -> Surface 2.",

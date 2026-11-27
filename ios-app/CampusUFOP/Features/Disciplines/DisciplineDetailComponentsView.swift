@@ -67,7 +67,7 @@ internal struct DisciplineDetailTopBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(summary.code)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                 .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -77,7 +77,7 @@ internal struct DisciplineDetailTopBar: View {
                 )
 
             Text(summary.semester)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -85,7 +85,7 @@ internal struct DisciplineDetailTopBar: View {
 
             if isEadCourse {
                 Text("EAD")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 11, weight: .bold))
                     .foregroundStyle(CampusTheme.mathBlue)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
@@ -124,7 +124,7 @@ internal struct DisciplineDetailHeaderSection: View {
 
         VStack(alignment: .leading, spacing: 6) {
             Text(summary.name)
-                .font(.system(size: 27, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 27, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             if !cleanProfessor.isEmpty {
@@ -134,7 +134,7 @@ internal struct DisciplineDetailHeaderSection: View {
             }
 
             Text("\(summary.workloadHours)h · Limite de \(summary.maxAbsences) faltas (25%)")
-                .font(.system(size: 13, weight: .medium))
+                .font(CampusTheme.tabularFont(size: 13, weight: .medium))
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
         }
     }
@@ -168,12 +168,12 @@ internal struct DisciplineDetailLocationShortcutRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text("Prédio / Sala")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 11, weight: .bold))
                             .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
 
                         if let scheduleLabel, !scheduleLabel.isEmpty {
                             Text("· \(scheduleLabel)")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .font(CampusTheme.tabularFont(size: 11, weight: .semibold))
                                 .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                         }
                     }
@@ -189,7 +189,7 @@ internal struct DisciplineDetailLocationShortcutRow: View {
 
                 HStack(spacing: 4) {
                     Text("Ver no mapa")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 12, weight: .bold))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
                 }
@@ -377,7 +377,7 @@ internal struct DisciplineEadAndSyllabusCard: View {
             Toggle(isOn: $isEadBinding) {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Disciplina a distância (EAD)", systemImage: "laptopcomputer")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 14, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                     Text("Exibe \"A distância (EAD)\" em vez de prédio e sala.")
@@ -393,7 +393,7 @@ internal struct DisciplineEadAndSyllabusCard: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Plano de Ensino (PDF)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 14, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 Text("Importe o PDF do plano de ensino para cadastrar provas, seminários e trabalhos automaticamente. O arquivo é processado em memória e excluído.")
@@ -407,7 +407,7 @@ internal struct DisciplineEadAndSyllabusCard: View {
                         Image(systemName: "doc.text.magnifyingglass")
                             .font(.system(size: 14, weight: .bold))
                         Text("Importar Plano de Ensino (PDF)")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 13, weight: .bold))
                     }
                     .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -447,7 +447,7 @@ internal struct DisciplineAbsenceHistorySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Histórico de faltas e cancelamentos")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 17, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             if history.isEmpty {
@@ -499,7 +499,7 @@ private struct DisciplineAbsenceHistoryRow: View {
             Spacer(minLength: 6)
 
             Text(entry.badgeTitle)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 11, weight: .bold))
                 .foregroundStyle(badgeForeground)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -524,7 +524,7 @@ internal struct DisciplineNotesSection: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Anotações")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 17, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 Spacer()
@@ -560,7 +560,7 @@ internal struct DisciplineDeleteCourseButton: View {
                 Image(systemName: "trash.fill")
                     .font(.system(size: 14, weight: .semibold))
                 Text("Remover disciplina")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 15, weight: .bold))
             }
             .foregroundStyle(Color(hex: 0xDC2626))
             .frame(maxWidth: .infinity, minHeight: max(48, minTouch))

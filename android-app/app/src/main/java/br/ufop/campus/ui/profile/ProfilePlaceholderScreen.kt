@@ -109,7 +109,6 @@ fun ProfilePlaceholderScreen(
     repository: CampusCoreRepository,
     modifier: Modifier = Modifier,
     onOpenDynamicGrid: () -> Unit = {},
-    onOpenReleaseNotes: () -> Unit = {},
     onReplayGuidedTour: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     onAppSecurityChanged: () -> Unit = {},
@@ -166,6 +165,7 @@ fun ProfilePlaceholderScreen(
     var activeDestination by rememberSaveable { mutableStateOf<ProfileDestination?>(null) }
     var activeSettingsSection by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
     var showCurriculumMatrixModal by rememberSaveable { mutableStateOf(false) }
+    var matrixAllowCourseSelection by rememberSaveable { mutableStateOf(false) }
     var showEditProfileSheet by remember { mutableStateOf(false) }
     var showShareScheduleSheet by remember { mutableStateOf(false) }
     var editingTranscriptEntry by remember { mutableStateOf<TranscriptCourseEntry?>(null) }
@@ -775,7 +775,10 @@ fun ProfilePlaceholderScreen(
                     onImportTranscriptPdf = {
                         transcriptPdfPickerLauncher.launch(arrayOf("application/pdf"))
                     },
-                    onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
+                    onOpenCurriculumMatrix = {
+                        matrixAllowCourseSelection = false
+                        showCurriculumMatrixModal = true
+                    },
                     onSelectTranscriptEntry = { entry ->
                         editingTranscriptEntry = entry
                     }
@@ -796,7 +799,10 @@ fun ProfilePlaceholderScreen(
                     accessibilityController = accessibilityController,
                     onAppSecurityChanged = onAppSecurityChanged,
                     onBackupRestored = { avatarRevision += 1 },
-                    onOpenCurriculumMatrix = { showCurriculumMatrixModal = true },
+                    onOpenCurriculumMatrix = {
+                        matrixAllowCourseSelection = true
+                        showCurriculumMatrixModal = true
+                    },
                     onReplayGuidedTour = onReplayGuidedTour,
                     onSelectCampus = { campusId ->
                         repository.setActiveCampus(campusId)
@@ -872,13 +878,18 @@ fun ProfilePlaceholderScreen(
 
             ProfileDestination.UPDATES -> {
                 ProfileUpdatesSubView(
-                    onOpenReleaseNotes = onOpenReleaseNotes,
                     onCheckForUpdates = onCheckForUpdates
                 )
             }
 
             ProfileDestination.FAQ -> {
-                ProfileFaqSubView()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    ProfileFaqSubView()
+                    ProfileAboutOpenSourceCard()
+                }
             }
         }
     }
@@ -1033,6 +1044,7 @@ fun ProfilePlaceholderScreen(
             CurriculumMatrixModal(
                 repository = repository,
                 initialCourseQuery = studentProfile.courseName,
+                allowCourseSelection = matrixAllowCourseSelection,
                 onDismiss = { showCurriculumMatrixModal = false }
             )
         }

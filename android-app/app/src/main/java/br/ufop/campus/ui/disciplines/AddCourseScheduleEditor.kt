@@ -80,9 +80,9 @@ internal fun InitialScheduleSlotSection(
     // Horário semanal inicial (opcional)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(br.ufop.campus.ui.theme.CampusCardRadius),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = br.ufop.campus.ui.theme.campusCardBorder()
     ) {
         Column(
             modifier = Modifier

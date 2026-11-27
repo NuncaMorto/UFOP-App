@@ -41,14 +41,18 @@ import br.ufop.campus.core.uniffi.MapLayer
 import br.ufop.campus.core.uniffi.OccupancyStatus
 import br.ufop.campus.core.uniffi.RenderFeature
 import br.ufop.campus.core.uniffi.RoomOccupancyItem
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.DarkStatusAbsentRed
 import br.ufop.campus.ui.theme.DarkStatusAttendingGreen
 import br.ufop.campus.ui.theme.DarkWeatherBadgeBg
 import br.ufop.campus.ui.theme.DarkWeatherBadgeText
 import br.ufop.campus.ui.theme.LightWeatherBadgeBg
 import br.ufop.campus.ui.theme.LightWeatherBadgeText
+import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 @Composable
 internal fun CampusMapDetailSheet(
@@ -74,10 +78,10 @@ internal fun CampusMapDetailSheet(
             .widthIn(max = 520.dp)
             .fillMaxWidth()
             .heightIn(max = 320.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.96f else 0.98f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -162,9 +166,13 @@ internal fun CampusMapDetailSheet(
                 )
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = statusColor.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.30f))
+                    border = if (LocalCampusAccessibility.current.settings.highContrastMode) {
+                        BorderStroke(1.5.dp, statusColor)
+                    } else {
+                        null
+                    }
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -293,10 +301,10 @@ internal fun FreeRoomsSummaryCard(
         modifier = modifier
             .widthIn(max = 520.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.96f else 0.98f),
-        border = BorderStroke(1.dp, freeAccent.copy(alpha = 0.45f)),
-        shadowElevation = 2.dp
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(2.dp)
     ) {
         Column(
             modifier = Modifier.padding(14.dp),

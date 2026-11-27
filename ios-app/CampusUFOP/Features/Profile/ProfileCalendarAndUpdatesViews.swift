@@ -24,7 +24,7 @@ internal struct ProfileCalendarSectionView: View {
 
         VStack(alignment: .leading, spacing: 12) {
             Text("Calendários Acadêmicos")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 16, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             HStack(spacing: 8) {
@@ -37,7 +37,7 @@ internal struct ProfileCalendarSectionView: View {
                         }
                     } label: {
                         Text(sem)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 13, weight: .bold))
                             .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                             .frame(maxWidth: .infinity, minHeight: 40)
                             .liquidGlassCapsule(selected: isSelected, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -55,7 +55,7 @@ internal struct ProfileCalendarSectionView: View {
                             selectedCategory = cat
                         } label: {
                             Text(cat)
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .font(CampusTheme.font(size: 12, weight: .semibold))
                                 .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                                 .padding(.horizontal, 12)
                                 .frame(minHeight: 34)
@@ -67,7 +67,7 @@ internal struct ProfileCalendarSectionView: View {
             }
 
             Text("\(filtered.count) evento(s) em \(selectedSemester)")
-                .font(.system(size: 12, weight: .medium))
+                .font(CampusTheme.tabularFont(size: 12, weight: .medium))
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: highContrast))
 
             VStack(spacing: 10) {
@@ -75,10 +75,10 @@ internal struct ProfileCalendarSectionView: View {
                     HStack(spacing: 12) {
                         VStack(spacing: 1) {
                             Text(ev.dayNumber)
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .font(CampusTheme.tabularFont(size: 15, weight: .bold))
                                 .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                             Text(ev.monthShort)
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 9, weight: .bold))
                                 .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                         }
                         .frame(width: 44, height: 42)
@@ -86,10 +86,10 @@ internal struct ProfileCalendarSectionView: View {
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(ev.title)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(CampusTheme.font(size: 14, weight: .semibold))
                                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                             Text(ev.category)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 11, weight: .bold))
                                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                         }
                         Spacer(minLength: 0)
@@ -109,7 +109,6 @@ internal struct ProfileUpdatesSectionView: View {
     let onPrimaryAccent: Color
     let highContrast: Bool
     let minTouch: CGFloat
-    let onOpenReleaseNotes: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -136,18 +135,6 @@ internal struct ProfileUpdatesSectionView: View {
                     .padding(.vertical, 5)
                     .background(Capsule(style: .continuous).fill(primaryAccent))
             }
-
-            Button {
-                onOpenReleaseNotes()
-            } label: {
-                Label("Abrir resumo em janela", systemImage: "sparkles")
-                    .font(CampusTheme.font(size: 13, weight: .bold))
-                    .foregroundStyle(onPrimaryAccent)
-                    .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
-                    .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: highContrast)
-            }
-            .buttonStyle(.plain)
-            .minimumTouchTarget(minTouch)
         }
         .padding(16)
         .liquidGlassCard(cornerRadius: 24, tint: nil, highContrast: highContrast)

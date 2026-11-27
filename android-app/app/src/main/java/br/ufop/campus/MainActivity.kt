@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,6 +38,7 @@ import br.ufop.campus.core.security.SecurePdfProcessor
 import br.ufop.campus.core.storage.GradeExportStorage
 import br.ufop.campus.core.update.AppUpdateManager
 import br.ufop.campus.ui.navigation.CampusNavigation
+import br.ufop.campus.ui.navigation.CampusTab
 import br.ufop.campus.ui.security.AppLockOverlay
 import br.ufop.campus.ui.security.PersistenceRecoveryScreen
 import br.ufop.campus.ui.theme.CampusAccentColor
@@ -53,6 +55,8 @@ class MainActivity : ComponentActivity() {
     private var lastBackgroundElapsedMs: Long = 0L
     private var pendingIncomingGrade by mutableStateOf<IncomingGradePreview?>(null)
     private var incomingGradeError by mutableStateOf<String?>(null)
+    private var pendingWidgetTargetTab by mutableStateOf<CampusTab?>(null)
+    private var pendingWidgetNavNonce by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -242,6 +246,9 @@ class MainActivity : ComponentActivity() {
                                 repository = repository,
                                 pendingIncomingGrade = if (isAppLockedState) null else pendingIncomingGrade,
                                 incomingGradeError = if (isAppLockedState) null else incomingGradeError,
+                                pendingTargetTab = if (isAppLockedState) null else pendingWidgetTargetTab,
+                                pendingTargetTabNonce = pendingWidgetNavNonce,
+                                onConsumeTargetTab = { pendingWidgetTargetTab = null },
                                 onConsumeIncomingGrade = { pendingIncomingGrade = null },
                                 onDismissIncomingGradeError = { incomingGradeError = null },
                                 onAppSecurityChanged = {
@@ -323,6 +330,17 @@ class MainActivity : ComponentActivity() {
         if (incomingIntent == null) return
         if ((incomingIntent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
 
+        val widgetTarget = incomingIntent.getStringExtra(EXTRA_WIDGET_TARGET_TAB)
+        if (!widgetTarget.isNullOrBlank()) {
+            incomingIntent.removeExtra(EXTRA_WIDGET_TARGET_TAB)
+            pendingWidgetTargetTab = when (widgetTarget.trim().uppercase()) {
+                WIDGET_TARGET_ACTIVITIES -> CampusTab.ACTIVITIES
+                WIDGET_TARGET_AGENDA -> CampusTab.AGENDA
+                else -> CampusTab.AGENDA
+            }
+            pendingWidgetNavNonce += 1
+        }
+
         when (incomingIntent.action) {
             Intent.ACTION_VIEW -> {
                 val uri = incomingIntent.data ?: return
@@ -399,9 +417,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private companion object {
+    companion object {
         const val STATE_KEY_APP_LOCKED = "state_app_locked"
         const val STATE_KEY_LAST_BG_MS = "state_last_bg_elapsed_ms"
         const val RELOCK_BACKGROUND_THRESHOLD_MS = 10_000L
+        const val EXTRA_WIDGET_TARGET_TAB = "br.ufop.campus.EXTRA_WIDGET_TARGET_TAB"
+        const val WIDGET_TARGET_AGENDA = "AGENDA"
+        const val WIDGET_TARGET_ACTIVITIES = "ACTIVITIES"
     }
 }

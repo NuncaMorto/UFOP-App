@@ -49,6 +49,7 @@ public struct ParsedSyllabusAssessment: Equatable, Sendable {
 
 public struct SyllabusImportReport: Equatable, Sendable {
     public let matchedCourse: Bool
+    public let matchedCourseId: String?
     public let matchedCourseCode: String?
     public let matchedCourseTitle: String?
     public let extractedProfessor: String
@@ -57,6 +58,30 @@ public struct SyllabusImportReport: Equatable, Sendable {
     public let parsedAssessments: [ParsedSyllabusAssessment]
     public let warningMessage: String?
     public let errorMessage: String?
+
+    public init(
+        matchedCourse: Bool,
+        matchedCourseId: String? = nil,
+        matchedCourseCode: String?,
+        matchedCourseTitle: String?,
+        extractedProfessor: String,
+        hasGradeDistribution: Bool,
+        hasAssessmentDates: Bool,
+        parsedAssessments: [ParsedSyllabusAssessment],
+        warningMessage: String?,
+        errorMessage: String?
+    ) {
+        self.matchedCourse = matchedCourse
+        self.matchedCourseId = matchedCourseId
+        self.matchedCourseCode = matchedCourseCode
+        self.matchedCourseTitle = matchedCourseTitle
+        self.extractedProfessor = extractedProfessor
+        self.hasGradeDistribution = hasGradeDistribution
+        self.hasAssessmentDates = hasAssessmentDates
+        self.parsedAssessments = parsedAssessments
+        self.warningMessage = warningMessage
+        self.errorMessage = errorMessage
+    }
 }
 
 // MARK: - Transcript / Histórico Escolar Models

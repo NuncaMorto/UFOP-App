@@ -43,6 +43,7 @@ import br.ufop.campus.core.map.sanitizeMapAttributionText
 import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 @Composable
 fun CampusMapScreen(
@@ -58,7 +59,7 @@ fun CampusMapScreen(
         CampusMapCanvas(
             controller = controller,
             showBuiltInHud = false,
-            topHudInsetDp = 148.dp,
+            topHudInsetDp = 112.dp,
             bottomHudInsetDp = bottomBarClearanceDp + 52.dp,
             startHudInsetDp = startBarClearanceDp,
             modifier = Modifier.fillMaxSize()
@@ -105,17 +106,11 @@ private fun CampusMapTopHud(
             onClearAll = {
                 controller.clearSearchAndFilters()
                 controller.setFreeRoomsMode(false)
-            }
+            },
+            campuses = topState.campuses,
+            activeCampusId = topState.activeCampusId,
+            onSelectCampus = controller::selectCampus
         )
-
-        if (topState.campuses.isNotEmpty()) {
-            CampusSelectorChipsRow(
-                campuses = topState.campuses,
-                activeCampusId = topState.activeCampusId,
-                isDark = isDark,
-                onSelectCampus = controller::selectCampus
-            )
-        }
 
         CampusMapFilterChipsRow(
             isFreeRoomsEnabled = topState.isFreeRoomsModeEnabled,
@@ -172,14 +167,6 @@ private fun CampusMapBottomHud(
             .padding(start = hudStartPadding, end = 12.dp, bottom = bottomBarClearanceDp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (bottomState.availableFloors.isNotEmpty()) {
-            FloorSelectorBar(
-                floors = bottomState.availableFloors,
-                activeFloor = bottomState.activeFloor,
-                onSelectFloor = controller::selectFloor
-            )
-        }
-
         val selected = bottomState.selectedFeature
         when {
             selected != null -> {
@@ -196,9 +183,10 @@ private fun CampusMapBottomHud(
             !bottomState.isNativeAvailable && !bottomState.isLoading -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    shape = RoundedCornerShape(CampusCardRadius),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                    border = campusCardBorder(),
+                    shadowElevation = campusCardElevation(2.dp)
                 ) {
                     Text(
                         text = bottomState.errorMessage ?: "Motor vetorial offline pronto para carga nativa.",
@@ -220,34 +208,52 @@ private fun CampusMapBottomHud(
             }
         }
 
-        if (!bottomState.attribution.isNullOrBlank()) {
-            Surface(
-                onClick = { showCreditsDialog = true },
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .minimumInteractiveComponentSize(),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.88f else 0.92f),
-                border = campusCardBorder()
+        if (bottomState.availableFloors.isNotEmpty() || !bottomState.attribution.isNullOrBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "© OSM · UFOP",
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                if (bottomState.availableFloors.isNotEmpty()) {
+                    FloorSelectorBar(
+                        floors = bottomState.availableFloors,
+                        activeFloor = bottomState.activeFloor,
+                        onSelectFloor = controller::selectFloor,
+                        modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = "Créditos cartográficos",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(12.dp)
-                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                if (!bottomState.attribution.isNullOrBlank()) {
+                    Surface(
+                        onClick = { showCreditsDialog = true },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.90f else 0.94f),
+                        border = campusCardBorder(),
+                        shadowElevation = campusCardElevation(1.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "© OSM · UFOP",
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = "Créditos cartográficos",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -289,10 +295,10 @@ private fun MapResolutionNoticeBanner(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (isDark) 0.95f else 0.97f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 1.dp
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(1.dp)
     ) {
         Row(
             modifier = Modifier

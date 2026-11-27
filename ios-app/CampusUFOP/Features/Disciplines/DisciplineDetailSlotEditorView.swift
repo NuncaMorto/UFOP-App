@@ -27,7 +27,7 @@ internal struct DisciplineWeeklySlotsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 Text("Horários semanais")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 17, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 Spacer()
@@ -42,7 +42,7 @@ internal struct DisciplineWeeklySlotsSection: View {
                         Image(systemName: isAddingSlot ? "xmark" : "plus")
                             .font(.system(size: 11, weight: .bold))
                         Text(isAddingSlot ? "Fechar" : "Adicionar horário")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 12, weight: .bold))
                     }
                     .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                     .padding(.horizontal, 12)
@@ -140,7 +140,7 @@ private struct DisciplineAddSlotCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Novo horário na grade (\(courseName))")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 13, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             if let slotConflictError {
@@ -155,7 +155,7 @@ private struct DisciplineAddSlotCard: View {
                         slotConflictError = nil
                     } label: {
                         Text(option.label)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 11, weight: .bold))
                             .foregroundStyle(isSelected ? .white : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                             .frame(maxWidth: .infinity, minHeight: 36)
                             .liquidGlassCapsule(selected: isSelected, accent: deptColor, interactive: true, highContrast: highContrast)
@@ -174,7 +174,7 @@ private struct DisciplineAddSlotCard: View {
                             slotConflictError = nil
                         } label: {
                             Text("\(preset.start)–\(preset.end)")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .font(CampusTheme.tabularFont(size: 11, weight: .semibold))
                                 .foregroundStyle(isSelected ? .white : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
@@ -205,7 +205,7 @@ private struct DisciplineAddSlotCard: View {
                 onSubmit()
             } label: {
                 Label("Salvar horário na grade", systemImage: "calendar.badge.plus")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
             }
         }
         .padding(14)
@@ -237,7 +237,7 @@ private struct DisciplineScheduleSlotRow: View {
 
         HStack(spacing: 12) {
             Text(slot.dayLabel)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 12, weight: .bold))
                 .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                 .frame(width: 46, height: 38)
                 .background(
@@ -247,7 +247,7 @@ private struct DisciplineScheduleSlotRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(slot.timeRange)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 14, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 Text(locationLabel)

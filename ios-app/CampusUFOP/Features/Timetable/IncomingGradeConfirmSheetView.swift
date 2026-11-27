@@ -72,7 +72,7 @@ internal struct FriendAvatarCircleView: View {
             .frame(width: size, height: size)
             .overlay {
                 Text(initials)
-                    .font(.system(size: max(12, size * 0.36), weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: max(12, size * 0.36), weight: .bold))
                     .foregroundStyle(onAccent)
             }
     }
@@ -113,12 +113,12 @@ public struct IncomingGradeConfirmSheetView: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("GRADE COMPARTILHADA")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 11, weight: .bold))
                             .tracking(0.9)
                             .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                         Text("Confirmar Importação")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 22, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                     }
 
@@ -161,14 +161,14 @@ public struct IncomingGradeConfirmSheetView: View {
                         onConfirm()
                     } label: {
                         Label(confirmButtonTitle, systemImage: "person.badge.plus")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                     }
 
                     Button {
                         onCancel()
                     } label: {
                         Text("Cancelar")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 14, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(maxWidth: .infinity, minHeight: minTouch)
                             .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
@@ -195,7 +195,7 @@ public struct IncomingGradeConfirmSheetView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(preview.friendName)
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 19, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                     .lineLimit(2)
 
@@ -208,7 +208,7 @@ public struct IncomingGradeConfirmSheetView: View {
 
                 HStack(spacing: 8) {
                     Text("Semestre \(preview.semester)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -218,7 +218,7 @@ public struct IncomingGradeConfirmSheetView: View {
                         )
 
                     Text(preview.sourceLabel)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(CampusTheme.font(size: 11, weight: .semibold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
                         .lineLimit(1)
                 }
@@ -261,12 +261,12 @@ public struct IncomingGradeConfirmSheetView: View {
             }
 
             Text(value)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(CampusTheme.tabularFont(size: 26, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .liquidGlassCard(cornerRadius: 18, tint: tint, highContrast: hc)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: tint, highContrast: hc)
     }
 
     private func infoNoticeCard(primary: Color, hc: Bool) -> some View {

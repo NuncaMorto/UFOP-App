@@ -131,10 +131,12 @@ public struct DisciplinesView: View {
         .sheet(isPresented: $isMatrixPresented) {
             CurriculumMatrixView(
                 store: viewModel.store,
+                allowCourseSelection: false,
                 onClose: {
                     isMatrixPresented = false
                 }
             )
+            .presentationCornerRadius(30)
         }
         .sheet(isPresented: $viewModel.isAddCoursePresented) {
             AddCourseSheetView(
@@ -155,6 +157,7 @@ public struct DisciplinesView: View {
                     viewModel.dismissAddCourseSheet()
                 }
             )
+            .presentationCornerRadius(30)
         }
         .onAppear {
             consumePendingTimetableRequest()
@@ -347,7 +350,7 @@ public struct DisciplinesView: View {
                 } label: {
                     HStack(spacing: 5) {
                         Text(viewModel.semesterFilter)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .bold))
                     }
@@ -440,7 +443,7 @@ public struct DisciplinesView: View {
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                 Text("Nenhuma disciplina encontrada")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(CampusTheme.font(size: 16, weight: .semibold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 Text("Ajuste os filtros ou toque em + Disciplina.")
@@ -449,7 +452,7 @@ public struct DisciplinesView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(28)
-            .liquidGlassCard(cornerRadius: 20, highContrast: hc)
+            .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, highContrast: hc)
         } else if isBarsMode {
             LazyVStack(spacing: 12) {
                 ForEach(items) { card in

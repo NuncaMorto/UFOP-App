@@ -103,7 +103,7 @@ internal struct ProfileCampusSelectorCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Campus")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 15, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                 Spacer()
                 WeatherPillBadge(label: summary.activeCampus.weatherBadgeLabel)
@@ -119,7 +119,7 @@ internal struct ProfileCampusSelectorCard: View {
                             }
                         } label: {
                             Text(campus.city)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 12, weight: .bold))
                                 .foregroundStyle(isSelected ? onPrimaryAccent : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 38)
@@ -567,7 +567,7 @@ internal struct ProfileSummarySectionView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Grade Dinâmica")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                         Text(subtitleText)
                             .font(.system(size: 12))
@@ -618,7 +618,7 @@ internal struct ProfileSummarySectionView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Compartilhar ou importar grade (.ufopgrade)")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 14, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     Text("Exporte para JSON/arquivo e envie para colegas da turma.")
                         .font(.system(size: 12))

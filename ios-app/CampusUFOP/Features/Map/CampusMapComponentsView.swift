@@ -149,7 +149,12 @@ internal struct MapFloorSelectorBar: View {
     let highContrast: Bool
     let onSelectFloor: (Int32) -> Void
 
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
     @Environment(\.colorScheme) private var colorScheme
+
+    private var onPrimaryColor: Color {
+        (appearance?.accentColor ?? .red).onPrimary(for: colorScheme)
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -160,11 +165,11 @@ internal struct MapFloorSelectorBar: View {
                         onSelectFloor(item.floor)
                     } label: {
                         Text(item.label)
-                            .font(.system(size: 13, weight: isSelected ? .bold : .medium, design: .rounded))
+                            .font(CampusTheme.font(size: 13, weight: isSelected ? .bold : .medium))
                             .foregroundStyle(
                                 isSelected
-                                    ? accentColor
-                                    : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast)
+                                    ? onPrimaryColor
+                                    : CampusTheme.primaryText(for: colorScheme, highContrast: highContrast, accent: appearance?.accentColor ?? .red)
                             )
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -199,7 +204,7 @@ internal struct MapSelectedFeatureCard: View {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(feature.name)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 15, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     if let floor = feature.floor {
                         Text("Andar: \(floor == 0 ? "Térreo / 1º Pav" : "\(floor + 1)º Pav")")
@@ -244,7 +249,7 @@ internal struct MapSchematicBadge: View {
 
     var body: some View {
         Text("Layout esquemático")
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .font(CampusTheme.font(size: 11, weight: .semibold))
             .foregroundStyle(CampusTheme.weatherBadgeText(for: colorScheme))
             .padding(.horizontal, 8)
             .padding(.vertical, 4)

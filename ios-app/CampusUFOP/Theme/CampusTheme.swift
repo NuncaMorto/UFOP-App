@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 // MARK: - Hex Color Extension
 
@@ -264,19 +267,28 @@ public struct CampusAccessibilitySettings: Equatable, Codable, Sendable {
 
 @Observable
 public final class CampusAppearanceController {
+    public static let appGroupSuiteName = "group.io.github.nuncamorto.vidaacademica"
     private static let keyAppearanceMode = "campus.ufop.appearanceMode"
     private static let keyAccentColor = "campus.ufop.accentColor"
     private static let keyAccessibility = "campus.ufop.accessibilitySettings"
 
+    private static var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: appGroupSuiteName)
+    }
+
     public var appearanceModeRaw: String {
         didSet {
             UserDefaults.standard.set(appearanceModeRaw, forKey: Self.keyAppearanceMode)
+            Self.sharedDefaults?.set(appearanceModeRaw, forKey: Self.keyAppearanceMode)
+            reloadWidgetTimelines()
         }
     }
 
     public var accentColor: CampusAccentColor {
         didSet {
             UserDefaults.standard.set(accentColor.storageKey, forKey: Self.keyAccentColor)
+            Self.sharedDefaults?.set(accentColor.storageKey, forKey: Self.keyAccentColor)
+            reloadWidgetTimelines()
         }
     }
 
@@ -290,14 +302,42 @@ public final class CampusAppearanceController {
 
     public init() {
         let defaults = UserDefaults.standard
-        self.appearanceModeRaw = defaults.string(forKey: Self.keyAppearanceMode) ?? "system"
-        self.accentColor = CampusAccentColor.fromKey(defaults.string(forKey: Self.keyAccentColor))
+        let shared = Self.sharedDefaults
+        let resolvedMode = defaults.string(forKey: Self.keyAppearanceMode) ?? shared?.string(forKey: Self.keyAppearanceMode) ?? "system"
+        let resolvedAccent = CampusAccentColor.fromKey(
+            defaults.string(forKey: Self.keyAccentColor) ?? shared?.string(forKey: Self.keyAccentColor)
+        )
+        self.appearanceModeRaw = resolvedMode
+        self.accentColor = resolvedAccent
+        shared?.set(resolvedMode, forKey: Self.keyAppearanceMode)
+        shared?.set(resolvedAccent.storageKey, forKey: Self.keyAccentColor)
         if let data = defaults.data(forKey: Self.keyAccessibility),
            let decoded = try? JSONDecoder().decode(CampusAccessibilitySettings.self, from: data) {
             self.accessibility = decoded
         } else {
             self.accessibility = CampusAccessibilitySettings()
         }
+    }
+
+    public func reloadWidgetTimelines() {
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+    }
+
+    public static func loadWidgetAppearance() -> (accentColor: CampusAccentColor, resolvedScheme: ColorScheme?) {
+        let shared = sharedDefaults
+        let standard = UserDefaults.standard
+        let accentKey = shared?.string(forKey: keyAccentColor) ?? standard.string(forKey: keyAccentColor)
+        let modeRaw = shared?.string(forKey: keyAppearanceMode) ?? standard.string(forKey: keyAppearanceMode) ?? "system"
+        let scheme: ColorScheme? = {
+            switch modeRaw {
+            case "light": return .light
+            case "dark": return .dark
+            default: return nil
+            }
+        }()
+        return (CampusAccentColor.fromKey(accentKey), scheme)
     }
 
     public var resolvedColorScheme: ColorScheme? {

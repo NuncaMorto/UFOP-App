@@ -130,9 +130,10 @@ internal fun CurriculumNoSearchResultsCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(br.ufop.campus.ui.theme.CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = br.ufop.campus.ui.theme.campusCardBorder(),
+        shadowElevation = br.ufop.campus.ui.theme.campusCardElevation()
     ) {
         Text(
             text = "Nenhum componente encontrado para \"$searchQuery\".",
@@ -161,9 +162,10 @@ internal fun MatrixAccordionGroup(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(br.ufop.campus.ui.theme.CampusCardRadius),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = br.ufop.campus.ui.theme.campusCardBorder(),
+        shadowElevation = br.ufop.campus.ui.theme.campusCardElevation()
     ) {
         Column(
             modifier = Modifier
@@ -291,8 +293,8 @@ internal fun MatrixSubjectRow(
             .defaultMinSize(minHeight = minTouchTarget)
             .semantics(mergeDescendants = true) {},
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = br.ufop.campus.ui.theme.campusCardBorder()
     ) {
         Column(
             modifier = Modifier

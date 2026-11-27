@@ -199,6 +199,12 @@ interface CampusCoreRepository {
     /** Importa Plano de Ensino (texto) com validação de disciplina, docente e critérios/datas. */
     fun importCourseSyllabusDetailedText(courseId: String, rawText: String): SyllabusImportReport
 
+    /** Importa Plano de Ensino (PDF) detectando automaticamente a disciplina matriculada no semestre. */
+    fun importSyllabusPdfAutoDetectCourse(semester: String, pdfBytes: ByteArray): SyllabusImportReport
+
+    /** Importa Plano de Ensino (texto) detectando automaticamente a disciplina matriculada no semestre. */
+    fun importSyllabusTextAutoDetectCourse(semester: String, rawText: String): SyllabusImportReport
+
     /** Eventos do Calendário Acadêmico UFOP para o semestre informado. */
     fun getAcademicCalendarEvents(
         semester: String = getStudentProfile().activeSemester

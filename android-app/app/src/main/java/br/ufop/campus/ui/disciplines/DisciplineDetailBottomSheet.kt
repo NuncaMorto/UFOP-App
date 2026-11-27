@@ -596,9 +596,10 @@ fun DisciplineDetailBottomSheet(
             val totalClasses = ((effectiveSummary.workloadHours * 60) / 50).coerceAtLeast(1)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder(),
+                shadowElevation = campusCardElevation(1.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -1009,9 +1010,9 @@ fun DisciplineDetailBottomSheet(
                 if (resolvedAbsenceHistory.isEmpty()) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        shape = RoundedCornerShape(CampusCardRadius),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = campusCardBorder()
                     ) {
                         Text(
                             text = "Nenhuma falta ou aula cancelada foi registrada nas sessões de aula desta disciplina até o momento. As marcações feitas na Agenda aparecerão aqui.",
@@ -1579,11 +1580,11 @@ fun DisciplineDetailBottomSheet(
     if (asSidePane) {
         Surface(
             modifier = modifier.fillMaxHeight(),
-            shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
+            shape = RoundedCornerShape(topStart = CampusSheetRadius, bottomStart = CampusSheetRadius),
             color = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 2.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            tonalElevation = 0.dp,
+            border = campusCardBorder()
         ) {
             detailBody()
         }

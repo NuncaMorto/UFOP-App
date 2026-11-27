@@ -58,6 +58,7 @@ import br.ufop.campus.core.ffi.StudentProfile
 import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.accessibleTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -136,8 +137,8 @@ internal fun TimetableTopBar(
                 Surface(
                     modifier = Modifier.size(closeVisualSize),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                    border = campusCardBorder()
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(

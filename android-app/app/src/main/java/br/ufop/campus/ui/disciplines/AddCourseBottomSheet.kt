@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.DepartmentColorOption
 import br.ufop.campus.core.ffi.DisciplineSummaryCard
+import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
 import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.accessibleContentColorOn
@@ -121,7 +123,7 @@ fun AddCourseBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier

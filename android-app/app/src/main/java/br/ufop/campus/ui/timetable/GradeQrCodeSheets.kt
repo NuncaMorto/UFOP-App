@@ -85,6 +85,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import br.ufop.campus.core.ffi.UfopGradeCodec
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -171,7 +175,8 @@ internal fun MyGradeQrSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -217,9 +222,10 @@ internal fun MyGradeQrSheet(
                     Surface(
                         modifier = Modifier
                             .size(240.dp),
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(CampusCardRadius),
                         color = Color.White,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        border = campusCardBorder(),
+                        shadowElevation = campusCardElevation(2.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
@@ -229,9 +235,9 @@ internal fun MyGradeQrSheet(
 
                 is QrGenerationState.Ready -> {
                     Surface(
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(CampusCardRadius),
                         color = Color.White,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        border = campusCardBorder(),
                         tonalElevation = 0.dp,
                         shadowElevation = 2.dp
                     ) {
@@ -401,7 +407,8 @@ internal fun GradeQrScannerSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -443,9 +450,9 @@ internal fun GradeQrScannerSheet(
             if (!cameraPermissionGranted) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    shape = RoundedCornerShape(CampusCardRadius),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = campusCardBorder()
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),

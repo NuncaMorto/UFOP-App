@@ -10,6 +10,18 @@ Todas as compilações instaláveis (Android `.apk` e iOS `.ipa` não assinado) 
 
 ---
 
+## v1.9.20 — Widgets Renovados, Novo Site, Mapa Refinado & Fluxos Inteligentes
+
+- **Android (`1.9.20` · Beta), iOS (`1.9.20`) & Site (`docs/`):**
+  - **Widgets de Tela Inicial `4×2` e `2×2` (Android AppWidget + iOS WidgetKit):** novo layout de leitura rápida em corredor com cabeçalho compacto em linha única (`DIA NUM`, contagem de aulas e contagem regressiva tabular), aula atual/próxima em bloco único elevado com pílula de sala em destaque, aula seguinte em linha aberta, rodapé inteligente com o próximo prazo pendente, estado `"Dia livre"`, toque contextual (Agenda / Atividades) e sincronismo automático com as 9 paletas tonais e Modo Claro/Escuro sem bordas de `1px`.
+  - **Página de Download renovada (`docs/`):** tipografia `Onest` + `JetBrains Mono`, alternância ao vivo das 9 paletas e Modo Claro/Escuro conectada ao mockup interativo de 3 abas (`Agenda`, `Disciplinas`, `Mapa`), guia de instalação e verificação recolhível de SHA-256.
+  - **Mapa 2D, Grade Horária & Detalhes de Disciplinas:** barra inferior alinhada com andares e atribuição `© OSM · UFOP` acima da barra flutuante (`82dp`/`82pt`), seletor de campus integrado à barra de busca e padronização tonal (`24dp`/`30dp`, sem bordas cinzas fora do Alto Contraste).
+  - **Matriz Curricular, Planos de Ensino & Perfil:** resumo da Matriz colapsável por padrão com atalho contextual de troca de curso nas Configurações, importação de Plano de Ensino (PDF) no topo de Nova Avaliação com detecção automática da disciplina matriculada, remoção do botão manual de resumo na aba Atualizações e novo card `"Sobre o Vida Acadêmica & Código Aberto"` no FAQ.
+
+<!-- versionCode: 37 -->
+
+---
+
 ## v1.9.19 — Redesign Completo de UI/UX, Tipografia Onest & 9 Escadas Tonais
 
 - **Android (`1.9.19` · Beta), iOS (`1.9.19`) & Mapa 2D (`rust-core`):**

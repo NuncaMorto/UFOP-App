@@ -167,6 +167,7 @@ internal fun extractCodeToken(raw: String): String {
 fun CurriculumMatrixModal(
     repository: CampusCoreRepository,
     initialCourseQuery: String? = null,
+    allowCourseSelection: Boolean = false,
     onDismiss: () -> Unit
 ) {
     BackHandler(onBack = onDismiss)
@@ -445,6 +446,7 @@ fun CurriculumMatrixModal(
                 CurriculumMatrixTopBar(
                     selectedCourse = selectedCourse,
                     catalogCourseCount = catalogCourses.size,
+                    allowCourseSelection = allowCourseSelection,
                     minTouchTarget = minTouchTarget,
                     onDismiss = onDismiss,
                     onOpenCoursePicker = { showCoursePickerDialog = true }
@@ -503,13 +505,17 @@ fun CurriculumMatrixModal(
                             }
                         }
 
-                        // Resumo oficial do curso (com versões embutidas)
+                        // Resumo oficial do curso (recolhido por padrão para priorizar as disciplinas)
                         item(key = "course_header") {
                             CourseWorkloadSummaryCard(
                                 course = selectedCourse,
                                 evaluatedSubjects = evaluatedSubjects,
                                 isConsultationMode = isConsultationMode,
                                 isDark = isDark,
+                                creReport = creReport,
+                                allowCourseSelection = allowCourseSelection,
+                                reduceMotion = a11y.reduceMotion,
+                                minTouchTarget = minTouchTarget,
                                 availableVersions = availableVersions,
                                 selectedCurriculumVersion = selectedCourse.curriculumVersion,
                                 onSelectVersion = { selectedCurriculumVersion = it }
@@ -551,6 +557,7 @@ fun CurriculumMatrixModal(
                                 CurriculumEmptySubjectsNotice(
                                     course = selectedCourse,
                                     catalogCourseCount = catalogCourses.size,
+                                    allowCourseSelection = allowCourseSelection,
                                     officialLinks = officialLinks,
                                     legacyReferences = allCourseLegacyRefs,
                                     isDark = isDark,
@@ -609,7 +616,7 @@ fun CurriculumMatrixModal(
         }
     }
 
-    if (showCoursePickerDialog) {
+    if (allowCourseSelection && showCoursePickerDialog) {
         CourseCatalogSwitcherDialog(
             courses = catalogCourses,
             selectedCourseCode = selectedCourseCode,

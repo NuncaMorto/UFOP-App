@@ -311,6 +311,7 @@ internal fun InMemoryCampusRepository.importCourseSyllabusDetailedTextImpl(
         SyllabusImportReport(
             importedCount = importedCount,
             matchedCourse = true,
+            matchedCourseId = currentCourse.courseId,
             matchedCourseCode = matchResult.detectedCode ?: extractRealUfopCourseCode(currentCourse.code),
             matchedCourseTitle = matchResult.detectedTitle ?: currentCourse.name,
             extractedProfessor = extractedProfessor,
@@ -320,6 +321,90 @@ internal fun InMemoryCampusRepository.importCourseSyllabusDetailedTextImpl(
             errorMessage = null
         )
     }
+}
+
+internal fun InMemoryCampusRepository.importSyllabusPdfAutoDetectCourseImpl(
+    semester: String,
+    pdfBytes: ByteArray
+): SyllabusImportReport {
+    require(pdfBytes.isNotEmpty()) { "Arquivo PDF vazio." }
+    return SecurePdfProcessor.withZeroedPdfBytes(pdfBytes) { safeBytes ->
+        val rawText = extractPdfTextWithPdfBox(safeBytes)
+        importSyllabusTextAutoDetectCourseImpl(semester, rawText)
+    }
+}
+
+internal fun InMemoryCampusRepository.importSyllabusTextAutoDetectCourseImpl(
+    semester: String,
+    rawText: String
+): SyllabusImportReport {
+    val trimmed = rawText.trim()
+    require(trimmed.isNotEmpty()) { "Texto do plano de ensino vazio." }
+
+    val winnerCourse = synchronized(lock) {
+        val targetSemester = semester.trim()
+        val candidates = courses.values
+            .filter { targetSemester.isBlank() || it.semester.equals(targetSemester, ignoreCase = true) }
+            .sortedBy { it.name }
+
+        if (candidates.isEmpty()) {
+            return@synchronized null to SyllabusImportReport(
+                importedCount = 0,
+                matchedCourse = false,
+                errorMessage = "Nenhuma disciplina matriculada neste semestre ($targetSemester) para vincular o plano."
+            )
+        }
+
+        val evals = candidates.map { course ->
+            course to matchSyllabusToCourse(course, trimmed, notesByCourseId)
+        }
+        val matchedPairs = evals.filter { it.second.matched }
+
+        val codeMatchedPairs = matchedPairs.filter { (course, matchRes) ->
+            val candidateCode = extractRealUfopCourseCode(course.code)
+                ?: extractRealUfopCourseCode(course.name.substringBefore(" "))
+                ?: Regex("""^([a-z]{2,4}\d{3,4}[a-z]?)(?:_|$)""", RegexOption.IGNORE_CASE)
+                    .find(course.courseId)?.groupValues?.getOrNull(1)?.let { extractRealUfopCourseCode(it) }
+            val detected = matchRes.detectedCode?.trim()
+            candidateCode != null && detected != null && candidateCode.equals(detected, ignoreCase = true)
+        }
+
+        val resolvedWinner: CourseSeed? = when {
+            codeMatchedPairs.size == 1 -> codeMatchedPairs.first().first
+            matchedPairs.size == 1 -> matchedPairs.first().first
+            matchedPairs.isEmpty() -> {
+                val sample = evals.first().second
+                val detectedInfo = listOfNotNull(
+                    sample.detectedCode,
+                    sample.detectedTitle
+                ).joinToString(" · ").ifBlank { "disciplina não reconhecida" }
+                return@synchronized null to SyllabusImportReport(
+                    importedCount = 0,
+                    matchedCourse = false,
+                    matchedCourseCode = sample.detectedCode,
+                    matchedCourseTitle = sample.detectedTitle,
+                    errorMessage = "Não foi possível vincular este Plano de Ensino ($detectedInfo) a nenhuma disciplina matriculada em $targetSemester. Nenhuma alteração foi feita."
+                )
+            }
+            else -> {
+                return@synchronized null to SyllabusImportReport(
+                    importedCount = 0,
+                    matchedCourse = false,
+                    matchedCourseCode = matchedPairs.first().second.detectedCode,
+                    matchedCourseTitle = matchedPairs.first().second.detectedTitle,
+                    errorMessage = "Mais de uma disciplina matriculada corresponde a este Plano de Ensino. Selecione a disciplina manualmente abaixo ou dentro dos detalhes dela."
+                )
+            }
+        }
+        resolvedWinner to null
+    }
+
+    val earlyFailure = winnerCourse.second
+    val winner = winnerCourse.first ?: return earlyFailure!!
+    return importCourseSyllabusDetailedTextImpl(winner.courseId, trimmed).copy(
+        matchedCourseId = winner.courseId,
+        matchedCourseTitle = winner.name
+    )
 }
 
 private fun InMemoryCampusRepository.importSyllabusAssessmentsLocked(

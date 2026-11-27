@@ -24,7 +24,7 @@ internal struct DisciplineAssessmentsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 Text("Prazos e avaliações")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 17, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
                 Spacer()
@@ -38,7 +38,7 @@ internal struct DisciplineAssessmentsSection: View {
                         Image(systemName: isAddingAssessment ? "xmark" : "plus")
                             .font(.system(size: 11, weight: .bold))
                         Text(isAddingAssessment ? "Fechar" : "Novo prazo")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 12, weight: .bold))
                     }
                     .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                     .padding(.horizontal, 12)
@@ -108,7 +108,7 @@ private struct DisciplineAddAssessmentCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Nova avaliação (\(courseName))")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 13, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             HStack(spacing: 8) {
@@ -118,7 +118,7 @@ private struct DisciplineAddAssessmentCard: View {
                         newAssessmentKind = kind
                     } label: {
                         Text(kind)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(CampusTheme.font(size: 12, weight: .semibold))
                             .foregroundStyle(isSelected ? .white : CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -142,7 +142,7 @@ private struct DisciplineAddAssessmentCard: View {
                 onSubmit()
             } label: {
                 Label("Adicionar em Prazos e Atividades", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
             }
         }
         .padding(14)
@@ -165,11 +165,11 @@ private struct DisciplineAssessmentRow: View {
         HStack(spacing: 14) {
             VStack(spacing: 1) {
                 Text(item.dayNumber)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 16, weight: .bold))
                     .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
 
                 Text(item.monthShort)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 10, weight: .bold))
                     .tracking(0.8)
                     .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
             }
@@ -187,7 +187,7 @@ private struct DisciplineAssessmentRow: View {
 
                 HStack(spacing: 6) {
                     Text(item.kind)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 11, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
 
                     if !item.subtitle.isEmpty {

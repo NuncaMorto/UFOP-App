@@ -435,14 +435,11 @@ internal fun DetailUfopBuildingPickerDialog(
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                             },
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = if (isSelected) {
-                                    accentColor.copy(alpha = 0.55f)
-                                } else {
-                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                                }
-                            )
+                            border = if (isSelected) {
+                                BorderStroke(1.5.dp, accentColor.copy(alpha = 0.55f))
+                            } else {
+                                br.ufop.campus.ui.theme.campusCardBorder()
+                            }
                         ) {
                             Row(
                                 modifier = Modifier

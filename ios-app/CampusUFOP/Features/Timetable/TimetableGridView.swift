@@ -353,12 +353,12 @@ public struct TimetableGridView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("SEMESTRE \(timetable.semester)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                     .tracking(0.9)
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                 Text(activeFriend == nil ? "Grade Horária" : "Grade de \(activeFriend?.friendName ?? "")")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 26, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -560,13 +560,13 @@ public struct TimetableGridView: View {
                         onAccent: resolvedAccent.onPrimary(for: colorScheme)
                     )
                     Text(activeFriend.friendName)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 12, weight: .bold))
                         .lineLimit(1)
                 } else {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 13, weight: .semibold))
                     Text("Minha grade")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 12, weight: .bold))
                 }
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .bold))
@@ -618,14 +618,14 @@ public struct TimetableGridView: View {
             VStack(spacing: cellSpacing) {
                 HStack(spacing: cellSpacing) {
                     Text("HORÁRIO")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 10, weight: .bold))
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                         .frame(width: 72, alignment: .leading)
 
                     ForEach(weekdays, id: \.self) { day in
                         let isToday = day == todayWeekdayShort
                         Text(isToday ? "\(day) •" : day)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 12, weight: .bold))
                             .foregroundStyle(isToday ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(width: verticalColWidth, height: 32)
                             .liquidGlassCapsule(selected: isToday, accent: primary, interactive: false, highContrast: hc)
@@ -635,7 +635,7 @@ public struct TimetableGridView: View {
                 ForEach(timeRanges, id: \.self) { range in
                     HStack(spacing: cellSpacing) {
                         Text(range.replacingOccurrences(of: "–", with: "\n"))
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                             .frame(width: 72, alignment: .leading)
 
@@ -649,7 +649,7 @@ public struct TimetableGridView: View {
             }
             .padding(14)
         }
-        .liquidGlassCard(cornerRadius: 20, tint: primary, highContrast: hc)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: primary, highContrast: hc)
     }
 
     // MARK: - Horizontal Grid (Weekday rows x Time columns)
@@ -666,13 +666,13 @@ public struct TimetableGridView: View {
             VStack(spacing: cellSpacing) {
                 HStack(spacing: cellSpacing) {
                     Text("DIA")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 10, weight: .bold))
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                         .frame(width: 58, alignment: .leading)
 
                     ForEach(timeRanges, id: \.self) { range in
                         Text(range)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(width: horizontalColWidth, height: 32)
                             .liquidGlassCapsule(selected: false, accent: primary, interactive: false, highContrast: hc)
@@ -683,7 +683,7 @@ public struct TimetableGridView: View {
                     let isToday = day == todayWeekdayShort
                     HStack(spacing: cellSpacing) {
                         Text(isToday ? "\(day)\nHOJE" : day)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 11, weight: .bold))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(isToday ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(width: 58, height: 74)
@@ -702,7 +702,7 @@ public struct TimetableGridView: View {
             }
             .padding(14)
         }
-        .liquidGlassCard(cornerRadius: 20, tint: primary, highContrast: hc)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: primary, highContrast: hc)
     }
 
     @ViewBuilder
@@ -723,7 +723,7 @@ public struct TimetableGridView: View {
             } label: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(cell.disciplineShortName)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 12, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -731,7 +731,7 @@ public struct TimetableGridView: View {
                     Spacer(minLength: 0)
 
                     Text(roomSub)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(CampusTheme.font(size: 10, weight: .semibold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                         .lineLimit(1)
                 }
@@ -770,7 +770,7 @@ public struct TimetableGridView: View {
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
             Text(isFriendMode ? "Sem horários nesta grade compartilhada" : "Sem horários cadastrados neste filtro")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 15, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
             Text(
@@ -804,7 +804,7 @@ public struct TimetableGridView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(friend.friendName)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 16, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                     if !cleanCourse.isEmpty {
@@ -815,7 +815,7 @@ public struct TimetableGridView: View {
                     }
 
                     Text("\(friend.semester) · \(friend.courses.count) disciplina(s) · \(friend.slots.count) horário(s)")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(CampusTheme.tabularFont(size: 11, weight: .medium))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 }
 
@@ -827,7 +827,7 @@ public struct TimetableGridView: View {
                     store.selectedFriendScheduleId = nil
                 } label: {
                     Label("Minha grade", systemImage: "person.fill")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(onPrimary)
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
@@ -839,7 +839,7 @@ public struct TimetableGridView: View {
                     pendingRemoveFriend = friend
                 } label: {
                     Label("Remover", systemImage: "trash")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(Color(hex: 0xDC2626))
                         .frame(maxWidth: .infinity, minHeight: 42)
                         .liquidGlassCapsule(selected: false, accent: Color(hex: 0xDC2626), interactive: true, highContrast: hc)
@@ -889,7 +889,7 @@ public struct TimetableGridView: View {
     private func legendSection(entries: [TimetableLegendEntry]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Legenda das disciplinas")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 15, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
             VStack(spacing: 8) {
@@ -1006,7 +1006,7 @@ private struct TimetableCellDetailSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text(detail?.summary.code ?? cell.weekdayShort)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -1026,12 +1026,12 @@ private struct TimetableCellDetailSheet: View {
                 }
 
                 Text(detail?.summary.name ?? cell.disciplineShortName)
-                    .font(.system(size: 23, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 23, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Label("\(cell.weekdayShort) · \(cell.timeRange)", systemImage: "clock.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(CampusTheme.tabularFont(size: 14, weight: .semibold))
 
                     if !isEad, let onOpenLocationInMap {
                         Button {
@@ -1052,7 +1052,7 @@ private struct TimetableCellDetailSheet: View {
 
                                 HStack(spacing: 4) {
                                     Text("Ver no mapa")
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .font(CampusTheme.font(size: 12, weight: .bold))
                                     Image(systemName: "chevron.right")
                                         .font(.system(size: 11, weight: .bold))
                                 }
@@ -1077,7 +1077,7 @@ private struct TimetableCellDetailSheet: View {
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .liquidGlassCard(cornerRadius: 16, tint: deptColor, highContrast: hc)
+                .liquidGlassCard(cornerRadius: 18, tint: deptColor, highContrast: hc)
 
                 Spacer()
 
@@ -1086,14 +1086,14 @@ private struct TimetableCellDetailSheet: View {
                         onQuickCheckIn()
                     } label: {
                         Label("Fazer check-in desta aula", systemImage: "checkmark.circle.fill")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                     }
 
                     Button {
                         onOpenDiscipline()
                     } label: {
                         Text("Abrir detalhes da disciplina")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 14, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .frame(maxWidth: .infinity, minHeight: 46)
                             .liquidGlassCapsule(selected: false, accent: deptColor, interactive: true, highContrast: hc)
@@ -1132,14 +1132,14 @@ private struct FriendTimetableCellDetailSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text(badgeText)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(CampusTheme.tabularFont(size: 12, weight: .bold))
                         .foregroundStyle(CampusTheme.accessibleTextColor(deptColor, scheme: colorScheme))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Capsule().fill(CampusTheme.departmentSoftTint(for: cell.colorKey, scheme: colorScheme)))
 
                     Text("Grade de \(friend.friendName)")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(CampusTheme.font(size: 11, weight: .semibold))
                         .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -1159,12 +1159,12 @@ private struct FriendTimetableCellDetailSheet: View {
                 }
 
                 Text(course?.name ?? cell.disciplineShortName)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 22, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                 VStack(alignment: .leading, spacing: 10) {
                     Label("\(cell.weekdayShort) · \(cell.timeRange)", systemImage: "clock.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(CampusTheme.tabularFont(size: 14, weight: .semibold))
 
                     if !isEad, let onOpenLocationInMap {
                         Button {
@@ -1185,7 +1185,7 @@ private struct FriendTimetableCellDetailSheet: View {
 
                                 HStack(spacing: 4) {
                                     Text("Ver no mapa")
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .font(CampusTheme.font(size: 12, weight: .bold))
                                     Image(systemName: "chevron.right")
                                         .font(.system(size: 11, weight: .bold))
                                 }
@@ -1216,7 +1216,7 @@ private struct FriendTimetableCellDetailSheet: View {
                     onClose()
                 } label: {
                     Text("Fechar")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 14, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .liquidGlassCapsule(selected: false, accent: deptColor, interactive: true, highContrast: hc)

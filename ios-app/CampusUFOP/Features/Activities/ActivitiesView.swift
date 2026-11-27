@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 public struct ActivitiesView: View {
     @Environment(CampusStore.self) private var store
@@ -11,6 +12,8 @@ public struct ActivitiesView: View {
     @State private var selectedDisciplineFilter: String = "Todas as disciplinas"
     @State private var isCompletedExpanded: Bool = false
     @State private var isAddAssessmentSheetPresented: Bool = false
+    @State private var syllabusBannerMessage: String? = nil
+    @State private var syllabusBannerIsWarning: Bool = false
     @State private var activeAssessmentDetail: AcademicActivityItem?
     @State private var assessmentPendingDelete: AcademicActivityItem?
 
@@ -136,6 +139,10 @@ public struct ActivitiesView: View {
 
                         singleRowFilterBar
 
+                        if let syllabusBannerMessage {
+                            syllabusFeedbackBannerView(message: syllabusBannerMessage, isWarning: syllabusBannerIsWarning)
+                        }
+
                         activitiesListSection
                     }
                     .padding(.horizontal, isRegular ? 24 : 18)
@@ -149,7 +156,13 @@ public struct ActivitiesView: View {
             #endif
             .sheet(isPresented: $isAddAssessmentSheetPresented) {
                 AddAssessmentSheetView(
+                    store: store,
                     disciplines: store.disciplines,
+                    onSyllabusImported: { message, isWarning in
+                        syllabusBannerMessage = message
+                        syllabusBannerIsWarning = isWarning
+                        isAddAssessmentSheetPresented = false
+                    },
                     onSave: { courseId, title, kind, dueDate, dueTime in
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                             _ = store.createAssessment(
@@ -166,7 +179,7 @@ public struct ActivitiesView: View {
                         isAddAssessmentSheetPresented = false
                     }
                 )
-                .presentationDetents([.large, .fraction(0.86)])
+                .presentationDetents([.large, .fraction(0.88)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(30)
             }
@@ -215,13 +228,14 @@ public struct ActivitiesView: View {
     private var headerSection: some View {
         let pendingCount = store.pendingAssessmentsCount
         let completedCount = store.completedAssessmentsCount
+        let onPrimary = (appearance?.accentColor ?? .red).onPrimary(for: colorScheme)
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center) {
                 Text("SEMESTRE \(store.selectedSemesterFilter)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                     .tracking(1.5)
-                    .foregroundStyle(accent)
+                    .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance?.accentColor ?? .red))
 
                 Spacer()
 
@@ -232,9 +246,9 @@ public struct ActivitiesView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .bold))
                         Text("Novo prazo")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 12, weight: .bold))
                     }
-                    .foregroundStyle(accent)
+                    .foregroundStyle(onPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .liquidGlassCapsule(selected: true, accent: accent, highContrast: hc)
@@ -245,7 +259,7 @@ public struct ActivitiesView: View {
             }
 
             Text("Atividades")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 28, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                 .accessibilityAddTraits(.isHeader)
 
@@ -300,12 +314,12 @@ public struct ActivitiesView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(typeFilterButtonLabel)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(hasActiveTypeFilter ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .font(CampusTheme.font(size: 12, weight: .semibold))
+                            .foregroundStyle(hasActiveTypeFilter ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .lineLimit(1)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(hasActiveTypeFilter ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .foregroundStyle(hasActiveTypeFilter ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -329,12 +343,12 @@ public struct ActivitiesView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(selectedDisciplineFilter)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(hasActiveCourseFilter ? accent : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                            .font(CampusTheme.font(size: 12, weight: .semibold))
+                            .foregroundStyle(hasActiveCourseFilter ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                             .lineLimit(1)
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(hasActiveCourseFilter ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .foregroundStyle(hasActiveCourseFilter ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -345,6 +359,31 @@ public struct ActivitiesView: View {
                 Spacer(minLength: 0)
             }
         }
+    }
+
+    private func syllabusFeedbackBannerView(message: String, isWarning: Bool) -> some View {
+        let toneColor = isWarning ? Color(hex: 0xD97706) : CampusTheme.algebraGreen
+        return HStack(spacing: 10) {
+            Image(systemName: isWarning ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(toneColor)
+            Text(message)
+                .font(CampusTheme.font(size: 12, weight: .semibold))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button {
+                syllabusBannerMessage = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Fechar aviso de importação")
+        }
+        .padding(14)
+        .liquidGlassCard(cornerRadius: 18, tint: toneColor, highContrast: hc)
     }
 
     // MARK: Activities List
@@ -651,10 +690,10 @@ public struct AssessmentDetailSheetView: View {
                         HStack(spacing: 12) {
                             VStack(spacing: 1) {
                                 Text(current.dueDay)
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.tabularFont(size: 16, weight: .bold))
                                     .foregroundStyle(courseColor)
                                 Text(current.dueMonth)
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .font(CampusTheme.font(size: 10, weight: .bold))
                                     .foregroundStyle(courseColor)
                             }
                             .frame(width: 48, height: 48)
@@ -662,10 +701,10 @@ public struct AssessmentDetailSheetView: View {
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Label("Data: \(formattedDisplayDate(current.dueDate))", systemImage: "calendar")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(CampusTheme.tabularFont(size: 14, weight: .semibold))
                                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                                 Label("Horário: \(current.dueTime)", systemImage: "clock")
-                                    .font(.system(size: 13))
+                                    .font(CampusTheme.tabularFont(size: 13, weight: .regular))
                                     .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                             }
                         }
@@ -674,7 +713,7 @@ public struct AssessmentDetailSheetView: View {
 
                         HStack(alignment: .center, spacing: 8) {
                             Text(current.kind)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(CampusTheme.font(size: 12, weight: .bold))
                                 .foregroundStyle(courseColor)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
@@ -684,9 +723,9 @@ public struct AssessmentDetailSheetView: View {
                                 Image(systemName: current.isCompleted ? "checkmark.circle.fill" : "circle")
                                     .font(.system(size: 12, weight: .semibold))
                                 Text(current.isCompleted ? "Concluída" : "Pendente")
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .font(CampusTheme.font(size: 12, weight: .semibold))
                             }
-                            .foregroundStyle(current.isCompleted ? accent : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .foregroundStyle(current.isCompleted ? (appearance?.accentColor ?? .red).onPrimary(for: colorScheme) : CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .liquidGlassCapsule(selected: current.isCompleted, accent: accent, interactive: false, highContrast: hc)
@@ -798,10 +837,12 @@ public struct AssessmentDetailSheetView: View {
     }
 }
 
-// MARK: - Add Assessment Sheet (Native DatePicker + Liquid Glass)
+// MARK: - Add Assessment Sheet (Auto-Detect Syllabus Top + Manual Section Below)
 
 public struct AddAssessmentSheetView: View {
+    public let store: CampusStore?
     public let disciplines: [DisciplineSummaryCard]
+    public let onSyllabusImported: ((String, Bool) -> Void)?
     public let onSave: (String, String, String, String, String) -> Void
     public let onCancel: () -> Void
 
@@ -812,15 +853,22 @@ public struct AddAssessmentSheetView: View {
     @State private var selectedKind: String = "Trabalho"
     @State private var title: String = ""
     @State private var dueDateTime: Date = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date()) ?? Date()
+    @State private var showSyllabusPicker: Bool = false
+    @State private var syllabusFeedbackMessage: String? = nil
+    @State private var syllabusFeedbackIsError: Bool = false
 
     private let kinds = ["Trabalho", "Seminário", "Prova"]
 
     public init(
+        store: CampusStore? = nil,
         disciplines: [DisciplineSummaryCard],
+        onSyllabusImported: ((String, Bool) -> Void)? = nil,
         onSave: @escaping (String, String, String, String, String) -> Void,
         onCancel: @escaping () -> Void
     ) {
+        self.store = store
         self.disciplines = disciplines
+        self.onSyllabusImported = onSyllabusImported
         self.onSave = onSave
         self.onCancel = onCancel
         self._selectedCourseId = State(initialValue: disciplines.first?.id ?? "calc-ii")
@@ -830,6 +878,8 @@ public struct AddAssessmentSheetView: View {
         let accentObj = appearance?.accentColor ?? .red
         let accent = accentObj.primary(for: colorScheme)
         let hc = appearance?.accessibility.highContrastMode ?? false
+        let minTouch = appearance?.accessibility.minTouchHeight ?? 48
+        let semesterLabel = store?.selectedSemesterFilter ?? "2026.2"
 
         ZStack {
             LiquidGlassBackdrop(accent: accentObj, highContrast: hc)
@@ -837,10 +887,10 @@ public struct AddAssessmentSheetView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack {
-                        Text("NOVA AVALIAÇÃO")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                        Text("NOVO PRAZO · \(semesterLabel)")
+                            .font(CampusTheme.tabularFont(size: 11, weight: .bold))
                             .tracking(1.4)
-                            .foregroundStyle(accent)
+                            .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: accentObj))
                         Spacer()
                         Button(action: onCancel) {
                             Image(systemName: "xmark")
@@ -850,28 +900,99 @@ public struct AddAssessmentSheetView: View {
                                 .liquidGlassCapsule(selected: false, accent: accent, highContrast: hc)
                         }
                         .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Fechar")
                     }
 
-                    Text("Cadastrar prazo acadêmico")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                    Text("Adicionar avaliação")
+                        .font(CampusTheme.font(size: 24, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(disciplines) { disc in
-                                let isSelected = selectedCourseId == disc.id
-                                let dColor = CampusTheme.departmentColor(for: disc.colorKey)
-                                Button {
-                                    selectedCourseId = disc.id
-                                } label: {
-                                    Text(disc.name)
-                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .liquidGlassCapsule(selected: isSelected, accent: dColor, highContrast: hc)
+                    // Topo exclusivo: Importar Plano de Ensino (PDF) com detecção automática
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: accentObj))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Importar Plano de Ensino (PDF)")
+                                    .font(CampusTheme.font(size: 14, weight: .bold))
+                                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                Text("Identifica automaticamente sua disciplina de \(semesterLabel)")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            }
+
+                            Spacer(minLength: 4)
+
+                            Button {
+                                showSyllabusPicker = true
+                            } label: {
+                                Text("Importar PDF")
+                                    .font(CampusTheme.font(size: 12, weight: .bold))
+                                    .foregroundStyle(accentObj.onPrimary(for: colorScheme))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 9)
+                                    .liquidGlassCapsule(selected: true, accent: accent, highContrast: hc)
+                            }
+                            .buttonStyle(.plain)
+                            .minimumTouchTarget(minTouch)
+                            .disabled(store == nil)
+                        }
+
+                        if let syllabusFeedbackMessage {
+                            let tone = syllabusFeedbackIsError ? Color(hex: 0xDC2626) : Color(hex: 0xD97706)
+                            Text(syllabusFeedbackMessage)
+                                .font(CampusTheme.font(size: 12, weight: .semibold))
+                                .foregroundStyle(tone)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(tone.opacity(0.12)))
+                        }
+                    }
+                    .padding(14)
+                    .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: accent, highContrast: hc, useSurface2: true)
+
+                    // Separador antes do cadastro manual
+                    HStack(spacing: 10) {
+                        Rectangle()
+                            .fill(CampusTheme.mutedText(for: colorScheme, highContrast: hc).opacity(0.25))
+                            .frame(height: 1)
+                        Text("ou cadastre manualmente")
+                            .font(CampusTheme.font(size: 11, weight: .semibold))
+                            .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
+                            .fixedSize()
+                        Rectangle()
+                            .fill(CampusTheme.mutedText(for: colorScheme, highContrast: hc).opacity(0.25))
+                            .frame(height: 1)
+                    }
+
+                    // Seletor de disciplina movido para a seção manual
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Disciplina")
+                            .font(CampusTheme.font(size: 13, weight: .semibold))
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(disciplines) { disc in
+                                    let isSelected = selectedCourseId == disc.id
+                                    let dColor = CampusTheme.departmentColor(for: disc.colorKey)
+                                    Button {
+                                        selectedCourseId = disc.id
+                                    } label: {
+                                        Text(disc.name)
+                                            .font(CampusTheme.font(size: 12, weight: .semibold))
+                                            .foregroundStyle(isSelected ? .white : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 8)
+                                            .liquidGlassCapsule(selected: isSelected, accent: dColor, highContrast: hc)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .minimumTouchTarget(minTouch)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -884,7 +1005,7 @@ public struct AddAssessmentSheetView: View {
                     TextField("Título (ex.: Prova 1, Trabalho Prático)", text: $title)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
-                        .liquidGlassCard(cornerRadius: 12, highContrast: hc)
+                        .liquidGlassCard(cornerRadius: 14, highContrast: hc)
 
                     DatePicker("Data e hora de entrega", selection: $dueDateTime)
                         .tint(accent)
@@ -894,7 +1015,7 @@ public struct AddAssessmentSheetView: View {
                     LiquidGlassPrimaryButton(
                         tint: accent,
                         foreground: accentObj.onPrimary(for: colorScheme),
-                        minHeight: appearance?.accessibility.minTouchHeight ?? 48
+                        minHeight: minTouch
                     ) {
                         let df = DateFormatter()
                         df.locale = Locale(identifier: "en_US_POSIX")
@@ -908,10 +1029,57 @@ public struct AddAssessmentSheetView: View {
                         onSave(selectedCourseId, finalTitle, selectedKind, df.string(from: dueDateTime), tf.string(from: dueDateTime))
                     } label: {
                         Text("Salvar avaliação")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 15, weight: .bold))
                     }
                 }
                 .padding(20)
+            }
+        }
+        .fileImporter(
+            isPresented: $showSyllabusPicker,
+            allowedContentTypes: [.pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            guard let store else { return }
+            syllabusFeedbackMessage = nil
+            syllabusFeedbackIsError = false
+            do {
+                guard let url = try result.get().first else { return }
+                let text = try SecurePdfProcessor.extractTextAndDeleteTemp(from: url)
+                let (report, importedCount) = store.importSyllabusAutoDetectCourse(text: text, semester: store.selectedSemesterFilter)
+                if !report.matchedCourse {
+                    syllabusFeedbackIsError = true
+                    syllabusFeedbackMessage = report.errorMessage
+                        ?? "Não foi possível vincular este Plano de Ensino a nenhuma disciplina matriculada."
+                } else {
+                    if let cid = report.matchedCourseId {
+                        selectedCourseId = cid
+                    }
+                    let courseName = report.matchedCourseTitle ?? "disciplina identificada"
+                    var bannerParts: [String] = []
+                    if importedCount > 0 {
+                        bannerParts.append("\(importedCount) avaliação(ões) importada(s) do Plano de Ensino de \(courseName).")
+                    } else {
+                        bannerParts.append("Plano de Ensino de \(courseName) analisado (nenhuma nova data pendente).")
+                    }
+                    if !report.extractedProfessor.isEmpty {
+                        bannerParts.append("Docente: \(report.extractedProfessor).")
+                    }
+                    if let warn = report.warningMessage, !warn.isEmpty {
+                        bannerParts.append(warn)
+                    }
+                    let msg = bannerParts.joined(separator: " ")
+                    let hasWarning = report.warningMessage != nil || !report.hasGradeDistribution || !report.hasAssessmentDates
+                    if importedCount > 0, let onSyllabusImported {
+                        onSyllabusImported(msg, hasWarning)
+                    } else {
+                        syllabusFeedbackIsError = false
+                        syllabusFeedbackMessage = msg
+                    }
+                }
+            } catch {
+                syllabusFeedbackIsError = true
+                syllabusFeedbackMessage = error.localizedDescription
             }
         }
     }

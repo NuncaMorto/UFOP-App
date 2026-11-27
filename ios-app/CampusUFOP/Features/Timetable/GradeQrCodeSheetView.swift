@@ -108,12 +108,12 @@ public struct GradeQrCodeSheetView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("QR CODE DA GRADE")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 11, weight: .bold))
                     .tracking(0.9)
                     .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                 Text(mode == .myQr ? "Compartilhar Offline" : "Escanear Colega")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 22, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
             }
 
@@ -170,21 +170,21 @@ public struct GradeQrCodeSheetView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: hc), lineWidth: 1)
+                            .strokeBorder(hc ? CampusTheme.cardBorder(for: colorScheme, highContrast: true) : .clear, lineWidth: hc ? 1.5 : 0)
                     )
                     .shadow(color: CampusTheme.cardShadow(for: colorScheme), radius: 12, x: 0, y: 6)
 
                     VStack(spacing: 6) {
                         Text(studentDisplayName)
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 18, weight: .bold))
                             .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                         Text("Semestre \(semesterLabel)")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(CampusTheme.tabularFont(size: 13, weight: .semibold))
                             .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
 
                         Text("100% offline · Android ↔ iOS")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 11, weight: .bold))
                             .foregroundStyle(CampusTheme.accessibleTextColor(primary, scheme: colorScheme))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 5)
@@ -202,7 +202,7 @@ public struct GradeQrCodeSheetView: View {
                             copiedFeedback ? "Código QR copiado!" : "Copiar código QR",
                             systemImage: copiedFeedback ? "checkmark.circle.fill" : "doc.on.doc"
                         )
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 14, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                         .frame(maxWidth: .infinity, minHeight: minTouch)
                         .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
@@ -267,7 +267,7 @@ public struct GradeQrCodeSheetView: View {
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                     Text("Permissão de câmera necessária")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 16, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                     Text("Autorize o acesso à câmera nos Ajustes para ler o QR Code da grade de seus colegas.")
@@ -281,7 +281,7 @@ public struct GradeQrCodeSheetView: View {
                         }
                     } label: {
                         Label("Abrir Ajustes", systemImage: "gear")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(CampusTheme.font(size: 14, weight: .bold))
                             .foregroundStyle(appearance?.accentColor.onPrimary(for: colorScheme) ?? .white)
                             .frame(maxWidth: .infinity, minHeight: minTouch)
                             .liquidGlassCapsule(selected: true, accent: primary, interactive: true, highContrast: hc)
@@ -308,7 +308,7 @@ public struct GradeQrCodeSheetView: View {
                         .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
                     Text("Câmera indisponível neste aparelho")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 16, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
                     Text("Você ainda pode colar um código UFOPG1: copiado da área de transferência abaixo.")
@@ -334,7 +334,7 @@ public struct GradeQrCodeSheetView: View {
                 pasteClipboardCode()
             } label: {
                 Label("Colar código UFOPG1: copiado", systemImage: "doc.on.clipboard")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                     .frame(maxWidth: .infinity, minHeight: minTouch)
                     .liquidGlassCapsule(selected: false, accent: primary, interactive: true, highContrast: hc)
@@ -350,7 +350,7 @@ public struct GradeQrCodeSheetView: View {
                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
 
             Text(title)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 16, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
 
             Text(message)

@@ -13,12 +13,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,7 +41,6 @@ import br.ufop.campus.ui.theme.campusCardElevation
 
 @Composable
 internal fun ProfileUpdatesSubView(
-    onOpenReleaseNotes: () -> Unit,
     onCheckForUpdates: () -> Unit
 ) {
     val isDark = LocalCampusThemeController.current.isDark
@@ -149,26 +146,6 @@ internal fun ProfileUpdatesSubView(
                         text = actionLabel,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onOpenReleaseNotes,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(CampusPillRadius)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Ver resumo em janela modal",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }

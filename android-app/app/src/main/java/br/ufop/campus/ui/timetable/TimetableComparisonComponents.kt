@@ -388,9 +388,9 @@ internal fun FriendScheduleFooterCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+        border = br.ufop.campus.ui.theme.campusCardBorder()
     ) {
         Row(
             modifier = Modifier

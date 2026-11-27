@@ -21,6 +21,7 @@ internal struct ProfileSettingsSectionView: View {
     @Binding var backupFeedback: String?
     @Binding var backupError: String?
     @Binding var showResetSeedConfirmation: Bool
+    let onOpenMatrix: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -29,6 +30,7 @@ internal struct ProfileSettingsSectionView: View {
         securityAndLockCard
         encryptedBackupCard
         AccessibilityControlsSection(appearance: appearance)
+        curriculumCatalogSettingsCard
         guidedTourSettingsCard
         maintenanceCard
     }
@@ -78,7 +80,7 @@ internal struct ProfileSettingsSectionView: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
                 Text("Segurança & Privacidade")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 16, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
             }
 
@@ -88,7 +90,7 @@ internal struct ProfileSettingsSectionView: View {
 
             if lockManager.isLockEnabled {
                 Label("Bloqueio do aplicativo ativado", systemImage: "checkmark.seal.fill")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
                     .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
 
                 if lockManager.biometricAvailable {
@@ -148,11 +150,11 @@ internal struct ProfileSettingsSectionView: View {
     private var encryptedBackupCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Backup Portátil (.ufopbackup)")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 16, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             Text("Exporte ou restaure disciplinas, horários, faltas, notas e avaliações usando criptografia PBKDF2 + AES-GCM.")
-                .font(.system(size: 12))
+                .font(CampusTheme.font(size: 12))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
 
             SecureField("Senha do backup", text: $backupPassword)
@@ -170,9 +172,9 @@ internal struct ProfileSettingsSectionView: View {
                     }
                 } label: {
                     Label("Exportar", systemImage: "square.and.arrow.up")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(onPrimaryAccent)
-                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
                         .liquidGlassCapsule(selected: true, accent: primaryAccent, interactive: true, highContrast: highContrast)
                 }
                 .buttonStyle(.plain)
@@ -182,9 +184,9 @@ internal struct ProfileSettingsSectionView: View {
                     showBackupImporter = true
                 } label: {
                     Label("Restaurar", systemImage: "arrow.down.doc")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 13, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
-                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
                         .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
                 }
                 .buttonStyle(.plain)
@@ -205,10 +207,36 @@ internal struct ProfileSettingsSectionView: View {
         .liquidGlassCard(cornerRadius: 20, tint: primaryAccent, highContrast: highContrast)
     }
 
+    private var curriculumCatalogSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Matriz Curricular & Catálogo UFOP")
+                .font(CampusTheme.font(size: 16, weight: .bold))
+                .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+
+            Text("Consulte os \(UfopCurriculumCatalog.allCourses.count) cursos da UFOP ou altere a matriz de referência exibida.")
+                .font(.system(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+
+            Button {
+                onOpenMatrix()
+            } label: {
+                Label("Abrir catálogo de cursos", systemImage: "books.vertical.fill")
+                    .font(CampusTheme.font(size: 13, weight: .bold))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+                    .frame(maxWidth: .infinity, minHeight: max(48, minTouch))
+                    .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: CampusTheme.cardCornerRadius, tint: primaryAccent, highContrast: highContrast)
+    }
+
     private var guidedTourSettingsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Guia Interativo")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 16, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             Text("Reveja a apresentação inicial com as principais ferramentas do Vida Acadêmica.")
@@ -219,7 +247,7 @@ internal struct ProfileSettingsSectionView: View {
                 store.guidedTourCompleted = false
             } label: {
                 Label("Refazer Tour Guiado do App", systemImage: "map.fill")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(CampusTheme.font(size: 13, weight: .bold))
                     .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                     .frame(maxWidth: .infinity, minHeight: max(44, minTouch))
                     .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -236,7 +264,7 @@ internal struct ProfileSettingsSectionView: View {
             showResetSeedConfirmation = true
         } label: {
             Label("Restaurar grade de demonstração 2026.2", systemImage: "arrow.counterclockwise")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 13, weight: .bold))
                 .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
@@ -294,11 +322,11 @@ internal struct ProfileFaqSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("AVISO DE INDEPENDÊNCIA")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 11, weight: .bold))
                 .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
 
             Text("Projeto estudantil sem vínculo institucional")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 15, weight: .bold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
 
             Text("Este é um aplicativo independente, desenvolvido por estudantes e sem qualquer vínculo oficial, endosso ou afiliação com a Universidade Federal de Ouro Preto (UFOP).")
@@ -327,26 +355,82 @@ internal struct ProfileFaqSectionView: View {
                         .padding(.top, 6)
                 } label: {
                     Text(entry.question)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(CampusTheme.font(size: 14, weight: .bold))
                         .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
                         .multilineTextAlignment(.leading)
                 }
                 .tint(primaryAccent)
                 .padding(14)
-                .liquidGlassCard(cornerRadius: 16, highContrast: highContrast)
+                .liquidGlassCard(cornerRadius: 20, highContrast: highContrast)
             }
         }
+
+        ProfileAboutOpenSourceCard(
+            primaryAccent: primaryAccent,
+            highContrast: highContrast,
+            minTouch: minTouch
+        )
 
         Button(role: .destructive) {
             onRequestSignOut()
         } label: {
             Label("Sair da conta e apagar dados locais", systemImage: "rectangle.portrait.and.arrow.right")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(CampusTheme.font(size: 14, weight: .bold))
                 .foregroundStyle(Color(hex: 0xDC2626))
                 .frame(maxWidth: .infinity, minHeight: max(48, minTouch))
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0xDC2626).opacity(colorScheme == .dark ? 0.18 : 0.10)))
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(hex: 0xDC2626).opacity(0.32), lineWidth: 1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(
+                            Color(hex: 0xDC2626).opacity(highContrast ? 0.65 : 0),
+                            lineWidth: highContrast ? 1.5 : 0
+                        )
+                )
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct ProfileAboutOpenSourceCard: View {
+    let primaryAccent: Color
+    let highContrast: Bool
+    let minTouch: CGFloat
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+
+                Text("Sobre o Vida Acadêmica & Código Aberto")
+                    .font(CampusTheme.font(size: 15, weight: .bold))
+                    .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: highContrast))
+            }
+
+            Text("Aplicativo open source desenvolvido para estudantes da UFOP, com foco em privacidade local, rapidez offline e acessibilidade.")
+                .font(CampusTheme.font(size: 12))
+                .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: highContrast))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                if let url = URL(string: "https://github.com/NuncaMorto/Vida-Academica") {
+                    openURL(url)
+                }
+            } label: {
+                Label("Acessar repositório no GitHub", systemImage: "arrow.up.right.square")
+                    .font(CampusTheme.font(size: 13, weight: .bold))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                    .frame(maxWidth: .infinity, minHeight: max(48, minTouch))
+                    .liquidGlassCapsule(selected: false, accent: primaryAccent, interactive: true, highContrast: highContrast)
+            }
+            .buttonStyle(.plain)
+            .minimumTouchTarget(minTouch)
+        }
+        .padding(16)
+        .liquidGlassCard(cornerRadius: 24, tint: primaryAccent, highContrast: highContrast)
     }
 }

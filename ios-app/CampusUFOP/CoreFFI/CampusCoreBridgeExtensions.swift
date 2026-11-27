@@ -570,6 +570,26 @@ public extension CampusStore {
     }
 
     @discardableResult
+    func importSyllabusAutoDetectCourse(text: String, semester: String? = nil) -> (report: SyllabusImportReport, importedCount: Int) {
+        let targetSem = (semester?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            ? semester!.trimmingCharacters(in: .whitespacesAndNewlines)
+            : selectedSemesterFilter
+        let candidates = disciplines.filter {
+            targetSem.isEmpty || $0.semester.caseInsensitiveCompare(targetSem) == .orderedSame
+        }
+        let report = UfopPdfParsers.parseSyllabusAutoDetect(
+            text: text,
+            courses: candidates,
+            semester: targetSem
+        )
+        guard report.matchedCourse, let courseId = report.matchedCourseId else {
+            return (report, 0)
+        }
+        let added = applySyllabusImport(report, forCourseId: courseId)
+        return (report, added)
+    }
+
+    @discardableResult
     func applySyllabusImport(_ report: SyllabusImportReport, forCourseId courseId: String) -> Int {
         guard report.matchedCourse else { return 0 }
         if !report.extractedProfessor.isEmpty,

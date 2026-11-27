@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Vida Acadêmica</string>
     <string name="widget_name">Vida Acadêmica</string>
-    <string name="widget_empty_message">Nenhuma aula ou compromisso hoje</string>
+    <string name="widget_compact_name">Vida Acadêmica (Compacto 2×2)</string>
+    <string name="widget_empty_message">Sem aulas hoje</string>
     <string name="widget_refresh">Atualizar</string>
 </resources>

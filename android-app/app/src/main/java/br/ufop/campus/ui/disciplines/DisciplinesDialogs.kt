@@ -260,6 +260,7 @@ private fun CurriculumMatrixDialog(
     ) {
         CurriculumMatrixModal(
             repository = repository,
+            allowCourseSelection = false,
             onDismiss = onDismiss
         )
     }

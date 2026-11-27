@@ -20,7 +20,7 @@ public struct CampusMapScreenView: View {
     private var hc: Bool { appearance?.accessibility.highContrastMode ?? false }
     private var minTouch: CGFloat { appearance?.accessibility.minTouchHeight ?? 48 }
     private var accentColor: Color { (appearance?.accentColor ?? .red).primary(for: colorScheme) }
-    private var bottomBarInset: CGFloat { isRegular ? 16 : 88 }
+    private var bottomBarInset: CGFloat { isRegular ? 16 : 82 }
     private var leadingBarInset: CGFloat { isRegular ? 96 : 12 }
 
     private var activeFloorDisplayLabel: String {
@@ -36,8 +36,8 @@ public struct CampusMapScreenView: View {
             CampusMapCanvasView(
                 bridge: bridge,
                 showBuiltInHud: false,
-                topHudInsetPt: 148,
-                bottomHudInsetPt: bottomBarInset + 48,
+                topHudInsetPt: 112,
+                bottomHudInsetPt: bottomBarInset + 52,
                 leadingHudInsetPt: isRegular ? leadingBarInset : 0
             )
             .ignoresSafeArea()
@@ -92,7 +92,7 @@ public struct CampusMapScreenView: View {
                 .foregroundStyle(accentColor)
 
             Text(text)
-                .font(.system(size: 12, weight: .semibold))
+                .font(CampusTheme.font(size: 12, weight: .semibold))
                 .foregroundStyle(CampusTheme.primaryText(for: colorScheme, highContrast: hc))
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -119,19 +119,9 @@ public struct CampusMapScreenView: View {
 
     private var bottomHud: some View {
         let floorItems = bridge.availableFloorsForUi()
+        let hasAttribution = !(bridge.renderBatch?.attribution ?? "").isEmpty
 
         return VStack(alignment: .leading, spacing: 8) {
-            if !floorItems.isEmpty {
-                MapFloorSelectorBar(
-                    floors: floorItems,
-                    activeFloor: bridge.activeFloor,
-                    accentColor: accentColor,
-                    minTouch: minTouch,
-                    highContrast: hc,
-                    onSelectFloor: { bridge.selectFloor($0) }
-                )
-            }
-
             if let selected = bridge.selectedFeature {
                 CampusMapDetailSheetView(
                     feature: selected,
@@ -163,29 +153,43 @@ public struct CampusMapScreenView: View {
                 )
             }
 
-            if let attribution = bridge.renderBatch?.attribution, !attribution.isEmpty {
-                HStack {
-                    Spacer()
-                    Button {
-                        isCreditsAlertPresented = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("© OSM · UFOP")
-                                .font(CampusTheme.font(size: 10, weight: .semibold))
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(CampusTheme.cardBackground(for: colorScheme, highContrast: hc).opacity(0.88))
+            if !floorItems.isEmpty || hasAttribution {
+                HStack(alignment: .center, spacing: 8) {
+                    if !floorItems.isEmpty {
+                        MapFloorSelectorBar(
+                            floors: floorItems,
+                            activeFloor: bridge.activeFloor,
+                            accentColor: accentColor,
+                            minTouch: minTouch,
+                            highContrast: hc,
+                            onSelectFloor: { bridge.selectFloor($0) }
                         )
+                    } else {
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
-                    .minimumTouchTarget(minTouch)
-                    .accessibilityLabel("Créditos cartográficos")
+
+                    if hasAttribution {
+                        Button {
+                            isCreditsAlertPresented = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("© OSM · UFOP")
+                                    .font(CampusTheme.font(size: 10, weight: .semibold))
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .foregroundStyle(CampusTheme.secondaryText(for: colorScheme, highContrast: hc))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(CampusTheme.cardBackground(for: colorScheme, highContrast: hc, accent: appearance?.accentColor ?? .red).opacity(0.92))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .minimumTouchTarget(minTouch)
+                        .accessibilityLabel("Créditos cartográficos")
+                    }
                 }
             }
         }

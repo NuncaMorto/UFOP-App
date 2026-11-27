@@ -28,6 +28,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.LocalLibrary
@@ -35,6 +37,8 @@ import androidx.compose.material.icons.outlined.MeetingRoom
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Wc
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +48,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,7 +71,10 @@ import br.ufop.campus.core.uniffi.CampusMapSummary
 import br.ufop.campus.core.uniffi.FloorLabel
 import br.ufop.campus.core.uniffi.PoiType
 import br.ufop.campus.core.uniffi.SearchResult
+import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.LocalCampusAccessibility
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
 
 private data class MapPoiFilterChipSpec(
     val poiType: PoiType,
@@ -88,35 +97,43 @@ internal fun CampusMapSearchBar(
     isDark: Boolean,
     onQueryChange: (String) -> Unit,
     onClearAll: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    campuses: List<CampusMapSummary> = emptyList(),
+    activeCampusId: String = "",
+    onSelectCampus: (String) -> Unit = {}
 ) {
     val focusManager = LocalFocusManager.current
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val a11y = LocalCampusAccessibility.current.settings
     val barHeight = if (a11y.largeTouchTargets) 54.dp else 48.dp
+    var campusMenuExpanded by remember { mutableStateOf(false) }
+    val activeCampus = campuses.firstOrNull { it.campusId == activeCampusId } ?: campuses.firstOrNull()
+    val activeCampusShortLabel = when (activeCampus?.campusId) {
+        "OP_MC" -> "Morro"
+        "JM_ICEA" -> "ICEA"
+        "MA_ICHS" -> "ICHS"
+        "MA_ICSA" -> "ICSA"
+        else -> activeCampus?.name ?: "Campus"
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = barHeight),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.95f else 0.97f),
-        border = BorderStroke(
-            width = if (isFocused) 1.5.dp else 1.dp,
-            color = if (isFocused) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
-        ),
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.95f else 0.98f),
+        border = when {
+            isFocused -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+            else -> campusCardBorder()
+        },
+        shadowElevation = campusCardElevation(2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = barHeight)
-                .padding(start = 14.dp, end = if (query.isNotEmpty() || hasActiveFilters) 4.dp else 14.dp),
+                .padding(start = 14.dp, end = if (campuses.isNotEmpty()) 6.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -125,14 +142,14 @@ internal fun CampusMapSearchBar(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart
             ) {
                 if (query.isEmpty()) {
                     Text(
-                        text = "Buscar prédio, sala ou ponto no campus...",
+                        text = "Buscar local ou sala...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -169,6 +186,68 @@ internal fun CampusMapSearchBar(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
+                }
+            }
+            if (campuses.isNotEmpty()) {
+                Box {
+                    Surface(
+                        onClick = { campusMenuExpanded = true },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = campusCardBorder()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = activeCampusShortLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = "Alternar campus",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = campusMenuExpanded,
+                        onDismissRequest = { campusMenuExpanded = false }
+                    ) {
+                        campuses.forEach { campus ->
+                            val isSelected = campus.campusId == activeCampusId
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = campusDisplayLabel(campus),
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                trailingIcon = if (isSelected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else null,
+                                onClick = {
+                                    campusMenuExpanded = false
+                                    onSelectCampus(campus.campusId)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -252,10 +331,10 @@ internal fun CampusMapSearchResultsCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(CampusCardRadius),
         color = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.96f else 0.98f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 3.dp
+        border = campusCardBorder(),
+        shadowElevation = campusCardElevation(2.dp)
     ) {
         if (results.isEmpty()) {
             Text(
@@ -385,8 +464,12 @@ internal fun MapCompactPillChip(
             modifier = Modifier.heightIn(min = visualHeight),
             shape = CircleShape,
             color = containerColor,
-            border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor),
-            shadowElevation = 0.dp
+            border = if (isSelected && a11y.highContrastMode) {
+                BorderStroke(2.dp, borderColor)
+            } else {
+                campusCardBorder()
+            },
+            shadowElevation = campusCardElevation(1.dp)
         ) {
             Row(
                 modifier = Modifier

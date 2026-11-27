@@ -105,6 +105,113 @@ public extension UfopPdfParsers {
         )
     }
 
+    static func parseSyllabusAutoDetect(
+        text: String,
+        courses: [DisciplineSummaryCard],
+        semester: String = "2026.2"
+    ) -> SyllabusImportReport {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return SyllabusImportReport(
+                matchedCourse: false,
+                matchedCourseId: nil,
+                matchedCourseCode: nil,
+                matchedCourseTitle: nil,
+                extractedProfessor: "",
+                hasGradeDistribution: false,
+                hasAssessmentDates: false,
+                parsedAssessments: [],
+                warningMessage: nil,
+                errorMessage: "O PDF do plano de ensino está vazio ou ilegível."
+            )
+        }
+
+        let targetSem = semester.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activeCandidates = courses.filter {
+            targetSem.isEmpty || $0.semester.caseInsensitiveCompare(targetSem) == .orderedSame
+        }
+
+        guard !activeCandidates.isEmpty else {
+            return SyllabusImportReport(
+                matchedCourse: false,
+                matchedCourseId: nil,
+                matchedCourseCode: nil,
+                matchedCourseTitle: nil,
+                extractedProfessor: "",
+                hasGradeDistribution: false,
+                hasAssessmentDates: false,
+                parsedAssessments: [],
+                warningMessage: nil,
+                errorMessage: "Nenhuma disciplina matriculada neste semestre para vincular o plano."
+            )
+        }
+
+        let evals = activeCandidates.map { course in
+            (course: course, report: parseSyllabus(text: trimmed, targetCourseCode: course.code, targetCourseName: course.name, semester: targetSem))
+        }
+        let matched = evals.filter { $0.report.matchedCourse }
+
+        let codeMatched = matched.filter { pair in
+            guard let courseCode = extractRealCourseCode(pair.course.code)
+                ?? extractRealCourseCode(firstCapture(#"\b([A-Z]{2,4}\d{3,4}[A-Z]?)\b"#, in: pair.course.name) ?? ""),
+                  let detectedCode = pair.report.matchedCourseCode else {
+                return false
+            }
+            return courseCode.caseInsensitiveCompare(detectedCode) == .orderedSame
+        }
+
+        let winner: (course: DisciplineSummaryCard, report: SyllabusImportReport)
+        if codeMatched.count == 1 {
+            winner = codeMatched[0]
+        } else if matched.count == 1 {
+            winner = matched[0]
+        } else if matched.isEmpty {
+            let sample = evals[0].report
+            let info = [sample.matchedCourseCode, sample.matchedCourseTitle]
+                .compactMap { $0 }
+                .joined(separator: " · ")
+            let infoLabel = info.isEmpty ? "disciplina não reconhecida" : info
+            return SyllabusImportReport(
+                matchedCourse: false,
+                matchedCourseId: nil,
+                matchedCourseCode: sample.matchedCourseCode,
+                matchedCourseTitle: sample.matchedCourseTitle,
+                extractedProfessor: "",
+                hasGradeDistribution: false,
+                hasAssessmentDates: false,
+                parsedAssessments: [],
+                warningMessage: nil,
+                errorMessage: "Não foi possível vincular este Plano de Ensino (\(infoLabel)) a nenhuma disciplina matriculada. Nenhuma alteração foi feita."
+            )
+        } else {
+            return SyllabusImportReport(
+                matchedCourse: false,
+                matchedCourseId: nil,
+                matchedCourseCode: matched[0].report.matchedCourseCode,
+                matchedCourseTitle: matched[0].report.matchedCourseTitle,
+                extractedProfessor: "",
+                hasGradeDistribution: false,
+                hasAssessmentDates: false,
+                parsedAssessments: [],
+                warningMessage: nil,
+                errorMessage: "Mais de uma disciplina matriculada corresponde a este plano. Selecione a disciplina manualmente abaixo."
+            )
+        }
+
+        return SyllabusImportReport(
+            matchedCourse: true,
+            matchedCourseId: winner.course.id,
+            matchedCourseCode: winner.report.matchedCourseCode ?? extractRealCourseCode(winner.course.code),
+            matchedCourseTitle: winner.course.name,
+            extractedProfessor: winner.report.extractedProfessor,
+            hasGradeDistribution: winner.report.hasGradeDistribution,
+            hasAssessmentDates: winner.report.hasAssessmentDates,
+            parsedAssessments: winner.report.parsedAssessments,
+            warningMessage: winner.report.warningMessage,
+            errorMessage: nil
+        )
+    }
+
     static func parseTranscript(text: String) throws -> ParsedTranscriptResult {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines) }

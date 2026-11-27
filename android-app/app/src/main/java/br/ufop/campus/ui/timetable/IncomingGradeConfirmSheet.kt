@@ -41,6 +41,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.core.ffi.IncomingGradePreview
+import br.ufop.campus.ui.theme.CampusCardRadius
+import br.ufop.campus.ui.theme.CampusSheetRadius
+import br.ufop.campus.ui.theme.campusCardBorder
+import br.ufop.campus.ui.theme.campusCardElevation
+import br.ufop.campus.ui.theme.tabularNums
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +62,8 @@ internal fun IncomingGradeConfirmSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = CampusSheetRadius, topEnd = CampusSheetRadius)
     ) {
         Column(
             modifier = Modifier
@@ -152,9 +158,9 @@ internal fun IncomingGradeConfirmSheet(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                shape = RoundedCornerShape(CampusCardRadius),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = campusCardBorder()
             ) {
                 Row(
                     modifier = Modifier
@@ -207,9 +213,9 @@ internal fun IncomingGradeConfirmSheet(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                border = campusCardBorder()
             ) {
                 Row(
                     modifier = Modifier

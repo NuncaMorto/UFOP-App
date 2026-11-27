@@ -536,6 +536,12 @@ class InMemoryCampusRepository(
     override fun importCourseSyllabusDetailedText(courseId: String, rawText: String): SyllabusImportReport =
         importCourseSyllabusDetailedTextImpl(courseId, rawText)
 
+    override fun importSyllabusPdfAutoDetectCourse(semester: String, pdfBytes: ByteArray): SyllabusImportReport =
+        importSyllabusPdfAutoDetectCourseImpl(semester, pdfBytes)
+
+    override fun importSyllabusTextAutoDetectCourse(semester: String, rawText: String): SyllabusImportReport =
+        importSyllabusTextAutoDetectCourseImpl(semester, rawText)
+
     override fun importAcademicTranscriptPdf(pdfBytes: ByteArray): AcademicCreReport =
         importAcademicTranscriptPdfImpl(pdfBytes)
 
