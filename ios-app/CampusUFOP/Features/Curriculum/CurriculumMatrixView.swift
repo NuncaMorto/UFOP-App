@@ -531,8 +531,8 @@ public struct CurriculumMatrixView: View {
                 .minimumTouchTarget(appearance.accessibility.minTouchHeight)
 
                 if expanded {
-                    let matrixUrl = officialLinks?.officialMatrixUrl.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let driveUrl = officialLinks?.drivePdfUrl.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let matrixUrl = officialLinks?.officialMatrixUrl?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let driveUrl = officialLinks?.drivePdfUrl?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let minTouch = appearance.accessibility.minTouchHeight
                     let accessibleAccent = CampusTheme.accessibleTextColor(accent, scheme: colorScheme, accent: appearance.accentColor)
 
