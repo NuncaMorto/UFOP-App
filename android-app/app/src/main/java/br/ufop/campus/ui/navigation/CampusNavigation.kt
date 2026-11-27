@@ -81,12 +81,14 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.ufop.campus.core.ffi.CampusCoreRepository
@@ -624,6 +626,7 @@ private fun rememberCachedNavAvatarBitmap(
         key2 = avatarRefreshKey
     ) {
         value = if (avatarPath.isNullOrBlank()) {
+            navAvatarLatestByPath.clear()
             null
         } else {
             withContext(Dispatchers.IO) {
@@ -649,11 +652,20 @@ private fun FloatingVerticalCampusNavigationIsland(
 ) {
     val avatarBitmap = rememberCachedNavAvatarBitmap(avatarPath, avatarRefreshKey)
     val density = LocalDensity.current
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
     val capsuleBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
     val capsuleBorder = campusCardBorder(strokeWidth = 2.dp)
+    val pillBg = if (highContrast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh
     val activeAccentText = campusAccentTextColor()
+    val selectedContentColor = when {
+        highContrast -> MaterialTheme.colorScheme.onPrimary
+        isDark -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> activeAccentText
+    }
 
-    var lastPrimaryIndex by remember { mutableIntStateOf(0) }
+    var lastPrimaryIndex by rememberSaveable {
+        mutableIntStateOf(CampusTab.primaryTabs.indexOf(selectedTab).coerceAtLeast(0))
+    }
     val primaryIndex = CampusTab.primaryTabs.indexOf(selectedTab)
     val isPrimarySelected = primaryIndex >= 0
     val targetPrimaryIndex = if (isPrimarySelected) primaryIndex else lastPrimaryIndex
@@ -663,17 +675,17 @@ private fun FloatingVerticalCampusNavigationIsland(
         }
     }
 
-    val animatedIndex by animateFloatAsState(
+    val animatedIndexState = animateFloatAsState(
         targetValue = targetPrimaryIndex.toFloat(),
         animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
         label = "VerticalNavPillSlideIndex"
     )
-    val pillAlpha by animateFloatAsState(
+    val pillAlphaState = animateFloatAsState(
         targetValue = if (isPrimarySelected) 1f else 0f,
         animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
         label = "VerticalNavPillAlpha"
     )
-    val pillScale by animateFloatAsState(
+    val pillScaleState = animateFloatAsState(
         targetValue = if (isPrimarySelected) 1f else 0.86f,
         animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
         label = "VerticalNavPillScale"
@@ -707,13 +719,13 @@ private fun FloatingVerticalCampusNavigationIsland(
                         .fillMaxWidth()
                         .height(itemHeightDp)
                         .graphicsLayer {
-                            translationY = animatedIndex * (itemHeightPx + gapPx)
-                            scaleX = pillScale
-                            scaleY = pillScale
-                            alpha = pillAlpha
+                            translationY = animatedIndexState.value * (itemHeightPx + gapPx)
+                            scaleX = pillScaleState.value
+                            scaleY = pillScaleState.value
+                            alpha = pillAlphaState.value
                         }
                         .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .background(pillBg)
                 )
 
                 Column(
@@ -725,14 +737,14 @@ private fun FloatingVerticalCampusNavigationIsland(
                         val isSelected = selectedTab == tab
                         val itemColor by animateColorAsState(
                             targetValue = if (isSelected) {
-                                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
+                                selectedContentColor
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             animationSpec = if (reduceMotion) snap() else spring(),
                             label = "VerticalIslandContent_${tab.name}"
                         )
-                        val iconScale by animateFloatAsState(
+                        val iconScaleState = animateFloatAsState(
                             targetValue = if (isSelected) 1.08f else 1.0f,
                             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
                             label = "VerticalIslandIconScale_${tab.name}"
@@ -772,6 +784,7 @@ private fun FloatingVerticalCampusNavigationIsland(
                                         avatarBitmap = avatarBitmap,
                                         studentName = studentName,
                                         isSelected = isSelected,
+                                        highContrast = highContrast,
                                         contentColor = itemColor
                                     )
                                 } else {
@@ -782,8 +795,9 @@ private fun FloatingVerticalCampusNavigationIsland(
                                         modifier = Modifier
                                             .size(21.dp)
                                             .graphicsLayer {
-                                                scaleX = iconScale
-                                                scaleY = iconScale
+                                                val s = iconScaleState.value
+                                                scaleX = s
+                                                scaleY = s
                                             }
                                     )
                                 }
@@ -809,24 +823,24 @@ private fun FloatingVerticalCampusNavigationIsland(
         }
 
         val isMapSelected = selectedTab == CampusTab.MAP
-        val mapPillAlpha by animateFloatAsState(
+        val mapPillAlphaState = animateFloatAsState(
             targetValue = if (isMapSelected) 1f else 0f,
             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
             label = "VerticalIslandMapBtnAlpha"
         )
-        val mapPillScale by animateFloatAsState(
+        val mapPillScaleState = animateFloatAsState(
             targetValue = if (isMapSelected) 1f else 0.84f,
             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
             label = "VerticalIslandMapBtnScale"
         )
-        val mapIconScale by animateFloatAsState(
+        val mapIconScaleState = animateFloatAsState(
             targetValue = if (isMapSelected) 1.08f else 1.0f,
             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
             label = "VerticalIslandMapIconScale"
         )
         val mapIconColor by animateColorAsState(
             targetValue = if (isMapSelected) {
-                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
+                selectedContentColor
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
@@ -870,12 +884,13 @@ private fun FloatingVerticalCampusNavigationIsland(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = mapPillScale
-                            scaleY = mapPillScale
-                            alpha = mapPillAlpha
+                            val s = mapPillScaleState.value
+                            scaleX = s
+                            scaleY = s
+                            alpha = mapPillAlphaState.value
                         }
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .background(pillBg)
                 )
                 Icon(
                     imageVector = if (isMapSelected) CampusTab.MAP.selectedIcon else CampusTab.MAP.icon,
@@ -884,8 +899,9 @@ private fun FloatingVerticalCampusNavigationIsland(
                     modifier = Modifier
                         .size(24.dp)
                         .graphicsLayer {
-                            scaleX = mapIconScale
-                            scaleY = mapIconScale
+                            val s = mapIconScaleState.value
+                            scaleX = s
+                            scaleY = s
                         }
                 )
             }
@@ -908,11 +924,21 @@ private fun FloatingCampusNavigationBar(
 ) {
     val avatarBitmap = rememberCachedNavAvatarBitmap(avatarPath, avatarRefreshKey)
     val density = LocalDensity.current
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val highContrast = LocalCampusAccessibility.current.settings.highContrastMode
     val capsuleBg = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
     val capsuleBorder = campusCardBorder(strokeWidth = 2.dp)
+    val pillBg = if (highContrast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh
     val activeAccentText = campusAccentTextColor()
+    val selectedContentColor = when {
+        highContrast -> MaterialTheme.colorScheme.onPrimary
+        isDark -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> activeAccentText
+    }
 
-    var lastPrimaryIndex by remember { mutableIntStateOf(0) }
+    var lastPrimaryIndex by rememberSaveable {
+        mutableIntStateOf(CampusTab.primaryTabs.indexOf(selectedTab).coerceAtLeast(0))
+    }
     val primaryIndex = CampusTab.primaryTabs.indexOf(selectedTab)
     val isPrimarySelected = primaryIndex >= 0
     val targetPrimaryIndex = if (isPrimarySelected) primaryIndex else lastPrimaryIndex
@@ -922,17 +948,17 @@ private fun FloatingCampusNavigationBar(
         }
     }
 
-    val animatedIndex by animateFloatAsState(
+    val animatedIndexState = animateFloatAsState(
         targetValue = targetPrimaryIndex.toFloat(),
         animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
         label = "FloatingNavPillSlideIndex"
     )
-    val pillAlpha by animateFloatAsState(
+    val pillAlphaState = animateFloatAsState(
         targetValue = if (isPrimarySelected) 1f else 0f,
         animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
         label = "FloatingNavPillAlpha"
     )
-    val pillScale by animateFloatAsState(
+    val pillScaleState = animateFloatAsState(
         targetValue = if (isPrimarySelected) 1f else 0.86f,
         animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
         label = "FloatingNavPillScale"
@@ -964,19 +990,21 @@ private fun FloatingCampusNavigationBar(
                 val totalWidthPx = constraints.maxWidth.toFloat()
                 val slotWidthPx = ((totalWidthPx - gapPx * (tabCount - 1)) / tabCount).coerceAtLeast(0f)
                 val slotWidthDp = with(density) { slotWidthPx.toDp() }
+                val rtlSign = if (isRtl) -1f else 1f
 
                 Box(
                     modifier = Modifier
                         .width(slotWidthDp)
                         .fillMaxHeight()
                         .graphicsLayer {
-                            translationX = animatedIndex * (slotWidthPx + gapPx)
-                            scaleX = pillScale
-                            scaleY = pillScale
-                            alpha = pillAlpha
+                            translationX = rtlSign * animatedIndexState.value * (slotWidthPx + gapPx)
+                            val s = pillScaleState.value
+                            scaleX = s
+                            scaleY = s
+                            alpha = pillAlphaState.value
                         }
                         .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .background(pillBg)
                 )
 
                 Row(
@@ -988,14 +1016,14 @@ private fun FloatingCampusNavigationBar(
                         val isSelected = selectedTab == tab
                         val itemColor by animateColorAsState(
                             targetValue = if (isSelected) {
-                                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
+                                selectedContentColor
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             animationSpec = if (reduceMotion) snap() else spring(),
                             label = "FloatingNavContent_${tab.name}"
                         )
-                        val iconScale by animateFloatAsState(
+                        val iconScaleState = animateFloatAsState(
                             targetValue = if (isSelected) 1.08f else 1.0f,
                             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
                             label = "FloatingNavIconScale_${tab.name}"
@@ -1035,6 +1063,7 @@ private fun FloatingCampusNavigationBar(
                                         avatarBitmap = avatarBitmap,
                                         studentName = studentName,
                                         isSelected = isSelected,
+                                        highContrast = highContrast,
                                         contentColor = itemColor
                                     )
                                 } else {
@@ -1045,8 +1074,9 @@ private fun FloatingCampusNavigationBar(
                                         modifier = Modifier
                                             .size(21.dp)
                                             .graphicsLayer {
-                                                scaleX = iconScale
-                                                scaleY = iconScale
+                                                val s = iconScaleState.value
+                                                scaleX = s
+                                                scaleY = s
                                             }
                                     )
                                 }
@@ -1072,24 +1102,24 @@ private fun FloatingCampusNavigationBar(
         }
 
         val isMapSelected = selectedTab == CampusTab.MAP
-        val mapPillAlpha by animateFloatAsState(
+        val mapPillAlphaState = animateFloatAsState(
             targetValue = if (isMapSelected) 1f else 0f,
             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
             label = "FloatingMapBtnAlpha"
         )
-        val mapPillScale by animateFloatAsState(
+        val mapPillScaleState = animateFloatAsState(
             targetValue = if (isMapSelected) 1f else 0.84f,
             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
             label = "FloatingMapBtnScale"
         )
-        val mapIconScale by animateFloatAsState(
+        val mapIconScaleState = animateFloatAsState(
             targetValue = if (isMapSelected) 1.08f else 1.0f,
             animationSpec = if (reduceMotion) snap() else NAV_SPRING_SPEC,
             label = "FloatingMapIconScale"
         )
         val mapIconColor by animateColorAsState(
             targetValue = if (isMapSelected) {
-                if (isDark) MaterialTheme.colorScheme.onPrimaryContainer else activeAccentText
+                selectedContentColor
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
@@ -1133,12 +1163,13 @@ private fun FloatingCampusNavigationBar(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = mapPillScale
-                            scaleY = mapPillScale
-                            alpha = mapPillAlpha
+                            val s = mapPillScaleState.value
+                            scaleX = s
+                            scaleY = s
+                            alpha = mapPillAlphaState.value
                         }
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .background(pillBg)
                 )
                 Icon(
                     imageVector = if (isMapSelected) CampusTab.MAP.selectedIcon else CampusTab.MAP.icon,
@@ -1147,8 +1178,9 @@ private fun FloatingCampusNavigationBar(
                     modifier = Modifier
                         .size(24.dp)
                         .graphicsLayer {
-                            scaleX = mapIconScale
-                            scaleY = mapIconScale
+                            val s = mapIconScaleState.value
+                            scaleX = s
+                            scaleY = s
                         }
                 )
             }
@@ -1161,13 +1193,15 @@ private fun ProfileTabAvatarIcon(
     avatarBitmap: ImageBitmap?,
     studentName: String,
     isSelected: Boolean,
+    highContrast: Boolean,
     contentColor: Color
 ) {
+    val activeAccentText = campusAccentTextColor()
     val ringWidth = if (isSelected) 2.dp else 1.dp
-    val ringColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
+    val ringColor = when {
+        isSelected && highContrast -> contentColor
+        isSelected -> activeAccentText
+        else -> MaterialTheme.colorScheme.outlineVariant
     }
     val initials = remember(studentName) { extractNavInitials(studentName) }
 
@@ -1177,7 +1211,11 @@ private fun ProfileTabAvatarIcon(
             .clip(CircleShape)
             .background(
                 if (isSelected) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                    if (highContrast) {
+                        contentColor.copy(alpha = 0.16f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                    }
                 } else {
                     MaterialTheme.colorScheme.surfaceVariant
                 }
@@ -1202,7 +1240,7 @@ private fun ProfileTabAvatarIcon(
                     fontSize = 10.sp,
                     lineHeight = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else contentColor,
+                    color = if (isSelected && !highContrast) activeAccentText else contentColor,
                     maxLines = 1,
                     softWrap = false
                 )
@@ -1234,7 +1272,7 @@ private fun decodeNavAvatarBitmapCached(path: String, maxSizePx: Int = 96): Imag
         navAvatarLatestByPath.remove(path)
         return null
     }
-    val key = "$path:${file.lastModified()}:$maxSizePx"
+    val key = "$path:${file.lastModified()}:${file.length()}:$maxSizePx"
     navAvatarBitmapCache.get(key)?.let { hit ->
         navAvatarLatestByPath[path] = hit
         return hit

@@ -12,8 +12,10 @@ internal struct ProfileStudentIdentityCard: View {
     var onEditProfile: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(CampusAppearanceController.self) private var appearance: CampusAppearanceController?
 
     var body: some View {
+        let activePalette = appearance?.accentColor ?? .red
         let displayName = profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "Estudante"
             : profile.fullName
@@ -37,7 +39,7 @@ internal struct ProfileStudentIdentityCard: View {
                     )
                 Text(initials.isEmpty ? "VA" : initials)
                     .font(CampusTheme.font(size: 19, weight: .bold))
-                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                    .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme, accent: activePalette))
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -56,7 +58,7 @@ internal struct ProfileStudentIdentityCard: View {
                 if !regLabel.isEmpty {
                     Text(regLabel)
                         .font(CampusTheme.tabularFont(size: 12, weight: .semibold))
-                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme))
+                        .foregroundStyle(CampusTheme.accessibleTextColor(primaryAccent, scheme: colorScheme, accent: activePalette))
                         .lineLimit(1)
                 }
             }
@@ -73,7 +75,7 @@ internal struct ProfileStudentIdentityCard: View {
                         .frame(width: minTouch, height: minTouch)
                         .background(
                             Circle()
-                                .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: highContrast))
+                                .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: highContrast, accent: activePalette))
                         )
                         .overlay {
                             if highContrast {
@@ -694,7 +696,7 @@ internal struct ProfileEditSheetView: View {
                                 .padding(.vertical, 10)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc, accent: appearance.accentColor))
                                 )
                         }
 
@@ -708,7 +710,7 @@ internal struct ProfileEditSheetView: View {
                                 .padding(.vertical, 10)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                        .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc, accent: appearance.accentColor))
                                 )
                         }
 
@@ -738,7 +740,7 @@ internal struct ProfileEditSheetView: View {
                                     .padding(.vertical, 10)
                                     .background(
                                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                            .fill(CampusTheme.secondarySurface(for: colorScheme, highContrast: hc, accent: appearance.accentColor))
                                     )
                             }
                         }

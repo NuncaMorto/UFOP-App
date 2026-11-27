@@ -101,6 +101,11 @@ private struct CampusRootCoordinatorView: View {
         }
         .tint(accent)
         .modifier(AccessibilityRootModifier(accessibility: appearance.accessibility))
+        .onAppear {
+            if appearance.attendanceIndicatorStyle != store.attendanceIndicatorStyle {
+                appearance.attendanceIndicatorStyle = store.attendanceIndicatorStyle
+            }
+        }
         .task {
             Task.detached(priority: .utility) {
                 _ = UfopCurriculumCatalog.allCourses

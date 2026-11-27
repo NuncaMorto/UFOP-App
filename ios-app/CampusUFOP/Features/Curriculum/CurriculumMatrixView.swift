@@ -551,8 +551,8 @@ public struct CurriculumMatrixView: View {
                                             .font(CampusTheme.font(size: 12, weight: .bold))
                                             .lineLimit(1)
                                             .foregroundStyle(accessibleAccent)
-                                            .frame(maxWidth: .infinity, minHeight: minTouch)
                                             .padding(.horizontal, 10)
+                                            .frame(maxWidth: .infinity, minHeight: minTouch)
                                             .liquidGlassCapsule(selected: false, accent: accent, interactive: true, highContrast: highContrast)
                                     }
                                     .buttonStyle(.plain)
@@ -567,8 +567,8 @@ public struct CurriculumMatrixView: View {
                                             .font(CampusTheme.font(size: 12, weight: .bold))
                                             .lineLimit(1)
                                             .foregroundStyle(accessibleAccent)
-                                            .frame(maxWidth: .infinity, minHeight: minTouch)
                                             .padding(.horizontal, 10)
+                                            .frame(maxWidth: .infinity, minHeight: minTouch)
                                             .liquidGlassCapsule(selected: false, accent: accent, interactive: true, highContrast: highContrast)
                                     }
                                     .buttonStyle(.plain)
@@ -620,9 +620,18 @@ public struct CurriculumMatrixView: View {
                 Label("Abrir oficial", systemImage: "arrow.up.right.square")
                     .font(CampusTheme.font(size: 12, weight: .bold))
                     .foregroundStyle(accessibleAccent)
-                    .frame(maxWidth: .infinity, minHeight: minTouch)
                     .padding(.horizontal, 12)
-                    .liquidGlassCapsule(selected: false, accent: accent, interactive: true, highContrast: highContrast)
+                    .frame(maxWidth: .infinity, minHeight: minTouch)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(CampusTheme.cardBackground(for: colorScheme, highContrast: highContrast, accent: appearance.accentColor))
+                    )
+                    .overlay {
+                        if highContrast {
+                            Capsule(style: .continuous)
+                                .strokeBorder(CampusTheme.cardBorder(for: colorScheme, highContrast: true), lineWidth: 1.5)
+                        }
+                    }
             }
             .buttonStyle(.plain)
             .minimumTouchTarget(minTouch)

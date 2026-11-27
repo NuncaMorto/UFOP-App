@@ -841,7 +841,6 @@ class CampusEngineBridgeRepository(
 
     override fun setAttendanceIndicatorStyle(style: String): Unit = synchronized(lock) {
         fallback.setAttendanceIndicatorStyle(style)
-        _mutationVersion.value += 1L
     }
 
     override fun getSelectedCurriculumVersion(courseCode: String): String? = synchronized(lock) {
@@ -850,7 +849,6 @@ class CampusEngineBridgeRepository(
 
     override fun setSelectedCurriculumVersion(courseCode: String, version: String): Unit = synchronized(lock) {
         fallback.setSelectedCurriculumVersion(courseCode, version)
-        _mutationVersion.value += 1L
     }
 
     override fun getAllSelectedCurriculumVersions(): Map<String, String> = synchronized(lock) {

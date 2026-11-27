@@ -62,6 +62,7 @@ import br.ufop.campus.core.ffi.FriendScheduleInfo
 import br.ufop.campus.core.ffi.StudentProfile
 import br.ufop.campus.ui.theme.CampusPillRadius
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusAccentTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.campusCardElevation
 
@@ -310,7 +311,7 @@ private fun SemesterSelectorDropdown(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = "Semestre ativo",
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = campusAccentTextColor(),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -348,10 +349,9 @@ private fun TimetableToolbarIconButton(
         },
         state = rememberTooltipState()
     ) {
-        Surface(
+        Box(
             modifier = Modifier
-                .minimumInteractiveComponentSize()
-                .size(visualSize)
+                .defaultMinSize(minWidth = minTouchTarget, minHeight = minTouchTarget)
                 .clip(CircleShape)
                 .semantics(mergeDescendants = true) {
                     selected = isActive
@@ -359,25 +359,30 @@ private fun TimetableToolbarIconButton(
                     contentDescription = contentDescriptionText
                 }
                 .clickable(onClickLabel = onClickLabel, onClick = onClick),
-            shape = CircleShape,
-            color = if (isActive) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            border = campusCardBorder()
+            contentAlignment = Alignment.Center
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(if (minTouchTarget >= 56.dp) 22.dp else 18.dp),
-                    tint = if (isActive) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
+            Surface(
+                modifier = Modifier.size(visualSize),
+                shape = CircleShape,
+                color = if (isActive) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                border = campusCardBorder()
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(if (minTouchTarget >= 56.dp) 22.dp else 18.dp),
+                        tint = if (isActive) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
             }
         }
     }
@@ -408,7 +413,7 @@ private fun TimetableToolbarChip(
             .clickable(onClickLabel = onClickLabel, onClick = onClick),
         shape = RoundedCornerShape(CampusPillRadius),
         color = if (isActive) {
-            MaterialTheme.colorScheme.primaryContainer
+            MaterialTheme.colorScheme.primary
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         },
@@ -427,7 +432,7 @@ private fun TimetableToolbarChip(
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = if (isActive) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    MaterialTheme.colorScheme.onPrimary
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 }
@@ -437,7 +442,7 @@ private fun TimetableToolbarChip(
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isActive) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    MaterialTheme.colorScheme.onPrimary
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },

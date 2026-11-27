@@ -742,6 +742,13 @@ fun StudentOnboardingOverlay(
                                 )
                                 themeController.selectAccentColor(restoredAccent)
 
+                                val restoredAttendanceStyle = CampusRepositoryHolder.saveAttendanceIndicatorStyle(
+                                    context = context,
+                                    repository = repository,
+                                    style = repository.getAttendanceIndicatorStyle()
+                                )
+                                themeController.selectAttendanceIndicatorStyle(restoredAttendanceStyle)
+
                                 val restoredA11y = repository.getAccessibilitySettings()
                                 CampusRepositoryHolder.saveAccessibilitySettings(
                                     context,

@@ -134,7 +134,7 @@ private fun ProfilePersonalizationSubView(
                 trailing = {
                     RadioButton(
                         selected = isBadgeSelected,
-                        onClick = { onSelectAttendanceIndicatorStyle("BADGE") }
+                        onClick = null
                     )
                 }
             )
@@ -152,7 +152,7 @@ private fun ProfilePersonalizationSubView(
                 trailing = {
                     RadioButton(
                         selected = !isBadgeSelected,
-                        onClick = { onSelectAttendanceIndicatorStyle("CARD_BORDER") }
+                        onClick = null
                     )
                 }
             )

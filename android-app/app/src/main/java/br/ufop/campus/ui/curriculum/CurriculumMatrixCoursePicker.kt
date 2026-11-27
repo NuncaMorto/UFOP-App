@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -55,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +75,7 @@ import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.StatusCancelledAmber
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusAccentTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.tabularNums
@@ -131,11 +134,18 @@ internal fun CurriculumMatrixTopBar(
         }
 
         Column(modifier = Modifier.weight(1f)) {
+            val formattedHeaderVersion = selectedCourse?.let {
+                formatCurriculumVersionLabel(
+                    it.curriculumVersion,
+                    it.effectiveFromYear,
+                    it.effectiveFromSemester
+                )
+            } ?: "2026/2"
             Text(
-                text = "MATRIZ CURRICULAR · ${selectedCourse?.curriculumVersion?.ifBlank { "2026/2" } ?: "2026/2"}",
+                text = "MATRIZ CURRICULAR · $formattedHeaderVersion",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = campusAccentTextColor()
             )
             Text(
                 text = selectedCourse?.let { "${it.code} · ${normalizeCurriculumDisplayName(it.name)}" } ?: "Carregando matrizes...",
@@ -182,6 +192,7 @@ internal fun CurriculumVersionDropdownSelector(
     onSelectVersion: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val accentText = campusAccentTextColor()
     val activeVersion = availableVersions.firstOrNull { it.curriculumVersion == selectedCurriculumVersion }
         ?: availableVersions.firstOrNull()
     val selectedLabel = activeVersion?.let {
@@ -218,7 +229,7 @@ internal fun CurriculumVersionDropdownSelector(
                 Icon(
                     imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = "Selecionar versão da matriz",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accentText,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -243,7 +254,7 @@ internal fun CurriculumVersionDropdownSelector(
                             style = MaterialTheme.typography.bodyMedium.tabularNums(),
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = if (isSelected) {
-                                MaterialTheme.colorScheme.primary
+                                accentText
                             } else {
                                 MaterialTheme.colorScheme.onSurface
                             }
@@ -254,7 +265,7 @@ internal fun CurriculumVersionDropdownSelector(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = "Selecionado",
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = accentText,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -475,6 +486,10 @@ internal fun CurriculumLegacyReferencesCard(
                     val matrixUrl = officialLinks?.officialMatrixUrl?.takeIf { it.isNotBlank() }
                     val driveUrl = officialLinks?.drivePdfUrl?.takeIf { it.isNotBlank() }
                     if (matrixUrl != null || driveUrl != null) {
+                        val footerButtonColors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = campusAccentTextColor()
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -486,6 +501,8 @@ internal fun CurriculumLegacyReferencesCard(
                                         .weight(1f)
                                         .defaultMinSize(minHeight = minTouchTarget),
                                     shape = RoundedCornerShape(CampusPillRadius),
+                                    colors = footerButtonColors,
+                                    border = campusCardBorder(),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                                 ) {
                                     Icon(
@@ -508,6 +525,8 @@ internal fun CurriculumLegacyReferencesCard(
                                         .weight(1f)
                                         .defaultMinSize(minHeight = minTouchTarget),
                                     shape = RoundedCornerShape(CampusPillRadius),
+                                    colors = footerButtonColors,
+                                    border = campusCardBorder(),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                                 ) {
                                     Icon(
@@ -600,6 +619,11 @@ private fun LegacyReferenceItemRow(
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = minTouchTarget),
                 shape = RoundedCornerShape(CampusPillRadius),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = campusAccentTextColor()
+                ),
+                border = campusCardBorder(),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Icon(
@@ -632,7 +656,8 @@ internal fun CourseWorkloadSummaryCard(
     val approvedCount = evaluatedSubjects.count { it.status == SubjectProgressStatus.APPROVED }
     val inProgressCount = evaluatedSubjects.count { it.status == SubjectProgressStatus.IN_PROGRESS }
     val campusColor = accessibleTextColor(DepartmentMathBlue, isDark)
-    var isSummaryExpanded by rememberSaveable(course.code, course.curriculumVersion) {
+    val accentText = campusAccentTextColor()
+    var isSummaryExpanded by rememberSaveable(course.code) {
         mutableStateOf(false)
     }
 
@@ -654,7 +679,15 @@ internal fun CourseWorkloadSummaryCard(
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = minTouchTarget)
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { isSummaryExpanded = !isSummaryExpanded }
+                    .semantics(mergeDescendants = true) {}
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = if (isSummaryExpanded) {
+                            "Recolher detalhes do curso"
+                        } else {
+                            "Expandir detalhes do curso"
+                        }
+                    ) { isSummaryExpanded = !isSummaryExpanded }
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -692,7 +725,6 @@ internal fun CourseWorkloadSummaryCard(
                 }
 
                 Surface(
-                    onClick = { isSummaryExpanded = !isSummaryExpanded },
                     modifier = Modifier.size(minTouchTarget),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -705,12 +737,8 @@ internal fun CourseWorkloadSummaryCard(
                             } else {
                                 Icons.Default.KeyboardArrowDown
                             },
-                            contentDescription = if (isSummaryExpanded) {
-                                "Recolher detalhes do curso"
-                            } else {
-                                "Expandir detalhes do curso"
-                            },
-                            tint = MaterialTheme.colorScheme.primary,
+                            contentDescription = null,
+                            tint = accentText,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -865,17 +893,18 @@ private fun WorkloadPill(
     Surface(
         shape = RoundedCornerShape(CampusPillRadius),
         color = if (highlighted) {
-            MaterialTheme.colorScheme.primaryContainer
+            MaterialTheme.colorScheme.primary
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
-        }
+        },
+        border = campusCardBorder()
     ) {
         Text(
             text = "$label ${formatHoursPtBr(hours)}h",
             style = MaterialTheme.typography.labelSmall.tabularNums(),
             fontWeight = if (highlighted) FontWeight.Bold else FontWeight.Medium,
             color = if (highlighted) {
-                MaterialTheme.colorScheme.onPrimaryContainer
+                MaterialTheme.colorScheme.onPrimary
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },

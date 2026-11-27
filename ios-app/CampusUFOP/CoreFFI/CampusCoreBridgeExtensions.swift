@@ -234,7 +234,7 @@ public extension CampusStore {
                 continue
             }
 
-            applySnapshot(decoded)
+            applySnapshot(decoded, resetMissingOptionalFields: false)
             persistenceBlockedDueToLoadError = false
             persistenceLoadErrorMessage = nil
             quarantinedStateFilenames = []
@@ -356,7 +356,7 @@ public extension CampusStore {
             throw CampusCryptoError.invalidBackupFormat
         }
         let decoded = try JSONDecoder().decode(PersistedCampusState.self, from: data)
-        applySnapshot(decoded)
+        applySnapshot(decoded, resetMissingOptionalFields: true)
         persistenceBlockedDueToLoadError = false
         persistenceLoadErrorMessage = nil
         quarantinedStateFilenames = []
@@ -394,7 +394,7 @@ public extension CampusStore {
         _ = applyRoomAllocationCatalog()
     }
 
-    private func applySnapshot(_ snapshot: PersistedCampusState) {
+    private func applySnapshot(_ snapshot: PersistedCampusState, resetMissingOptionalFields: Bool = false) {
         self.studentProfile = snapshot.studentProfile
         self.selectedSemesterFilter = snapshot.selectedSemesterFilter.isEmpty ? "2026.2" : snapshot.selectedSemesterFilter
         _ = setActiveCampus(campusId: snapshot.activeCampusId)
@@ -415,6 +415,9 @@ public extension CampusStore {
             let normalized = Self.normalizeAttendanceIndicatorStyle(restoredStyle)
             self.attendanceIndicatorStyle = normalized
             UserDefaults.standard.set(normalized, forKey: "campus.ufop.attendanceIndicatorStyle")
+        } else if resetMissingOptionalFields {
+            self.attendanceIndicatorStyle = "BADGE"
+            UserDefaults.standard.set("BADGE", forKey: "campus.ufop.attendanceIndicatorStyle")
         }
         if let restoredVersions = snapshot.selectedCurriculumVersionsByCourse {
             var normalized: [String: String] = [:]
@@ -427,6 +430,9 @@ public extension CampusStore {
             }
             self.selectedCurriculumVersionsByCourse = normalized
             UserDefaults.standard.set(normalized, forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
+        } else if resetMissingOptionalFields {
+            self.selectedCurriculumVersionsByCourse = [:]
+            UserDefaults.standard.removeObject(forKey: "campus.ufop.selectedCurriculumVersionsByCourse")
         }
         if let activeFriendId = selectedFriendScheduleId,
            !self.friendSchedules.contains(where: { $0.id == activeFriendId }) {

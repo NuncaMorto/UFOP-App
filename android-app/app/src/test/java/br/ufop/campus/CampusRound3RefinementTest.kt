@@ -1,6 +1,7 @@
 package br.ufop.campus
 
 import androidx.compose.ui.graphics.Color
+import br.ufop.campus.core.ffi.CampusRepositoryHolder
 import br.ufop.campus.core.ffi.InMemoryCampusRepository
 import br.ufop.campus.core.ffi.extractDepartmentAcronym
 import br.ufop.campus.ui.curriculum.formatCurriculumVersionLabel
@@ -188,5 +189,57 @@ class CampusRound3RefinementTest {
         val fallbackB = parseHexColor("invalid", fallback = Color.Blue)
         assertEquals(Color.Red, fallbackA)
         assertEquals(Color.Blue, fallbackB)
+    }
+
+    @Test
+    fun legacySnapshot_resetsAttendanceIndicatorStyleAndCurriculumVersions() {
+        val sourceRepo = InMemoryCampusRepository(
+            stateFile = File(tempFolder.root, "legacy_source_state.json")
+        )
+        val legacyJson = JSONObject(sourceRepo.exportFullAccountSnapshotJson()).apply {
+            remove("attendanceIndicatorStyle")
+            remove("selectedCurriculumVersionsByCourse")
+        }.toString()
+
+        val targetRepo = InMemoryCampusRepository(
+            stateFile = File(tempFolder.root, "legacy_target_state.json")
+        )
+        targetRepo.setAttendanceIndicatorStyle("CARD_BORDER")
+        targetRepo.setSelectedCurriculumVersion("BCC", "2026/2 (currículo 3)")
+
+        assertTrue(targetRepo.restoreFullAccountSnapshotJson(legacyJson))
+        assertEquals("BADGE", targetRepo.getAttendanceIndicatorStyle())
+        assertTrue(targetRepo.getAllSelectedCurriculumVersions().isEmpty())
+    }
+
+    @Test
+    fun repositoryHolder_attendanceIndicatorStylePrefsHelpers_normalizeAndFallback() {
+        val repo = InMemoryCampusRepository(
+            stateFile = File(tempFolder.root, "holder_prefs_fallback.json")
+        )
+        assertEquals(
+            "BADGE",
+            CampusRepositoryHolder.loadSavedAttendanceIndicatorStyleFromPrefs(null, repo)
+        )
+
+        val savedBorder = CampusRepositoryHolder.saveAttendanceIndicatorStyleToPrefs(
+            prefs = null,
+            repository = repo,
+            style = "  card_border  "
+        )
+        assertEquals("CARD_BORDER", savedBorder)
+        assertEquals("CARD_BORDER", repo.getAttendanceIndicatorStyle())
+        assertEquals(
+            "CARD_BORDER",
+            CampusRepositoryHolder.loadSavedAttendanceIndicatorStyleFromPrefs(null, repo)
+        )
+
+        val savedFallback = CampusRepositoryHolder.saveAttendanceIndicatorStyleToPrefs(
+            prefs = null,
+            repository = repo,
+            style = "INVALID_STYLE"
+        )
+        assertEquals("BADGE", savedFallback)
+        assertEquals("BADGE", repo.getAttendanceIndicatorStyle())
     }
 }

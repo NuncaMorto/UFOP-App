@@ -449,6 +449,7 @@ internal fun rememberAvatarBitmap(avatarPath: String?, revision: Int = 0): Image
     }
     val state = produceState<ImageBitmap?>(initialValue = initialCached, key1 = cleanPath, key2 = revision) {
         if (cleanPath == null) {
+            avatarLatestByPath.clear()
             value = null
             return@produceState
         }
@@ -458,7 +459,7 @@ internal fun rememberAvatarBitmap(avatarPath: String?, revision: Int = 0): Image
                 avatarLatestByPath.remove(cleanPath)
                 return@withContext null
             }
-            val cacheKey = "$cleanPath:${file.lastModified()}:$revision"
+            val cacheKey = "$cleanPath:${file.lastModified()}:${file.length()}:$revision"
             avatarBitmapCache.get(cacheKey)?.let { hit ->
                 avatarLatestByPath[cleanPath] = hit
                 return@withContext hit

@@ -77,6 +77,7 @@ import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleContentColorOn
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusAccentTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.campusCardElevation
 import br.ufop.campus.ui.theme.tabularNums
@@ -352,7 +353,7 @@ internal fun AcademicIdentityCard(
                         text = regLabel,
                         style = MaterialTheme.typography.labelSmall.tabularNums(),
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = campusAccentTextColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

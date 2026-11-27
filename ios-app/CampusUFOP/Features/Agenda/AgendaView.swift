@@ -632,34 +632,37 @@ public struct AgendaView: View {
                                 .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                         }
 
-                        HStack(spacing: 8) {
-                            if !item.professor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                Text(item.professor)
-                                    .font(CampusTheme.font(size: 12, weight: .regular))
-                                    .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
-                            }
-
-                            Spacer()
-
-                            if item.isCustomCommitment {
-                                Button(role: .destructive) {
-                                    commitmentToDelete = item
-                                } label: {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "trash")
-                                            .font(.system(size: 11, weight: .semibold))
-                                        Text("Excluir")
-                                            .font(CampusTheme.font(size: 11, weight: .semibold))
-                                    }
-                                    .foregroundStyle(Color(hex: 0xEF4444))
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 5)
-                                    .background(Capsule().fill(Color(hex: 0xEF4444).opacity(0.12)))
+                        let cleanProfessor = item.professor.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !cleanProfessor.isEmpty || item.isCustomCommitment || !useBorderIndicator {
+                            HStack(spacing: 8) {
+                                if !cleanProfessor.isEmpty {
+                                    Text(cleanProfessor)
+                                        .font(CampusTheme.font(size: 12, weight: .regular))
+                                        .foregroundStyle(CampusTheme.mutedText(for: colorScheme, highContrast: hc))
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Excluir compromisso \(item.title)")
-                            } else if !useBorderIndicator {
-                                statusBadge(for: item.attendanceStatus)
+
+                                Spacer()
+
+                                if item.isCustomCommitment {
+                                    Button(role: .destructive) {
+                                        commitmentToDelete = item
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: 11, weight: .semibold))
+                                            Text("Excluir")
+                                                .font(CampusTheme.font(size: 11, weight: .semibold))
+                                        }
+                                        .foregroundStyle(Color(hex: 0xEF4444))
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 5)
+                                        .background(Capsule().fill(Color(hex: 0xEF4444).opacity(0.12)))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Excluir compromisso \(item.title)")
+                                } else if !useBorderIndicator {
+                                    statusBadge(for: item.attendanceStatus)
+                                }
                             }
                         }
                     }
@@ -668,6 +671,13 @@ public struct AgendaView: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(a11yDescription)
+            .accessibilityActions {
+                if item.isCustomCommitment {
+                    Button("Excluir compromisso", role: .destructive) {
+                        commitmentToDelete = item
+                    }
+                }
+            }
             .campusHoverLift()
         }
     }

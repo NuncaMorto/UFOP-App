@@ -751,16 +751,16 @@ public struct TimetableGridView: View {
                             .font(CampusTheme.font(size: 11, weight: .bold))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(isToday ? resolvedAccent.onPrimary(for: colorScheme) : CampusTheme.primaryText(for: colorScheme, highContrast: hc))
-                            .frame(width: 58, height: 74)
+                            .frame(width: 58, height: verticalCellHeight)
                             .background(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(isToday ? primary : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc))
+                                    .fill(isToday ? primary : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc, accent: resolvedAccent))
                             )
 
                         ForEach(timeRanges, id: \.self) { range in
                             let match = slots.first { $0.weekdayShort == day && $0.timeRange == range }
                             gridCellView(cell: match, isTodayColumn: isToday, isFriendMode: isFriendMode)
-                                .frame(width: horizontalColWidth, height: 74)
+                                .frame(width: horizontalColWidth, height: verticalCellHeight)
                         }
                     }
                 }
@@ -819,7 +819,7 @@ public struct TimetableGridView: View {
                 .fill(
                     isTodayColumn
                         ? resolvedAccent.primary(for: colorScheme).opacity(colorScheme == .dark ? 0.08 : 0.05)
-                        : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc).opacity(0.45)
+                        : CampusTheme.secondarySurface(for: colorScheme, highContrast: hc, accent: resolvedAccent).opacity(0.45)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)

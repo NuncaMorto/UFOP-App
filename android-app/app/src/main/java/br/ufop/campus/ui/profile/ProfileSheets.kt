@@ -79,6 +79,7 @@ import br.ufop.campus.ui.theme.LocalCampusThemeController
 import br.ufop.campus.ui.theme.StatusAbsentRed
 import br.ufop.campus.ui.theme.StatusAttendingGreen
 import br.ufop.campus.ui.theme.accessibleTextColor
+import br.ufop.campus.ui.theme.campusAccentTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -338,6 +339,7 @@ internal fun EditStudentProfileBottomSheet(
             )
 
             var campusDropdownExpanded by remember { mutableStateOf(false) }
+            val campusAccentText = campusAccentTextColor()
             Box(modifier = Modifier.fillMaxWidth()) {
                 Surface(
                     onClick = { campusDropdownExpanded = true },
@@ -372,7 +374,7 @@ internal fun EditStudentProfileBottomSheet(
                                 Icons.Default.KeyboardArrowDown
                             },
                             contentDescription = "Selecionar campus universitário",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = campusAccentText,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -391,7 +393,7 @@ internal fun EditStudentProfileBottomSheet(
                                     text = campus,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) {
-                                        MaterialTheme.colorScheme.primary
+                                        campusAccentText
                                     } else {
                                         MaterialTheme.colorScheme.onSurface
                                     }
@@ -402,7 +404,7 @@ internal fun EditStudentProfileBottomSheet(
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Selecionado",
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = campusAccentText,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }

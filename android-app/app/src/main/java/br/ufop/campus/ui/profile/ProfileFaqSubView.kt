@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.ufop.campus.ui.theme.CampusCardRadius
 import br.ufop.campus.ui.theme.CampusPillRadius
+import br.ufop.campus.ui.theme.campusAccentTextColor
 import br.ufop.campus.ui.theme.campusCardBorder
 import br.ufop.campus.ui.theme.campusCardElevation
 
@@ -141,6 +143,7 @@ private val GitHubOctocatIcon: ImageVector by lazy {
 internal fun ProfileFaqSubView() {
     val context = LocalContext.current
     val minTouchTarget = campusMinTouchTarget()
+    val accentText = campusAccentTextColor()
     val expandedIds = remember { mutableStateMapOf<String, Boolean>() }
 
     Column(
@@ -150,8 +153,8 @@ internal fun ProfileFaqSubView() {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(CampusCardRadius),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = campusCardElevation(2.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = campusCardElevation(1.dp),
             border = campusCardBorder()
         ) {
             Column(
@@ -167,14 +170,14 @@ internal fun ProfileFaqSubView() {
                     Icon(
                         imageVector = GitHubOctocatIcon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = accentText,
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
                         text = "AVISO DE INDEPENDÊNCIA",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = accentText,
                         modifier = Modifier.semantics { heading() }
                     )
                 }
@@ -200,7 +203,12 @@ internal fun ProfileFaqSubView() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = minTouchTarget),
-                    shape = RoundedCornerShape(CampusPillRadius)
+                    shape = RoundedCornerShape(CampusPillRadius),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = accentText
+                    ),
+                    border = campusCardBorder()
                 ) {
                     Icon(
                         imageVector = GitHubOctocatIcon,
